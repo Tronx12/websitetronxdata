@@ -1,6 +1,6 @@
-// app/api/teamlead/attendance/route.js
+// app/api/teamlead/attendance/route.ts
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { connectDB } from "@/config/db";
 import Team from "@/models/Team";
@@ -32,7 +32,7 @@ async function getTeamLeadScope() {
 
   const memberIds = Array.from(
     new Set(
-      teams.flatMap((t) => (t.members || []).map((m) => String(m)))
+      teams.flatMap((t: any) => (t.members || []).map((m: any) => String(m)))
     )
   );
 
@@ -42,12 +42,12 @@ async function getTeamLeadScope() {
 /* =========================================================
    GET  — list attendance for the team lead's own team members
 ========================================================= */
-export async function GET(req) {
+export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
     const { currentUser, memberIds, error } = await getTeamLeadScope();
-    if (error) return error;
+    if (error || !memberIds) return error;
 
     if (memberIds.length === 0) {
       return NextResponse.json({ success: true, data: [] });
@@ -58,7 +58,7 @@ export async function GET(req) {
     const to = searchParams.get("to");
     const memberId = searchParams.get("memberId"); // optional single-member filter
 
-    const query = { userId: { $in: memberIds } };
+    const query: any = { userId: { $in: memberIds } };
 
     if (memberId) {
       if (!memberIds.includes(memberId)) {
@@ -87,7 +87,7 @@ export async function GET(req) {
       .lean();
 
     return NextResponse.json({ success: true, data: records });
-  } catch (error) {
+  } catch (error: any) {
     console.error("GET /api/teamlead/attendance ERROR:", error);
     return NextResponse.json(
       { success: false, message: error?.message || "Failed to fetch attendance" },
@@ -100,12 +100,12 @@ export async function GET(req) {
    POST — team lead manually adds an attendance record for
    one of their own team members (e.g. backfilling a missed day)
 ========================================================= */
-export async function POST(req) {
+export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
     const { currentUser, memberIds, error } = await getTeamLeadScope();
-    if (error) return error;
+    if (error || !currentUser || !memberIds) return error;
 
     const body = await req.json();
     const {
@@ -164,7 +164,7 @@ export async function POST(req) {
       updatedBy: currentUser.userId,
     });
 
-    const populated = await Attendance.findById(record._id)
+    const populated: any = await Attendance.findById(record._id)
       .populate("userId", "name email role workingShift")
       .populate("updatedBy", "name email")
       .lean();
@@ -173,17 +173,16 @@ export async function POST(req) {
       userId: currentUser.userId,
       action: "CREATE",
       module: "Attendance",
-      description: `Added an attendance entry for ${populated.userId?.name || "a team member"} on ${new Date(
+      description: `Added an attendance entry for ${populated?.userId?.name || "a team member"} on ${new Date(
         date
       ).toDateString()}`,
       entityType: "Attendance",
-      entityId: record._id,
+      entityId: String(record._id),
       metadata: { userId, date },
-      req,
     });
 
     return NextResponse.json({ success: true, data: populated }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("POST /api/teamlead/attendance ERROR:", error);
     return NextResponse.json(
       { success: false, message: error?.message || "Failed to create attendance record" },

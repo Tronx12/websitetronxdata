@@ -1,6 +1,7 @@
-// app/api/teamlead/attendance/[id]/route.js
+// app/api/teamlead/attendance/[id]/route.ts
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 
 import { connectDB } from "@/config/db";
 import Team from "@/models/Team";
@@ -31,7 +32,7 @@ async function getTeamLeadScope() {
     .lean();
 
   const memberIds = Array.from(
-    new Set(teams.flatMap((t) => (t.members || []).map((m) => String(m))))
+    new Set(teams.flatMap((t: any) => (t.members || []).map((m: any) => String(m))))
   );
 
   return { currentUser, memberIds };
@@ -41,12 +42,15 @@ async function getTeamLeadScope() {
    PUT — edit an attendance record belonging to a member of
    the team lead's own team
 ========================================================= */
-export async function PUT(req, { params }) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     await connectDB();
 
     const { currentUser, memberIds, error } = await getTeamLeadScope();
-    if (error) return error;
+    if (error || !currentUser || !memberIds) return error;
 
     const { id } = await params;
 
@@ -102,11 +106,11 @@ export async function PUT(req, { params }) {
     if (lateByMinutes !== undefined) record.lateByMinutes = lateByMinutes;
     if (loginLocationAddress !== undefined) record.loginLocationAddress = loginLocationAddress;
 
-    record.updatedBy = currentUser.userId;
+    record.updatedBy = new mongoose.Types.ObjectId(currentUser.userId);
 
     await record.save();
 
-    const updated = await Attendance.findById(record._id)
+    const updated: any = await Attendance.findById(record._id)
       .populate("userId", "name email role workingShift")
       .populate("updatedBy", "name email")
       .lean();
@@ -115,11 +119,11 @@ export async function PUT(req, { params }) {
       userId: currentUser.userId,
       action: "UPDATE",
       module: "Attendance",
-      description: `Updated attendance entry for ${updated.userId?.name || "a team member"} on ${new Date(
-        updated.date
+      description: `Updated attendance entry for ${updated?.userId?.name || "a team member"} on ${new Date(
+        updated?.date || Date.now()
       ).toDateString()}`,
       entityType: "Attendance",
-      entityId: record._id,
+      entityId: String(record._id),
       metadata: {
         before,
         after: {
@@ -132,7 +136,6 @@ export async function PUT(req, { params }) {
           loginLocationAddress: record.loginLocationAddress,
         },
       },
-      req,
     });
 
     return NextResponse.json({
@@ -140,7 +143,7 @@ export async function PUT(req, { params }) {
       message: "Attendance updated successfully",
       data: updated,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("PUT /api/teamlead/attendance/[id] ERROR:", error);
     return NextResponse.json(
       { success: false, message: error?.message || "Failed to update attendance" },
@@ -153,12 +156,15 @@ export async function PUT(req, { params }) {
    DELETE — remove an attendance record belonging to a member
    of the team lead's own team (e.g. a mistaken manual entry)
 ========================================================= */
-export async function DELETE(req, { params }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     await connectDB();
 
     const { currentUser, memberIds, error } = await getTeamLeadScope();
-    if (error) return error;
+    if (error || !currentUser || !memberIds) return error;
 
     const { id } = await params;
 
@@ -169,7 +175,7 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    const record = await Attendance.findById(id).populate("userId", "name email");
+    const record: any = await Attendance.findById(id).populate("userId", "name email");
 
     if (!record) {
       return NextResponse.json(
@@ -178,7 +184,7 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    if (!memberIds.includes(String(record.userId._id || record.userId))) {
+    if (!memberIds.includes(String(record.userId?._id || record.userId))) {
       return NextResponse.json(
         { success: false, message: "You can only manage attendance for your own team" },
         { status: 403 }
@@ -208,14 +214,13 @@ export async function DELETE(req, { params }) {
       entityType: "Attendance",
       entityId: id,
       metadata: deletedSnapshot,
-      req,
     });
 
     return NextResponse.json({
       success: true,
       message: "Attendance record deleted successfully",
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("DELETE /api/teamlead/attendance/[id] ERROR:", error);
     return NextResponse.json(
       { success: false, message: error?.message || "Failed to delete attendance" },

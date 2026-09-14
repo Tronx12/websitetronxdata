@@ -11,6 +11,7 @@ type Props = {
   error?: string;
   autoComplete?: string;
   required?: boolean;
+  disabled?: boolean;
 };
 
 export default function FormField({
@@ -23,6 +24,7 @@ export default function FormField({
   error,
   autoComplete,
   required,
+  disabled,
 }: Props) {
   return (
     <div className={`form-field ${error ? "has-error" : ""}`}>
@@ -36,6 +38,7 @@ export default function FormField({
         onChange={onChange}
         autoComplete={autoComplete}
         required={required}
+        disabled={disabled}
       />
       {error && <span className="field-error">{error}</span>}
     </div>

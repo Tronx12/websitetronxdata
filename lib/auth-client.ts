@@ -42,6 +42,7 @@ export const authApi = {
     email: string;
     phoneNumber?: string;
     password: string;
+    workingShift?: "day" | "night";
   }) =>
     api("/api/auth/register", {
       method: "POST",

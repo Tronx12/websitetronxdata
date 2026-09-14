@@ -585,6 +585,10 @@ export async function GET(req: NextRequest) {
         "Content-Disposition":
           `attachment; filename="${filename}"`,
 
+        "X-Report-Record-Count": String(records.length),
+        "X-Report-From": start.toISOString(),
+        "X-Report-To": end.toISOString(),
+
         "Cache-Control":
           "no-store, no-cache, must-revalidate",
       },

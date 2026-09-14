@@ -5,25 +5,65 @@ import { format } from "date-fns";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
+interface AttendanceRecord {
+  _id: string;
+  userId?: { _id: string; name: string; email: string; workingShift?: string };
+  date: string;
+  loggingTime?: string;
+  logoutTime?: string;
+  isLate?: boolean;
+  lateByMinutes?: number;
+  lunchStart?: string;
+  lunchEnd?: string;
+  loginLocationAddress?: string;
+}
+
+interface ModalRecord {
+  _id?: string;
+  userId: string;
+  userName?: string;
+  date: string;
+  loggingTime: string;
+  logoutTime: string;
+  lunchStart: string;
+  lunchEnd: string;
+  isLate: boolean;
+  lateByMinutes: number | string;
+  loginLocationAddress: string;
+}
+
+interface UserInfo {
+  _id: string;
+  name: string;
+  email: string;
+  workingShift?: string;
+}
+
+interface EmployeeItem {
+  user: UserInfo;
+  count: number;
+  lastDate: string;
+}
+
 export default function TeamLeadAttendancePage() {
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filters
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
+  const [search, setSearch] = useState<string>("");
 
   // Selected employee
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<UserInfo | null>(null);
 
   // Modal state (used for both "add" and "edit")
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState("edit"); // "edit" | "add"
-  const [modalRecord, setModalRecord] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [modalError, setModalError] = useState(null);
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [modalMode, setModalMode] = useState<"edit" | "add">("edit");
+  const [modalRecord, setModalRecord] = useState<ModalRecord | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // ── Fetch data ─────────────────────────────────────────
   const fetchAttendance = async () => {
@@ -43,7 +83,7 @@ export default function TeamLeadAttendancePage() {
       }
 
       setRecords(Array.isArray(payload.data) ? payload.data : []);
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
@@ -55,8 +95,8 @@ export default function TeamLeadAttendancePage() {
   }, []);
 
   // ── Unique team members (grouped from records) ─────────
-  const employees = useMemo(() => {
-    const map = new Map();
+  const employees = useMemo<EmployeeItem[]>(() => {
+    const map = new Map<string, EmployeeItem>();
 
     records.forEach((r) => {
       if (!r.userId?._id) return;
@@ -81,7 +121,7 @@ export default function TeamLeadAttendancePage() {
     );
   }, [records]);
 
-  const filteredEmployees = useMemo(() => {
+  const filteredEmployees = useMemo<EmployeeItem[]>(() => {
     if (!search.trim()) return employees;
     const q = search.trim().toLowerCase();
     return employees.filter(
@@ -98,7 +138,7 @@ export default function TeamLeadAttendancePage() {
     }
   }, [employees, selectedEmployee]);
 
-  const employeeRecords = useMemo(() => {
+  const employeeRecords = useMemo<AttendanceRecord[]>(() => {
     if (!selectedEmployee) return [];
     return records
       .filter((r) => r.userId?._id === selectedEmployee._id)
@@ -106,7 +146,7 @@ export default function TeamLeadAttendancePage() {
   }, [records, selectedEmployee]);
 
   // ── Helpers ────────────────────────────────────────────
-  const formatTime = (dateStr) => {
+  const formatTime = (dateStr?: string) => {
     if (!dateStr) return "—";
     try {
       return format(new Date(dateStr), "hh:mm a");
@@ -115,7 +155,8 @@ export default function TeamLeadAttendancePage() {
     }
   };
 
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "—";
     try {
       return format(new Date(dateStr), "dd MMM yyyy");
     } catch {
@@ -123,7 +164,7 @@ export default function TeamLeadAttendancePage() {
     }
   };
 
-  const toTimeInputValue = (dateStr) => {
+  const toTimeInputValue = (dateStr?: string) => {
     if (!dateStr) return "";
     try {
       return format(new Date(dateStr), "HH:mm");
@@ -172,12 +213,12 @@ export default function TeamLeadAttendancePage() {
   };
 
   // ── Modal helpers ───────────────────────────────────────
-  const openEditModal = (record) => {
+  const openEditModal = (record: AttendanceRecord) => {
     setModalMode("edit");
     setModalError(null);
     setModalRecord({
       _id: record._id,
-      userId: record.userId?._id,
+      userId: record.userId?._id || "",
       userName: record.userId?.name,
       date: record.date,
       loggingTime: toTimeInputValue(record.loggingTime),
@@ -219,9 +260,9 @@ export default function TeamLeadAttendancePage() {
 
   // Combine a yyyy-MM-dd date with an HH:mm time into an ISO string.
   // Returns undefined if the time field is empty (so the field is left untouched on edit).
-  const combineDateAndTime = (dateStr, timeStr) => {
+  const combineDateAndTime = (dateStr: string, timeStr: string) => {
     if (!timeStr) return undefined;
-    const base = modalMode === "add" ? dateStr : format(new Date(modalRecord.date), "yyyy-MM-dd");
+    const base = modalMode === "add" ? dateStr : format(new Date(modalRecord?.date || Date.now()), "yyyy-MM-dd");
     return new Date(`${base}T${timeStr}:00`).toISOString();
   };
 
@@ -242,7 +283,7 @@ export default function TeamLeadAttendancePage() {
         loginLocationAddress: modalRecord.loginLocationAddress,
       };
 
-      let res;
+      let res: Response;
       if (modalMode === "add") {
         res = await fetch(`/api/teamlead/attendance`, {
           method: "POST",
@@ -270,14 +311,14 @@ export default function TeamLeadAttendancePage() {
       await fetchAttendance();
       setModalOpen(false);
       setModalRecord(null);
-    } catch (err) {
+    } catch (err: any) {
       setModalError(err.message || "Something went wrong");
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteRecord = async (record) => {
+  const deleteRecord = async (record: AttendanceRecord) => {
     if (!confirm(`Delete the attendance entry for ${record.userId?.name} on ${formatDate(record.date)}?`)) {
       return;
     }
@@ -291,7 +332,7 @@ export default function TeamLeadAttendancePage() {
       }
 
       await fetchAttendance();
-    } catch (err) {
+    } catch (err: any) {
       alert(err.message || "Something went wrong");
     }
   };

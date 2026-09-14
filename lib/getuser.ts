@@ -8,6 +8,7 @@ export async function getCurrentUser(): Promise<{
   userId: string;
   role: UserRole;
   email: string;
+  name?: string;
 } | null> {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("access_token")?.value;
@@ -48,6 +49,7 @@ export async function getCurrentUser(): Promise<{
         userId: user._id.toString(),
         role: user.role as UserRole,
         email: user.email,
+        name: user.name,
       };
     } catch {
       return null;

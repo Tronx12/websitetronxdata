@@ -24,15 +24,15 @@ export interface IAuditLog extends Document {
 
   description: string;
 
-  entityType?: string;
+  entityType?: string | null;
 
-  entityId?: string;
+  entityId?: string | null;
 
   metadata?: Record<string, any>;
 
-  ipAddress?: string;
+  ipAddress?: string | null;
 
-  userAgent?: string;
+  userAgent?: string | null;
 
   createdAt: Date;
 
