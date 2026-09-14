@@ -28,7 +28,7 @@ export default function AuthShell({
                 <span className="eyebrow-line" />
                 Tronx CRM
               </p>
-              <h1>{title}</h1>
+              <h4>{title}</h4>
               {subtitle && <p className="auth-subtitle">{subtitle}</p>}
             </div>
             {children}

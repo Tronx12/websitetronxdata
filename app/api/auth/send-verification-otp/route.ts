@@ -81,9 +81,9 @@ export async function POST(req: NextRequest) {
 
           <p>Your verification OTP is:</p>
 
-          <h1 style="letter-spacing: 8px;">
+          <h4 style="letter-spacing: 8px;">
             ${otp}
-          </h1>
+          </h4>
 
           <p>This OTP will expire in <strong>10 minutes</strong>.</p>
 

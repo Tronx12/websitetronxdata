@@ -10,7 +10,7 @@ export default function Home() {
       <section className="hero" id="top">
         <div className="hero-copy">
           <p className="eyebrow"><span className="eyebrow-line" /> CRM for teams in motion</p>
-          <h1>Make every<br /><em>connection</em> count.</h1>
+          <h4>Make every<br /><em>connection</em> count.</h4>
           <p className="hero-description">Tronx brings your people, pipeline, and next best action into one clear view, so your team can spend less time updating tools and more time moving work forward.</p>
           <div className="hero-actions"><a className="button" href="/login">Start for free <span aria-hidden="true">-&gt;</span></a><a className="text-link" href="#product">Explore the platform <span aria-hidden="true">↗</span></a></div>
           <div className="proof-row"><div className="avatar-stack"><span>AM</span><span>JK</span><span>RS</span><span>+</span></div><p>Trusted by 2,000+ growing teams</p></div>

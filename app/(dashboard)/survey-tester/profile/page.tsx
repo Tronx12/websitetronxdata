@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -12,7 +12,8 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
-  Clock, // added for shift icon
+  Clock,
+  ChevronDown,
 } from "lucide-react";
 
 interface UserProfile {
@@ -45,9 +46,23 @@ export default function ProfilePage() {
     text: string;
   }>({ type: null, text: "" });
 
+  const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     fetchCurrentUser();
+    return () => {
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+    };
   }, []);
+
+  // Auto-dismiss success/error banners after a few seconds
+  const showMessage = (type: "success" | "error", text: string) => {
+    if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+    setMessage({ type, text });
+    messageTimeoutRef.current = setTimeout(() => {
+      setMessage({ type: null, text: "" });
+    }, 5000);
+  };
 
   const fetchCurrentUser = async () => {
     try {
@@ -62,6 +77,11 @@ export default function ProfilePage() {
 
       if (response.status === 401) {
         router.push("/login");
+        return;
+      }
+
+      if (response.status === 403) {
+        showMessage("error", "You don't have permission to view this page.");
         return;
       }
 
@@ -81,10 +101,7 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
-      setMessage({
-        type: "error",
-        text: "Failed to load profile. Please try again.",
-      });
+      showMessage("error", "Failed to load profile. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -120,6 +137,7 @@ export default function ProfilePage() {
       const data = await response.json();
 
       if (data.success) {
+        // data.data is already the fresh record — no need to re-fetch
         setUser(data.data);
         setFormData({
           name: data.data.name,
@@ -129,20 +147,12 @@ export default function ProfilePage() {
         });
 
         setIsEditing(false);
-        setMessage({
-          type: "success",
-          text: "Profile updated successfully!",
-        });
-
-        await fetchCurrentUser();
+        showMessage("success", "Profile updated successfully!");
       } else {
         throw new Error(data.message || "Update failed");
       }
     } catch (error: any) {
-      setMessage({
-        type: "error",
-        text: error.message || "Failed to update profile",
-      });
+      showMessage("error", error.message || "Failed to update profile");
     } finally {
       setIsSaving(false);
     }
@@ -187,11 +197,13 @@ export default function ProfilePage() {
     );
   }
 
+  const fieldsDisabled = !isEditing || isSaving;
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
+        <h4 className="text-2xl font-bold text-gray-900">My Profile</h4>
         <p className="text-gray-500 mt-1">
           View and manage your personal information
         </p>
@@ -200,6 +212,8 @@ export default function ProfilePage() {
       {/* Message Alert */}
       {message.type && (
         <div
+          role="status"
+          aria-live="polite"
           className={`mb-6 p-4 rounded-lg flex items-start gap-3 ${
             message.type === "success"
               ? "bg-green-50 text-green-800 border border-green-200"
@@ -246,7 +260,7 @@ export default function ProfilePage() {
         {/* Profile Content */}
         <div className="p-6">
           <form onSubmit={handleSubmit}>
-            <div className="space-y-6">
+            <fieldset disabled={isSaving} className="space-y-6">
               {/* Name */}
               <div>
                 <label
@@ -265,7 +279,7 @@ export default function ProfilePage() {
                     type="text"
                     value={formData.name}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
+                    disabled={fieldsDisabled}
                     className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       isEditing
                         ? "border-gray-300 bg-white"
@@ -294,7 +308,7 @@ export default function ProfilePage() {
                     type="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
+                    disabled={fieldsDisabled}
                     className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       isEditing
                         ? "border-gray-300 bg-white"
@@ -323,7 +337,7 @@ export default function ProfilePage() {
                     type="tel"
                     value={formData.phoneNumber}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
+                    disabled={fieldsDisabled}
                     placeholder="+1 (555) 000-0000"
                     className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       isEditing
@@ -351,8 +365,8 @@ export default function ProfilePage() {
                     name="workingShift"
                     value={formData.workingShift}
                     onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none ${
+                    disabled={fieldsDisabled}
+                    className={`block w-full pl-10 pr-9 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none ${
                       isEditing
                         ? "border-gray-300 bg-white"
                         : "border-gray-200 bg-gray-50 cursor-not-allowed"
@@ -361,6 +375,9 @@ export default function ProfilePage() {
                     <option value="day">Day Shift</option>
                     <option value="night">Night Shift</option>
                   </select>
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  </div>
                 </div>
               </div>
 
@@ -441,7 +458,7 @@ export default function ProfilePage() {
                   </button>
                 </div>
               )}
-            </div>
+            </fieldset>
           </form>
         </div>
       </div>

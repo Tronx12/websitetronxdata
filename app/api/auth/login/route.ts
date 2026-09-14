@@ -8,6 +8,8 @@ import {
   createRefreshToken,
 } from "@/lib/auth";
 
+import { createAuditLog } from "@/lib/auditLog";
+
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
@@ -17,7 +19,9 @@ export async function POST(req: NextRequest) {
     const email = body.email?.trim().toLowerCase();
     const password = body.password;
 
-    // Validate input
+    // ============================================
+    // VALIDATE INPUT
+    // ============================================
     if (!email || !password) {
       return NextResponse.json(
         {
@@ -28,13 +32,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find user and explicitly include password
+    // ============================================
+    // FIND USER
+    // ============================================
     const user = await Auth.findOne({
       email,
     }).select("+password");
 
-    // Don't reveal whether email exists
+    // ============================================
+    // USER NOT FOUND
+    // ============================================
     if (!user) {
+      await createAuditLog({
+        action: "LOGIN",
+        module: "Authentication",
+        description: `Failed login attempt for ${email}`,
+        metadata: {
+          email,
+          reason: "USER_NOT_FOUND",
+        },
+        ipAddress:
+          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          req.headers.get("x-real-ip") ||
+          null,
+        userAgent: req.headers.get("user-agent") || null,
+      });
+
       return NextResponse.json(
         {
           success: false,
@@ -44,13 +67,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check password
+    // ============================================
+    // CHECK PASSWORD
+    // ============================================
     const passwordMatch = await bcrypt.compare(
       password,
       user.password
     );
 
     if (!passwordMatch) {
+      await createAuditLog({
+        userId: user._id.toString(),
+        action: "LOGIN",
+        module: "Authentication",
+        description: `Failed login attempt for ${email}`,
+        entityType: "Auth",
+        entityId: user._id.toString(),
+        metadata: {
+          email,
+          role: user.role,
+          reason: "INVALID_PASSWORD",
+        },
+        ipAddress:
+          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          req.headers.get("x-real-ip") ||
+          null,
+        userAgent: req.headers.get("user-agent") || null,
+      });
+
       return NextResponse.json(
         {
           success: false,
@@ -60,8 +104,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check email verification
+    // ============================================
+    // CHECK EMAIL VERIFICATION
+    // ============================================
     if (!user.isEmailVerified) {
+      await createAuditLog({
+        userId: user._id.toString(),
+        action: "LOGIN",
+        module: "Authentication",
+        description: `Login blocked because email is not verified`,
+        entityType: "Auth",
+        entityId: user._id.toString(),
+        metadata: {
+          email: user.email,
+          role: user.role,
+          reason: "EMAIL_NOT_VERIFIED",
+        },
+        ipAddress:
+          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          req.headers.get("x-real-ip") ||
+          null,
+        userAgent: req.headers.get("user-agent") || null,
+      });
+
       return NextResponse.json(
         {
           success: false,
@@ -72,18 +137,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create access token
+    // ============================================
+    // CREATE ACCESS TOKEN
+    // ============================================
     const accessToken = createAccessToken(
       user._id.toString(),
-      user.role
+      user.role,
+      user.email
     );
-
-    // Create refresh token
+    console.log(accessToken);
+    // ============================================
+    // CREATE REFRESH TOKEN
+    // ============================================
     const refreshToken = createRefreshToken(
       user._id.toString()
     );
-
-    // Response
+    console.log(refreshToken);
+    // ============================================
+    // RESPONSE
+    // ============================================
     const response = NextResponse.json(
       {
         success: true,
@@ -100,24 +172,52 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
 
-    // Access token
-   response.cookies.set("access_token", accessToken, {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  maxAge: 60 * 15, // 15 minutes
-  path: "/",
-});
+    // ============================================
+    // ACCESS TOKEN COOKIE
+    // ============================================
+    response.cookies.set("access_token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 15, // 15 minutes
+      path: "/",
+    });
 
-// Refresh token
-response.cookies.set("refresh_token", refreshToken, {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  maxAge: 60 * 60 * 24 * 7, // 7 days
-  path: "/",
-});
+    // ============================================
+    // REFRESH TOKEN COOKIE
+    // ============================================
+    response.cookies.set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    });
 
+    // ============================================
+    // SUCCESS LOGIN AUDIT LOG
+    // ============================================
+    await createAuditLog({
+      userId: user._id.toString(),
+      action: "LOGIN",
+      module: "Authentication",
+      description: `User ${user.email} logged in successfully`,
+      entityType: "Auth",
+      entityId: user._id.toString(),
+      metadata: {
+        email: user.email,
+        role: user.role,
+      },
+      ipAddress:
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        req.headers.get("x-real-ip") ||
+        null,
+      userAgent: req.headers.get("user-agent") || null,
+    });
+
+    // ============================================
+    // RETURN RESPONSE
+    // ============================================
     return response;
   } catch (error) {
     console.error("LOGIN ERROR:", error);

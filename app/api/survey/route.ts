@@ -3,10 +3,10 @@ import mongoose from "mongoose";
 
 import { connectDB } from "@/config/db";
 import SurveyData from "@/models/SurveyData";
-import {
-  parseBulkPaste,
-} from "@/lib/parseSurveyBulk";
+import { parseBulkPaste } from "@/lib/parseSurveyBulk";
 import { SurveyCategory } from "@/lib/survey-fields";
+import { getCurrentUser } from "@/lib/getuser";
+import { createAuditLog } from "@/lib/auditLog";
 
 const VALID_CATEGORIES: SurveyCategory[] = [
   "B2B",
@@ -14,21 +14,61 @@ const VALID_CATEGORIES: SurveyCategory[] = [
   "B2C",
 ];
 
-export async function POST(
-  req: NextRequest
-) {
+export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
+    /* ============================================
+       AUTHENTICATED USER
+    ============================================ */
+
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser?.userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        { status: 401 }
+      );
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(
+        currentUser.userId
+      )
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid authenticated user ID",
+        },
+        { status: 401 }
+      );
+    }
+
+    const authenticatedUserId =
+      new mongoose.Types.ObjectId(
+        currentUser.userId
+      );
+
+    /* ============================================
+       REQUEST
+    ============================================ */
+
     const body = await req.json();
 
-    const category = body?.category;
-    const paste = body?.paste;
-    const createdBy = body?.createdBy;
+    const category =
+      body?.category as
+        | SurveyCategory
+        | undefined;
 
-    // --------------------------------------------------
-    // Validate category
-    // --------------------------------------------------
+    const paste = body?.paste;
+
+    /* ============================================
+       CATEGORY
+    ============================================ */
 
     if (
       category &&
@@ -44,9 +84,9 @@ export async function POST(
       );
     }
 
-    // --------------------------------------------------
-    // Validate paste
-    // --------------------------------------------------
+    /* ============================================
+       PASTE
+    ============================================ */
 
     if (
       typeof paste !== "string" ||
@@ -61,47 +101,23 @@ export async function POST(
       );
     }
 
-    // --------------------------------------------------
-    // Fallback category
-    // --------------------------------------------------
-
     const fallbackCategory: SurveyCategory =
       category &&
       VALID_CATEGORIES.includes(category)
         ? category
         : "B2C";
 
-    // --------------------------------------------------
-    // Parse
-    // --------------------------------------------------
+    /* ============================================
+       PARSE
+    ============================================ */
 
-    const {
-      records,
-      errors,
-    } = parseBulkPaste(
-      paste,
-      fallbackCategory
-    );
+    const { records, errors } =
+      parseBulkPaste(
+        paste,
+        fallbackCategory
+      );
 
-    console.log(
-      "========== PARSED RECORDS =========="
-    );
-
-    console.dir(records, {
-      depth: null,
-    });
-
-    console.log(
-      "========== PARSER ERRORS =========="
-    );
-
-    console.log(errors);
-
-    // --------------------------------------------------
-    // No records
-    // --------------------------------------------------
-
-    if (records.length === 0) {
+    if (!records.length) {
       return NextResponse.json(
         {
           success: false,
@@ -113,117 +129,118 @@ export async function POST(
       );
     }
 
-    // --------------------------------------------------
-    // IMPORTANT DEBUG
-    // --------------------------------------------------
-
-    console.log(
-      "========== MONGOOSE DATA TYPE =========="
-    );
-
-    console.log(
-      SurveyData.schema.path("data")?.instance
-    );
-
-    // Expected:
-    //
-    // Mixed
-    //
-
-    // --------------------------------------------------
-    // Validate createdBy
-    // --------------------------------------------------
-
-    let normalizedCreatedBy:
-      | mongoose.Types.ObjectId
-      | null = null;
-
-    if (
-      createdBy &&
-      mongoose.Types.ObjectId.isValid(
-        createdBy
-      )
-    ) {
-      normalizedCreatedBy =
-        new mongoose.Types.ObjectId(
-          createdBy
-        );
-    }
-
-    // --------------------------------------------------
-    // Batch ID
-    // --------------------------------------------------
+    /* ============================================
+       BATCH ID
+    ============================================ */
 
     const batchId =
       records.length > 1
         ? new mongoose.Types.ObjectId().toString()
         : null;
 
-    // --------------------------------------------------
-    // Build documents
-    // --------------------------------------------------
+    /* ============================================
+       DOCUMENTS
+    ============================================ */
 
-    const documents = records.map((record) => ({
-      category: record.category,
+    const documents = records.map(
+      (record) => ({
+        category: record.category,
 
-      accountType:
-        record.accountType || undefined,
+        accountType:
+          record.accountType || undefined,
 
-      projectNo:
-        record.projectNo || undefined,
+        projectNo:
+          record.projectNo || undefined,
 
-      panelCode:
-        record.panelCode || undefined,
+        panelCode:
+          record.panelCode || undefined,
 
-      description:
-        record.description || undefined,
+        description:
+          record.description || undefined,
 
-      pid:
-        record.pid || undefined,
+        pid:
+          record.pid || undefined,
 
-      supplierId:
-        record.supplierId || undefined,
+        supplierId:
+          record.supplierId || undefined,
 
-      country:
-        record.country || undefined,
+        country:
+          record.country || undefined,
 
-      ip:
-        record.ip || undefined,
+        ip:
+          record.ip || undefined,
 
-      status:
-        record.status || undefined,
+        status:
+          record.status || undefined,
 
-      data: record.data || {},
+        data:
+          record.data || {},
 
-      rawPaste:
-        record.rawBlock || paste,
+        rawPaste:
+          record.rawBlock || paste,
 
-      batchId,
+        batchId,
 
-      createdBy:
-        normalizedCreatedBy,
-    }));
-
-    console.log(
-      "========== DOCUMENTS TO INSERT =========="
+        // IMPORTANT:
+        // Always use authenticated user.
+        createdBy:
+          authenticatedUserId,
+      })
     );
 
-    console.dir(documents, {
-      depth: null,
-    });
-
-    // --------------------------------------------------
-    // Insert
-    // --------------------------------------------------
+    /* ============================================
+       SAVE
+    ============================================ */
 
     const docs =
       await SurveyData.insertMany(
         documents
       );
 
-    // --------------------------------------------------
-    // Response
-    // --------------------------------------------------
+    /* ============================================
+       AUDIT LOG
+    ============================================ */
+
+    await createAuditLog({
+      userId:
+        currentUser.userId,
+
+      action: "UPLOAD",
+
+      module: "Survey",
+
+      description:
+        `Uploaded ${docs.length} survey record${
+          docs.length === 1
+            ? ""
+            : "s"
+        }`,
+
+      entityType: "SurveyData",
+
+      entityId:
+        docs.length === 1
+          ? docs[0]._id.toString()
+          : batchId || undefined,
+
+      metadata: {
+        count: docs.length,
+
+        categories: [
+          ...new Set(
+            docs.map(
+              (doc) => doc.category
+            )
+          ),
+        ],
+
+        batchId,
+      },
+    });
+
+    /* ============================================
+       RESPONSE
+    ============================================ */
 
     return NextResponse.json(
       {
@@ -249,51 +266,17 @@ export async function POST(
           };
         }),
       },
-      {
-        status: 201,
-      }
+      { status: 201 }
     );
   } catch (error: any) {
     console.error(
-      "===================================="
+      "SURVEY POST ERROR:",
+      error
     );
 
-    console.error(
-      "SURVEY POST ERROR"
-    );
-
-    console.error(
-      "===================================="
-    );
-
-    console.error(
-      "Name:",
-      error?.name
-    );
-
-    console.error(
-      "Message:",
-      error?.message
-    );
-
-    console.error(
-      "Code:",
-      error?.code
-    );
-
-    console.error(
-      "Errors:",
-      error?.errors
-    );
-
-    console.error(
-      "Stack:",
-      error?.stack
-    );
-
-    // --------------------------------------------------
-    // Mongoose validation error
-    // --------------------------------------------------
+    /* ============================================
+       VALIDATION
+    ============================================ */
 
     if (
       error?.name ===
@@ -303,18 +286,15 @@ export async function POST(
         Object.entries(
           error.errors || {}
         ).map(
-          ([
+          ([field, err]: [
+            string,
+            any
+          ]) => ({
             field,
-            err,
-          ]: [string, any]) => ({
-            field,
-
             message:
               err?.message ||
               "Validation failed",
-
             value: err?.value,
-
             kind: err?.kind,
           })
         );
@@ -322,24 +302,18 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-
           message:
             "Survey validation failed",
-
-          error:
-            error.message,
-
+          error: error.message,
           validationErrors,
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    // --------------------------------------------------
-    // Cast error
-    // --------------------------------------------------
+    /* ============================================
+       CAST
+    ============================================ */
 
     if (
       error?.name === "CastError"
@@ -347,147 +321,110 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-
           message:
             `Invalid value for ${error.path}`,
-
-          error:
-            error.message,
-
-          path:
-            error.path,
-
-          value:
-            error.value,
+          error: error.message,
+          path: error.path,
+          value: error.value,
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    // --------------------------------------------------
-    // Duplicate key
-    // --------------------------------------------------
+    /* ============================================
+       DUPLICATE
+    ============================================ */
 
-    if (
-      error?.code === 11000
-    ) {
+    if (error?.code === 11000) {
       return NextResponse.json(
         {
           success: false,
-
           message:
             "Duplicate survey record",
-
-          error:
-            error.message,
-
+          error: error.message,
           keyValue:
             error.keyValue,
         },
-        {
-          status: 409,
-        }
+        { status: 409 }
       );
     }
 
-    // --------------------------------------------------
-    // Generic error
-    // --------------------------------------------------
+    /* ============================================
+       UNKNOWN
+    ============================================ */
 
     return NextResponse.json(
       {
         success: false,
-
         message:
           "Failed to save survey data",
-
         error:
           error?.message ||
           String(error),
-
         name:
           error?.name ||
           "UnknownError",
-
         code:
-          error?.code ||
-          null,
+          error?.code || null,
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
+/* ======================================================
+   GET - FETCH SURVEY RECORDS
+====================================================== */
 
-// ======================================================
-// GET
-// ======================================================
-
-export async function GET(
-  req: NextRequest
-) {
+export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
-    const {
-      searchParams,
-    } = new URL(req.url);
+    const { searchParams } =
+      new URL(req.url);
 
     const category =
-      searchParams.get(
-        "category"
-      );
+      searchParams.get("category");
 
     const projectNo =
-      searchParams.get(
-        "projectNo"
-      );
+      searchParams.get("projectNo");
 
     const accountType =
-      searchParams.get(
-        "accountType"
-      );
+      searchParams.get("accountType");
 
     const pid =
       searchParams.get("pid");
 
     const country =
-      searchParams.get(
-        "country"
-      );
+      searchParams.get("country");
 
     const status =
-      searchParams.get(
-        "status"
-      );
+      searchParams.get("status");
+
+    const createdBy =
+      searchParams.get("createdBy");
+
+    const excludeCreatedBy =
+      searchParams.get("excludeCreatedBy");
+
+    const includeUnassigned =
+      searchParams.get("includeUnassigned");
 
     const sortBy =
-      searchParams.get(
-        "sortBy"
-      ) || "createdAt";
+      searchParams.get("sortBy") ||
+      "createdAt";
 
     const sortOrder =
-      searchParams.get(
-        "sortOrder"
-      ) === "asc"
+      searchParams.get("sortOrder") === "asc"
         ? 1
         : -1;
 
     const search =
-      searchParams.get(
-        "search"
-      ) || "";
+      searchParams.get("search") || "";
 
     const page = Math.max(
       1,
-      parseInt(
-        searchParams.get(
-          "page"
-        ) || "1",
-        10
+      Number(
+        searchParams.get("page") || "1"
       )
     );
 
@@ -495,11 +432,8 @@ export async function GET(
       100,
       Math.max(
         1,
-        parseInt(
-          searchParams.get(
-            "limit"
-          ) || "20",
-          10
+        Number(
+          searchParams.get("limit") || "20"
         )
       )
     );
@@ -507,11 +441,15 @@ export async function GET(
     const skip =
       (page - 1) * limit;
 
+    /* ==================================================
+       FILTER
+    ================================================== */
+
     const filter: any = {};
 
-    // --------------------------------------------------
-    // Filters
-    // --------------------------------------------------
+    /* -----------------------------------------------
+       Category
+    ------------------------------------------------ */
 
     if (
       category &&
@@ -519,23 +457,37 @@ export async function GET(
         category as SurveyCategory
       )
     ) {
-      filter.category =
-        category;
+      filter.category = category;
     }
 
+    /* -----------------------------------------------
+       Project
+    ------------------------------------------------ */
+
     if (projectNo) {
-      filter.projectNo =
-        projectNo;
+      filter.projectNo = projectNo;
     }
+
+    /* -----------------------------------------------
+       Account type
+    ------------------------------------------------ */
 
     if (accountType) {
       filter.accountType =
         accountType.toUpperCase();
     }
 
+    /* -----------------------------------------------
+       PID
+    ------------------------------------------------ */
+
     if (pid) {
       filter.pid = pid;
     }
+
+    /* -----------------------------------------------
+       Country
+    ------------------------------------------------ */
 
     if (country) {
       filter.country = {
@@ -544,6 +496,10 @@ export async function GET(
       };
     }
 
+    /* -----------------------------------------------
+       Status
+    ------------------------------------------------ */
+
     if (status) {
       filter.status = {
         $regex: status,
@@ -551,84 +507,158 @@ export async function GET(
       };
     }
 
-    // --------------------------------------------------
-    // Search
-    // --------------------------------------------------
+    /* ==================================================
+       CREATOR FILTER
+    ================================================== */
 
-    if (search.trim()) {
-      filter.$or = [
-        {
-          rawPaste: {
-            $regex: search,
-            $options: "i",
+    if (createdBy) {
+      if (
+        !mongoose.Types.ObjectId.isValid(
+          createdBy
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Invalid createdBy ObjectId",
+            createdBy,
           },
-        },
-        {
-          pid: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          projectNo: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          supplierId: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-        {
-          country: {
-            $regex: search,
-            $options: "i",
-          },
-        },
-      ];
+          { status: 400 }
+        );
+      }
+
+      filter.createdBy =
+        new mongoose.Types.ObjectId(
+          createdBy
+        );
     }
 
-    // --------------------------------------------------
-    // Query
-    // --------------------------------------------------
+    /* -----------------------------------------------
+       Exclude creator
+    ------------------------------------------------ */
 
-    const [
-      items,
-      total,
-    ] = await Promise.all([
-      SurveyData.find(filter)
-        .sort({
-          [sortBy]:
-            sortOrder,
-        })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+    else if (excludeCreatedBy) {
+      if (
+        !mongoose.Types.ObjectId.isValid(
+          excludeCreatedBy
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Invalid excludeCreatedBy ObjectId",
+            excludeCreatedBy,
+          },
+          { status: 400 }
+        );
+      }
 
-      SurveyData.countDocuments(
-        filter
-      ),
-    ]);
+      const excludedId =
+        new mongoose.Types.ObjectId(
+          excludeCreatedBy
+        );
 
-    // --------------------------------------------------
-    // Normalize data
-    // --------------------------------------------------
+      if (
+        includeUnassigned === "true"
+      ) {
+        filter.$or = [
+          {
+            createdBy: null,
+          },
+          {
+            createdBy: {
+              $ne: excludedId,
+            },
+          },
+        ];
+      } else {
+        filter.createdBy = {
+          $ne: excludedId,
+        };
+      }
+    }
 
-    const data =
-      items.map(
-        (item: any) => ({
-          ...item,
+    /* ==================================================
+       SEARCH
+    ================================================== */
 
-          data:
-            item.data || {},
-        })
-      );
+    if (search.trim()) {
+      const searchRegex = {
+        $regex: search.trim(),
+        $options: "i",
+      };
 
-    // --------------------------------------------------
-    // Response
-    // --------------------------------------------------
+      const searchOr = [
+        {
+          rawPaste: searchRegex,
+        },
+        {
+          pid: searchRegex,
+        },
+        {
+          projectNo: searchRegex,
+        },
+        {
+          supplierId: searchRegex,
+        },
+        {
+          country: searchRegex,
+        },
+        {
+          accountType: searchRegex,
+        },
+        {
+          status: searchRegex,
+        },
+      ];
+
+      if (filter.$or) {
+        filter.$and = [
+          {
+            $or: filter.$or,
+          },
+          {
+            $or: searchOr,
+          },
+        ];
+
+        delete filter.$or;
+      } else {
+        filter.$or = searchOr;
+      }
+    }
+
+    /* ==================================================
+       DATABASE QUERY
+    ================================================== */
+
+    const [items, total] =
+      await Promise.all([
+        SurveyData.find(filter)
+          .sort({
+            [sortBy]: sortOrder,
+          })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+
+        SurveyData.countDocuments(
+          filter
+        ),
+      ]);
+
+    /* ==================================================
+       RESPONSE
+    ================================================== */
+
+    const data = items.map(
+      (item: any) => ({
+        ...item,
+        data: item.data || {},
+      })
+    );
 
     return NextResponse.json({
       success: true,
@@ -639,11 +669,8 @@ export async function GET(
         page,
         limit,
         total,
-
         totalPages:
-          Math.ceil(
-            total / limit
-          ),
+          Math.ceil(total / limit),
       },
     });
   } catch (error: any) {
@@ -655,17 +682,13 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-
         message:
           "Failed to fetch survey data",
-
         error:
           error?.message ||
           String(error),
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }

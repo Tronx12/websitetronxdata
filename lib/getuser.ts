@@ -1,21 +1,19 @@
-// lib/auth.ts
 import { cookies } from "next/headers";
 import { UserRole } from "@/types/role";
-import {
-  verifyAccessToken,
-  verifyRefreshToken,
-  createAccessToken,
-} from "./auth"; // adjust path if needed
+import { verifyAccessToken, verifyRefreshToken } from "./auth";
+import { connectDB } from "@/config/db";
+import Auth from "@/models/Auth";
 
 export async function getCurrentUser(): Promise<{
   userId: string;
   role: UserRole;
+  email: string;
 } | null> {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("access_token")?.value;
   const refreshToken = cookieStore.get("refresh_token")?.value;
 
-  // 1. Try access token first
+  // 1. Try access token first — the common, fast path
   if (accessToken) {
     try {
       const payload = verifyAccessToken(accessToken);
@@ -23,40 +21,33 @@ export async function getCurrentUser(): Promise<{
         return {
           userId: payload.userId,
           role: payload.role as UserRole,
+          email: payload.email,
         };
       }
     } catch {
-      // Access token expired or invalid → fall through to refresh
+      // Expired or invalid — fall through to refresh
     }
   }
 
-  // 2. Try refresh token
+  // 2. Fall back to refresh token — look up the real user, never guess the role
   if (refreshToken) {
     try {
       const payload = verifyRefreshToken(refreshToken);
       if (payload.type !== "refresh") return null;
 
-      // Optional: look up the latest role from DB here
-      // const user = await db.user.findUnique({ where: { id: payload.userId } });
-      // if (!user) return null;
-      // const role = user.role as UserRole;
+      await connectDB();
+      const user = await Auth.findById(payload.userId);
+      if (!user) return null;
 
-      // For now we re-issue with the role that was originally in the access token
-      // (or fetch from DB in production)
-      const newAccessToken = createAccessToken(payload.userId, "admin"); // ← replace with real role
-
-      // Set the new access token cookie
-      cookieStore.set("access_token", newAccessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 15 * 60, // 15 minutes
-        path: "/",
-      });
-
+      // This only *reads* the user for the current render — it doesn't
+      // rotate the access_token cookie, since cookies() can be read-only
+      // here (e.g. called from a Server Component like a layout).
+      // Actual cookie rotation happens in /api/auth/refresh, which is a
+      // Route Handler and is allowed to set cookies.
       return {
-        userId: payload.userId,
-        role: "admin" as UserRole, // ← replace with real role from DB
+        userId: user._id.toString(),
+        role: user.role as UserRole,
+        email: user.email,
       };
     } catch {
       return null;

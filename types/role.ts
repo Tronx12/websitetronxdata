@@ -1,84 +1,122 @@
 // types/role.ts
+
 export type UserRole = "survey-tester" | "team-lead" | "hr" | "admin";
 
 export interface SidebarItem {
   label: string;
   path: string;
-  icon?: string; // or ReactNode
+  icon?: string; // lucide-react icon name
   roles: UserRole[]; // which roles can see this item
 }
 
 export const SIDEBAR_ITEMS: SidebarItem[] = [
+  // ─────────────────────────────
+  // Shared (visible to multiple roles)
+  // ─────────────────────────────
+  // {
+  //   label: "Dashboard",
+  //   path: "/survey-tester",
+  //   icon: "LayoutDashboard",
+  //   roles: ["survey-tester", "team-lead", "hr", "admin"],
+  // },
   {
-    label: "Dashboard",
-    path: "/survey-tester",
-    icon: "LayoutDashboard",
-    roles: ["survey-tester", "team-lead", "hr", "admin"],
-  },
-  {
-    label: "Attendence",
+    label: "Attendance",
     path: "/survey-tester/attendence",
-    icon: "ClipboardList",
-    roles: ["survey-tester", "team-lead","hr"],
+    icon: "CalendarCheck",
+    roles: ["survey-tester", "team-lead", "hr"],
   },
   {
     label: "Request Missing Attendance",
     path: "/survey-tester/missing-attendence",
-    icon: "ClipboardList",
-    roles: ["survey-tester", "team-lead"],
+    icon: "CalendarPlus",
+    roles: ["survey-tester", "team-lead", "hr", "admin"],
+  },
+  {
+    label: "Manage Team Attendance",
+    path: "/team-lead/manage-attendance",
+    icon: "CalendarPlus",
+    roles: ["team-lead"],
   },
   {
     label: "My Profile",
     path: "/survey-tester/profile",
-    icon: "ClipboardList",
-    roles: ["survey-tester", "team-lead"],
+    icon: "UserCircle",
+    roles: ["survey-tester", "team-lead", "hr", "admin"],
   },
+
+  // ─────────────────────────────
+  // Survey Tester
+  // ─────────────────────────────
   {
     label: "Surveys Data",
     path: "/survey-tester/survey-data",
-    icon: "ClipboardList",
-    roles: ["survey-tester", "team-lead"],
-  },
-  {
-    label: "Assigned Surveys",
-    path: "/surveys/assigned",
-    icon: "ListChecks",
+    icon: "FileSpreadsheet",
     roles: ["survey-tester"],
   },
+
+  // ─────────────────────────────
+  // Team Lead
+  // ─────────────────────────────
   {
-    label: "Team Surveys",
-    path: "/surveys/team",
+    label: "Team Surveys Data",
+    path: "/team-lead/survey-data",
     icon: "Users",
-    roles: ["team-lead", "admin"],
+    roles: ["team-lead"],
   },
+  // {
+  //   label: "Settings",
+  //   path: "/settings",
+  //   icon: "Settings",
+  //   roles: ["team-lead"],
+  // },
+
+  // ─────────────────────────────
+  // HR
+  // ─────────────────────────────
+  // {
+  //   label: "HR Reports",
+  //   path: "/hr/reports",
+  //   icon: "BarChart3",
+  //   roles: ["hr"],
+  // },
+
+  // ─────────────────────────────
+  // Admin (HR shares admin management screens)
+  // ─────────────────────────────
   {
-    label: "Create Survey",
-    path: "/surveys/create",
-    icon: "PlusCircle",
-    roles: ["team-lead", "admin"],
-  },
-  {
-    label: "All Surveys",
-    path: "/surveys/all",
-    icon: "FolderOpen",
+    label: "Manage Users",
+    path: "/admin/users",
+    icon: "UsersRound",
     roles: ["admin", "hr"],
   },
   {
-    label: "Users & Roles",
-    path: "/admin/users",
-    icon: "UserCog",
-    roles: ["admin"],
+    label: "Manage Teams",
+    path: "/admin/teams",
+    icon: "Network",
+    roles: ["admin", "hr"],
   },
   {
-    label: "HR Reports",
-    path: "/hr/reports",
-    icon: "BarChart3",
-    roles: ["hr", "admin"],
+    label: "Manage Attendance",
+    path: "/admin/attendance",
+    icon: "CalendarCog",
+    roles: ["admin", "hr"],
   },
   {
-    label: "Settings",
-    path: "/settings",
-    icon: "Settings",
-    roles: ["team-lead", "hr", "admin"],
+    label: "Manage Survey Data",
+    path: "/admin/survey-data",
+    icon: "Database",
+    roles: ["admin", "hr"],
+  },
+  {
+    label: "Office Off Manage",
+    path: "/admin/office-off",
+    icon: "CalendarOff",
+    roles: ["admin", "hr"],
+  },
+  {
+    label: "Audit Logs",
+    path: "/admin/audit-logs",
+    icon: "ScrollText",
+    roles: ["admin", "hr"],
   },
 ];

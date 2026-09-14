@@ -9,8 +9,8 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
-    const refreshToken =
-      req.cookies.get("refreshToken")?.value;
+    // Must match the cookie name set in the login route
+    const refreshToken = req.cookies.get("refresh_token")?.value;
 
     if (!refreshToken) {
       return NextResponse.json(
@@ -38,9 +38,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // createAccessToken requires (userId, role, email) — all three, real values
     const accessToken = createAccessToken(
       user._id.toString(),
-      user.role
+      user.role,
+      user.email
     );
 
     const response = NextResponse.json({
@@ -48,7 +50,8 @@ export async function POST(req: NextRequest) {
       message: "Token refreshed",
     });
 
-    response.cookies.set("accessToken", accessToken, {
+    // Must match the cookie name read everywhere else (access_token)
+    response.cookies.set("access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

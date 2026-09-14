@@ -1,7 +1,7 @@
 // app/attendence/page.tsx
 
 import SurveyPage from "@/components/SurveyPage";
-import { getCurrentUser } from "@/lib/getuser"; // or "@/lib/getuser"
+import { getCurrentUser } from "@/lib/getuser";
 import { redirect } from "next/navigation";
 
 export default async function Page() {
@@ -10,9 +10,9 @@ export default async function Page() {
   console.log("===== SERVER USER =====");
   console.log(user);
 
-  if (!user || !user.userId) {
+  if (!user?.userId) {
     redirect("/login");
   }
 
-  return <SurveyPage />;
+  return <SurveyPage userId={user.userId} />;
 }

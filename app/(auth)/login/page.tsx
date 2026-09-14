@@ -43,7 +43,7 @@ console.log("LOGIN RESPONSE:", res.data);
 console.log("ROLE FROM API:", res.data?.role);
 
 const role = res.data?.role;
-const destination = ROLE_REDIRECT[role] ?? "/tester";
+const destination = ROLE_REDIRECT[role] ?? "/survey-tester";
 
 console.log("ROLE:", role);
 console.log("DESTINATION:", destination);

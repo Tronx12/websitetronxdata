@@ -10,56 +10,69 @@ import {
   LogOut,
   Menu,
   X,
-  Home,
-  FileText,
+  LayoutDashboard,
+  CalendarCheck,
+  CalendarPlus,
+  UserCircle,
+  FileSpreadsheet,
   Users,
+  BarChart3,
   Settings,
-  BarChart,
-  User,
+  UsersRound,
+  Network,
+  CalendarCog,
+  Database,
+  ScrollText,
+  CalendarOff,
+  Home,
 } from "lucide-react";
 
 interface SidebarProps {
   role: UserRole;
+  email: string;
+  isCollapsed: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
 }
 
-// Map icon names to actual components
+// Keys here must match the `icon` strings used in SIDEBAR_ITEMS exactly
 const iconMap = {
-  home: Home,
-  surveys: FileText,
-  responses: BarChart,
-  users: Users,
-  profile: User,
-  settings: Settings,
+  LayoutDashboard,
+  CalendarCheck,
+  CalendarPlus,
+  UserCircle,
+  FileSpreadsheet,
+  Users,
+  BarChart3,
+  Settings,
+  UsersRound,
+  Network,
+  CalendarCog,
+  Database,
+  ScrollText,
+  CalendarOff,
 };
 
-export function Sidebar({ role }: SidebarProps) {
+export function Sidebar({ role, email, isCollapsed, onCollapsedChange }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Auto-collapse on smaller screens
+  // Auto-collapse on smaller screens — reports up to the shared state
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsCollapsed(true);
-      } else {
-        setIsCollapsed(false);
-      }
+      onCollapsedChange(window.innerWidth < 768);
     };
 
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [onCollapsedChange]);
 
-  // Filter menu items based on current role
   const visibleItems = useMemo(() => {
     return SIDEBAR_ITEMS.filter((item) => item.roles.includes(role));
   }, [role]);
 
-  // Handle logout
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
@@ -85,25 +98,23 @@ export function Sidebar({ role }: SidebarProps) {
     }
   };
 
-  // Toggle collapse state
   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
+    onCollapsedChange(!isCollapsed);
   };
 
-  // Toggle mobile menu
   const toggleMobile = () => {
     setIsMobileOpen(!isMobileOpen);
   };
 
-  // Get icon component
-  const getIcon = (iconName: string) => {
+  // Get icon component — falls back to Home if the name isn't in the map
+  const getIcon = (iconName?: string) => {
+    if (!iconName) return <Home className="w-5 h-5" />;
     const IconComponent = iconMap[iconName as keyof typeof iconMap];
     return IconComponent ? <IconComponent className="w-5 h-5" /> : <Home className="w-5 h-5" />;
   };
 
   return (
     <>
-      {/* Mobile hamburger menu button */}
       <button
         onClick={toggleMobile}
         className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-gray-900 text-white md:hidden"
@@ -112,7 +123,6 @@ export function Sidebar({ role }: SidebarProps) {
         {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
 
-      {/* Mobile overlay */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
@@ -120,17 +130,17 @@ export function Sidebar({ role }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar - now properly fixed on left */}
       <aside
         className={`fixed left-0 top-0 h-screen bg-gray-900 text-white transition-all duration-300 flex flex-col z-50
           ${isCollapsed ? "w-16" : "w-64"}
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
       >
-        {/* Header with toggle button */}
         <div className="flex items-center justify-between h-16 px-3 border-b border-gray-700 flex-shrink-0">
           {!isCollapsed && (
-            <span className="text-xl font-bold whitespace-nowrap">SurveyApp</span>
+            <span className="text-xl font-bold whitespace-nowrap">
+              Tron <span className="text-green-300 text-2xl">X.</span>
+            </span>
           )}
 
           <button
@@ -148,7 +158,6 @@ export function Sidebar({ role }: SidebarProps) {
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 mt-4 px-2 space-y-1 overflow-y-auto">
           {visibleItems.map((item) => {
             const isActive = pathname.startsWith(item.path);
@@ -179,17 +188,23 @@ export function Sidebar({ role }: SidebarProps) {
           })}
         </nav>
 
-        {/* Bottom section */}
         <div className="border-t border-gray-700 pt-3 pb-4 px-2 space-y-2 flex-shrink-0">
-          {/* Role badge */}
           {!isCollapsed && (
-            <div className="bg-gray-800 rounded-lg px-3 py-2 text-xs text-gray-400 truncate">
-              Role:{" "}
-              <span className="text-white capitalize">{role.replace("-", " ")}</span>
+            <div className="bg-gray-800 rounded-lg px-3 py-2 text-xs text-gray-400">
+              <div className="truncate">
+                Role:{" "}
+                <span className="text-white capitalize">
+                  {role.replace("-", " ")}
+                </span>
+              </div>
+
+              <div className="truncate mt-1">
+                Email:{" "}
+                <span className="text-white">{email}</span>
+              </div>
             </div>
           )}
 
-          {/* Logout button */}
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}

@@ -1,9 +1,36 @@
-import mongoose from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 
-const attendanceSchema = new mongoose.Schema(
+interface IAttendance extends Document {
+  userId: mongoose.Types.ObjectId;
+  date: Date;
+
+  loggingTime?: Date | null;
+  logoutTime?: Date | null;
+
+  lunchStart?: Date | null;
+  lunchEnd?: Date | null;
+
+  isLate?: boolean;
+  lateByMinutes?: number;
+  isManual?: boolean;
+
+  loginLocation?: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+
+  loginLocationAddress?: string;
+
+  updatedBy?: mongoose.Types.ObjectId | null;
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const AttendanceSchema = new Schema<IAttendance>(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Auth",
       required: true,
     },
@@ -33,45 +60,38 @@ const attendanceSchema = new mongoose.Schema(
       default: null,
     },
 
-    // New: Late status
     isLate: {
       type: Boolean,
       default: false,
     },
 
-    // Optional: how many minutes late (useful for reports)
     lateByMinutes: {
       type: Number,
       default: 0,
     },
 
-    // Geo-location at login
-    loginLocation: {
-      type: {
-        type: String,
-        enum: ["Point"],
-        default: "Point",
-      },
-      coordinates: {
-        type: [Number], // [longitude, latitude]
-        default: undefined,
-      },
-    },
-
-    // Optional: store address / raw location string if needed
-    loginLocationAddress: {
-      type: String,
-      default: null,
-    },
-
-    // Flag to know if attendance was marked via regular flow or request
     isManual: {
       type: Boolean,
       default: false,
     },
 
+    loginLocation: {
+      type: {
+        type: String,
+        enum: ["Point"],
+      },
+      coordinates: {
+        type: [Number],
+      },
+    },
+
+    loginLocationAddress: {
+      type: String,
+      default: null,
+    },
+
     updatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Auth",
       default: null,
     },
@@ -81,12 +101,13 @@ const attendanceSchema = new mongoose.Schema(
   }
 );
 
-// Index for geo queries (optional but recommended)
-attendanceSchema.index({ loginLocation: "2dsphere" });
+// Geo index
+AttendanceSchema.index({
+  loginLocation: "2dsphere",
+});
 
-// Prevent OverwriteModelError during hot reload
-const Attendance =
+const Attendance: Model<IAttendance> =
   mongoose.models.Attendance ||
-  mongoose.model("Attendance", attendanceSchema);
+  mongoose.model<IAttendance>("Attendance", AttendanceSchema);
 
 export default Attendance;

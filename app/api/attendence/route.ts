@@ -155,59 +155,80 @@ export async function POST(request: NextRequest) {
       switch (action) {
         // ────────────── LOGIN ──────────────
         case "login": {
-          if (record.loggingTime) {
-            return NextResponse.json(
-              { error: "Already logged in for this date" },
-              { status: 400 }
-            );
-          }
+  if (record.loggingTime) {
+    return NextResponse.json(
+      { error: "Already logged in for this date" },
+      { status: 400 }
+    );
+  }
 
-          // Geo check is mandatory for login
-          if (latitude == null || longitude == null) {
-            return NextResponse.json(
-              { error: "Latitude and longitude are required for login" },
-              { status: 400 }
-            );
-          }
+  if (latitude == null || longitude == null) {
+    return NextResponse.json(
+      {
+        error: "Latitude and longitude are required for login",
+      },
+      { status: 400 }
+    );
+  }
 
-          const distance = getDistanceInMeters(
-            latitude,
-            longitude,
-            OFFICE_LAT,
-            OFFICE_LNG
-          );
+  const lat = Number(latitude);
+  const lng = Number(longitude);
 
-          if (distance > MAX_DISTANCE_METERS) {
-            return NextResponse.json(
-              {
-                error: `You are not at the office location. Distance: ${Math.round(
-                  distance
-                )} meters (allowed: ${MAX_DISTANCE_METERS}m)`,
-              },
-              { status: 403 }
-            );
-          }
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return NextResponse.json(
+      {
+        error: "Invalid latitude or longitude",
+      },
+      { status: 400 }
+    );
+  }
 
-          // Set login time + location
-          record.loggingTime = now;
-          record.loginLocation = {
-            type: "Point",
-            coordinates: [longitude, latitude], // GeoJSON order: [lng, lat]
-          };
-          if (locationAddress) {
-            record.loginLocationAddress = locationAddress;
-          }
+  const distance = getDistanceInMeters(
+    lat,
+    lng,
+    OFFICE_LAT,
+    OFFICE_LNG
+  );
 
-          // Calculate late
-          const { isLate, lateByMinutes } = calculateLate(
-            now,
-            user.workingShift as "day" | "night"
-          );
-          record.isLate = isLate;
-          record.lateByMinutes = lateByMinutes;
+  if (distance > MAX_DISTANCE_METERS) {
+    return NextResponse.json(
+      {
+        error: `You are not at the office location. Distance: ${Math.round(
+          distance
+        )} meters (allowed: ${MAX_DISTANCE_METERS}m)`,
+      },
+      { status: 403 }
+    );
+  }
 
-          break;
-        }
+  record.loggingTime = now;
+
+  record.loginLocation = {
+    type: "Point",
+    coordinates: [lng, lat],
+  };
+
+  if (locationAddress) {
+    record.loginLocationAddress = locationAddress;
+  }
+
+  const { isLate, lateByMinutes } = calculateLate(
+    now,
+    user.workingShift as "day" | "night"
+  );
+
+  record.isLate = isLate;
+  record.lateByMinutes = lateByMinutes;
+
+  break;
+}
 
         // ────────────── LOGOUT ──────────────
         case "logout": {

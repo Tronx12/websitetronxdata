@@ -207,7 +207,7 @@ export default function AttendencePage({ currentUserId }: Props) {
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Attendance</h1>
+          <h4 className="text-3xl font-bold text-gray-900">Attendance</h4>
           <p className="text-gray-500 mt-1">Mark & track daily attendance</p>
         </div>
 
