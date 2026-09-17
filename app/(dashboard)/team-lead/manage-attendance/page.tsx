@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { formatLateTime } from "@/lib/shiftValidation";
 
 interface AttendanceRecord {
   _id: string;
@@ -542,7 +543,7 @@ export default function TeamLeadAttendancePage() {
                                 <td className="px-4 py-3 text-sm">
                                   {record.isLate ? (
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                      {record.lateByMinutes} min
+                                      Late ({formatLateTime(record.lateByMinutes)})
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

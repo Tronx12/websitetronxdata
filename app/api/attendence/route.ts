@@ -3,6 +3,12 @@ import mongoose from "mongoose";
 import Attendance from "@/models/Attendance";
 import Auth from "@/models/Auth";
 import { connectDB } from "@/config/db";
+import { createAuditLog } from "@/lib/auditLog";
+import {
+  validateLoginShift,
+  validateLogoutShift,
+  validateLunchEnd,
+} from "@/lib/shiftValidation";
 
 // ────────────────────────────────────────────────
 // Office location (change these values or move to env)
@@ -29,30 +35,6 @@ function getDistanceInMeters(
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c;
-}
-
-// Calculate late status based on shift
-function calculateLate(loggingTime: Date, workingShift: "day" | "night") {
-  const login = new Date(loggingTime);
-
-  let allowedHour = 10;
-  let allowedMinute = 15; // day default
-
-  if (workingShift === "night") {
-    allowedHour = 21; // 9:30 PM → 21:30 + 15 min = 21:45
-    allowedMinute = 45;
-  }
-
-  const allowedTime = new Date(login);
-  allowedTime.setHours(allowedHour, allowedMinute, 0, 0);
-
-  if (login > allowedTime) {
-    const diffMs = login.getTime() - allowedTime.getTime();
-    const lateByMinutes = Math.ceil(diffMs / (1000 * 60));
-    return { isLate: true, lateByMinutes };
-  }
-
-  return { isLate: false, lateByMinutes: 0 };
 }
 
 // ────────────────────────────────────────────────
@@ -97,7 +79,20 @@ export async function GET(request: NextRequest) {
       .populate("updatedBy", "name email")
       .sort({ date: -1 });
 
-    return NextResponse.json(records);
+    const processed = records.map((rec) => {
+      const doc = rec.toObject();
+      if (doc.loggingTime) {
+        const shift = (doc.userId as any)?.workingShift || "day";
+        const validation = validateLoginShift(new Date(doc.loggingTime), shift);
+        if (validation.allowed && validation.isLate) {
+          doc.isLate = true;
+          doc.lateByMinutes = validation.lateByMinutes || 0;
+        }
+      }
+      return doc;
+    });
+
+    return NextResponse.json(processed);
   } catch (error) {
     console.error("GET /api/attendance error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -144,6 +139,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
 
+      const shift = (user.workingShift as "day" | "night") || "day";
+
       if (!record) {
         record = new Attendance({
           userId,
@@ -155,80 +152,88 @@ export async function POST(request: NextRequest) {
       switch (action) {
         // ────────────── LOGIN ──────────────
         case "login": {
-  if (record.loggingTime) {
-    return NextResponse.json(
-      { error: "Already logged in for this date" },
-      { status: 400 }
-    );
-  }
+          if (record.loggingTime) {
+            return NextResponse.json(
+              { error: "Already logged in for this date" },
+              { status: 400 }
+            );
+          }
 
-  if (latitude == null || longitude == null) {
-    return NextResponse.json(
-      {
-        error: "Latitude and longitude are required for login",
-      },
-      { status: 400 }
-    );
-  }
+          // Validate shift login window
+          const loginValidation = validateLoginShift(now, shift);
+          if (!loginValidation.allowed) {
+            return NextResponse.json(
+              { error: loginValidation.message },
+              { status: 400 }
+            );
+          }
 
-  const lat = Number(latitude);
-  const lng = Number(longitude);
+          if (latitude == null || longitude == null) {
+            return NextResponse.json(
+              {
+                error: "Latitude and longitude are required for login",
+              },
+              { status: 400 }
+            );
+          }
 
-  if (
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lng) ||
-    lat < -90 ||
-    lat > 90 ||
-    lng < -180 ||
-    lng > 180
-  ) {
-    return NextResponse.json(
-      {
-        error: "Invalid latitude or longitude",
-      },
-      { status: 400 }
-    );
-  }
+          const lat = Number(latitude);
+          const lng = Number(longitude);
 
-  const distance = getDistanceInMeters(
-    lat,
-    lng,
-    OFFICE_LAT,
-    OFFICE_LNG
-  );
+          if (
+            !Number.isFinite(lat) ||
+            !Number.isFinite(lng) ||
+            lat < -90 ||
+            lat > 90 ||
+            lng < -180 ||
+            lng > 180
+          ) {
+            return NextResponse.json(
+              {
+                error: "Invalid latitude or longitude",
+              },
+              { status: 400 }
+            );
+          }
 
-  if (distance > MAX_DISTANCE_METERS) {
-    return NextResponse.json(
-      {
-        error: `You are not at the office location. Distance: ${Math.round(
-          distance
-        )} meters (allowed: ${MAX_DISTANCE_METERS}m)`,
-      },
-      { status: 403 }
-    );
-  }
+          const distance = getDistanceInMeters(
+            lat,
+            lng,
+            OFFICE_LAT,
+            OFFICE_LNG
+          );
 
-  record.loggingTime = now;
+          if (distance > MAX_DISTANCE_METERS) {
+            return NextResponse.json(
+              {
+                error: `You are not at the office location. Distance: ${Math.round(
+                  distance
+                )} meters (allowed: ${MAX_DISTANCE_METERS}m)`,
+              },
+              { status: 403 }
+            );
+          }
 
-  record.loginLocation = {
-    type: "Point",
-    coordinates: [lng, lat],
-  };
+          record.loggingTime = now;
+          record.status = "present";
 
-  if (locationAddress) {
-    record.loginLocationAddress = locationAddress;
-  }
+          record.loginLocation = {
+            type: "Point",
+            coordinates: [lng, lat],
+          };
 
-  const { isLate, lateByMinutes } = calculateLate(
-    now,
-    user.workingShift as "day" | "night"
-  );
+          if (locationAddress) {
+            record.loginLocationAddress = locationAddress;
+          }
 
-  record.isLate = isLate;
-  record.lateByMinutes = lateByMinutes;
+          record.isLate = !!loginValidation.isLate;
+          record.lateByMinutes = loginValidation.lateByMinutes || 0;
+          if (loginValidation.message) {
+            record.remarks = loginValidation.message;
+          }
 
-  break;
-}
+          break;
+        }
 
         // ────────────── LOGOUT ──────────────
         case "logout": {
@@ -247,6 +252,16 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
+
+          // Validate shift logout window
+          const logoutValidation = validateLogoutShift(now, shift);
+          if (!logoutValidation.allowed) {
+            return NextResponse.json(
+              { error: logoutValidation.message },
+              { status: 400 }
+            );
+          }
+
           record.logoutTime = now;
           break;
         }
@@ -295,7 +310,24 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
+
+          // Validate lunch duration (30 to 35 min)
+          const lunchValidation = validateLunchEnd(record.lunchStart, now);
+          if (!lunchValidation.allowed) {
+            return NextResponse.json(
+              { error: lunchValidation.message },
+              { status: 400 }
+            );
+          }
+
           record.lunchEnd = now;
+          record.lunchDurationMinutes = lunchValidation.lunchDurationMinutes || 0;
+          record.excessLunchMinutes = lunchValidation.excessLunchMinutes || 0;
+          if (lunchValidation.message) {
+            record.remarks = record.remarks
+              ? `${record.remarks} | ${lunchValidation.message}`
+              : lunchValidation.message;
+          }
           break;
         }
 
@@ -305,6 +337,18 @@ export async function POST(request: NextRequest) {
 
       if (updatedBy) record.updatedBy = updatedBy;
       await record.save();
+
+      // AUDIT LOG
+      const auditAction = action === "login" ? "LOGIN" : action === "logout" ? "LOGOUT" : "UPDATE";
+      await createAuditLog({
+        userId,
+        action: auditAction,
+        module: "Attendance",
+        description: `Marked attendance action: ${action} for ${user.name || "user"}`,
+        entityType: "Attendance",
+        entityId: String(record._id),
+        metadata: { action, date: targetDate },
+      });
 
       // Return populated record
       const populated = await Attendance.findById(record._id)
@@ -319,6 +363,17 @@ export async function POST(request: NextRequest) {
       Object.assign(record, rest);
       if (updatedBy) record.updatedBy = updatedBy;
       await record.save();
+
+      await createAuditLog({
+        userId: updatedBy || userId,
+        action: "UPDATE",
+        module: "Attendance",
+        description: `Updated attendance record for user ${userId}`,
+        entityType: "Attendance",
+        entityId: String(record._id),
+        metadata: rest,
+      });
+
       return NextResponse.json(record);
     }
 
@@ -329,9 +384,19 @@ export async function POST(request: NextRequest) {
       ...rest,
     });
 
+    await createAuditLog({
+      userId: updatedBy || userId,
+      action: "CREATE",
+      module: "Attendance",
+      description: `Created attendance record for user ${userId}`,
+      entityType: "Attendance",
+      entityId: String(newRecord._id),
+      metadata: rest,
+    });
+
     return NextResponse.json(newRecord, { status: 201 });
   } catch (error) {
     console.error("POST /api/attendance error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+}

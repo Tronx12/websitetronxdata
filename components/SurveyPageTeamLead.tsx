@@ -36,7 +36,7 @@ interface SurveyItem {
   createdBy?: string;
 }
 
-interface TesterSummary {
+interface TeamMemberSummary {
   _id: string;
   name: string;
   email: string;
@@ -46,7 +46,7 @@ interface TesterSummary {
   categories: string[];
 }
 
-type MainTab = "MY_DATA" | "TESTER_DATA";
+type MainTab = "MY_DATA" | "TEAM_DATA";
 type CategoryTab = SurveyCategory | "ALL";
 
 const BULK_PLACEHOLDER = `Paste ONE record like this:
@@ -79,6 +79,21 @@ interface SurveyPageTeamLeadProps {
   currentUserName?: string;
 }
 
+/**
+ * Team Lead survey page.
+ *
+ * Unlike the Admin view (which browses ALL testers and does not submit its
+ * own survey data), a Team Lead:
+ *   1. Submits/pastes their OWN survey data (MY_DATA tab), and
+ *   2. Can view the survey data submitted by the members of THEIR OWN team
+ *      only (TEAM_DATA tab) — not every tester in the system.
+ *
+ * The "team member" restriction is enforced by passing the current team
+ * lead's id as `teamLeadId` to /api/survey/team-members. The backend is
+ * expected to resolve that to "users whose manager/teamLeadId === this id"
+ * (or however your reporting-line relationship is modeled) rather than
+ * returning every tester, the way /api/survey/testers does for Admin.
+ */
 export default function SurveyPageTeamLead({
   currentUserId,
   currentUserName = "Team Lead",
@@ -105,10 +120,10 @@ export default function SurveyPageTeamLead({
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const [testers, setTesters] = useState<TesterSummary[]>([]);
-  const [testersLoading, setTestersLoading] = useState(false);
-  const [testerSearch, setTesterSearch] = useState("");
-  const [selectedTester, setSelectedTester] = useState<TesterSummary | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [teamSearch, setTeamSearch] = useState("");
+  const [selectedMember, setSelectedMember] = useState<TeamMemberSummary | null>(null);
 
   const [editingItem, setEditingItem] = useState<SurveyItem | null>(null);
   const [editForm, setEditForm] = useState<Partial<SurveyItem>>({});
@@ -130,8 +145,8 @@ export default function SurveyPageTeamLead({
 
       if (mainTab === "MY_DATA") {
         params.set("createdBy", currentUserId);
-      } else if (mainTab === "TESTER_DATA" && selectedTester) {
-        params.set("createdBy", selectedTester._id);
+      } else if (mainTab === "TEAM_DATA" && selectedMember) {
+        params.set("createdBy", selectedMember._id);
       }
 
       const res = await fetch(`/api/survey?${params}`);
@@ -147,39 +162,41 @@ export default function SurveyPageTeamLead({
     } finally {
       setLoading(false);
     }
-  }, [activeTab, page, sortBy, sortOrder, search, mainTab, currentUserId, selectedTester]);
+  }, [activeTab, page, sortBy, sortOrder, search, mainTab, currentUserId, selectedMember]);
 
-  // ---------- Fetch testers ----------
-  const fetchTesters = useCallback(async () => {
+  // ---------- Fetch team members (scoped to this team lead only) ----------
+  const fetchTeamMembers = useCallback(async () => {
     try {
-      setTestersLoading(true);
-      const params = new URLSearchParams();
-      if (testerSearch.trim()) params.set("search", testerSearch.trim());
+      setTeamLoading(true);
+      const params = new URLSearchParams({
+        teamLeadId: currentUserId, // restrict results to members reporting to this team lead
+      });
+      if (teamSearch.trim()) params.set("search", teamSearch.trim());
 
-      const res = await fetch(`/api/survey/testers?${params}`);
+      const res = await fetch(`/api/survey/team-members?${params}`);
       const json = await res.json();
 
       if (json.success) {
-        setTesters(json.data);
+        setTeamMembers(json.data);
       }
     } catch (err) {
       console.error(err);
     } finally {
-      setTestersLoading(false);
+      setTeamLoading(false);
     }
-  }, [testerSearch]);
+  }, [teamSearch, currentUserId]);
 
   useEffect(() => {
-    if (mainTab === "MY_DATA" || (mainTab === "TESTER_DATA" && selectedTester)) {
+    if (mainTab === "MY_DATA" || (mainTab === "TEAM_DATA" && selectedMember)) {
       fetchData();
     }
-  }, [fetchData, mainTab, selectedTester]);
+  }, [fetchData, mainTab, selectedMember]);
 
   useEffect(() => {
-    if (mainTab === "TESTER_DATA" && !selectedTester) {
-      fetchTesters();
+    if (mainTab === "TEAM_DATA" && !selectedMember) {
+      fetchTeamMembers();
     }
-  }, [mainTab, selectedTester, fetchTesters]);
+  }, [mainTab, selectedMember, fetchTeamMembers]);
 
   const blockPreviewCount = useMemo(() => {
     if (!paste.trim()) return 0;
@@ -207,7 +224,7 @@ export default function SurveyPageTeamLead({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paste,
-          createdBy: currentUserId,
+          // createdBy: currentUserId,
         }),
       });
 
@@ -222,7 +239,7 @@ export default function SurveyPageTeamLead({
         });
         setPaste("");
         setMainTab("MY_DATA");
-        setSelectedTester(null);
+        setSelectedMember(null);
         fetchData();
       } else {
         setMessage({ type: "error", text: json.message || "Save failed" });
@@ -238,38 +255,132 @@ export default function SurveyPageTeamLead({
   };
 
   // ---------- Export ----------
+  // const handleExport = async () => {
+  //   try {
+  //     setExporting(true);
+  //     const params = new URLSearchParams();
+  //     if (activeTab !== "ALL") params.set("category", activeTab);
+  //     if (mainTab === "MY_DATA") {
+  //       params.set("createdBy", currentUserId);
+  //     } else if (selectedMember) {
+  //       params.set("createdBy", selectedMember._id);
+  //     }
+
+  //     const res = await fetch(`/api/survey/export?${params}`);
+  //     if (!res.ok) throw new Error("Export failed");
+
+  //     const blob = await res.blob();
+  //     const url = window.URL.createObjectURL(blob);
+  //     const a = document.createElement("a");
+  //     a.href = url;
+  //     a.download = `survey-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
+  //     a.click();
+  //     window.URL.revokeObjectURL(url);
+  //   } catch (err) {
+  //     alert("Failed to download Excel");
+  //   } finally {
+  //     setExporting(false);
+  //   }
+  // };
+
   const handleExport = async () => {
-    try {
-      setExporting(true);
-      const params = new URLSearchParams();
-      if (activeTab !== "ALL") params.set("category", activeTab);
-      if (mainTab === "MY_DATA") {
-        params.set("createdBy", currentUserId);
-      } else if (selectedTester) {
-        params.set("createdBy", selectedTester._id);
-      }
+  try {
+    setExporting(true);
 
-      const res = await fetch(`/api/survey/export?${params}`);
-      if (!res.ok) throw new Error("Export failed");
+    const params =
+      new URLSearchParams();
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `survey-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      alert("Failed to download Excel");
-    } finally {
-      setExporting(false);
+    if (
+      activeTab !== "ALL"
+    ) {
+      params.set(
+        "category",
+        activeTab
+      );
     }
-  };
+
+    /*
+     * DO NOT send createdBy.
+     *
+     * Backend automatically gets:
+     * logged-in Team Lead
+     * +
+     * all members of his team
+     */
+    const res =
+      await fetch(
+        `/api/survey/export?${params.toString()}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+    if (!res.ok) {
+      const errorText =
+        await res.text();
+
+      console.error(
+        "Team Lead export error:",
+        errorText
+      );
+
+      throw new Error(
+        "Export failed"
+      );
+    }
+
+    const blob =
+      await res.blob();
+
+    const url =
+      window.URL.createObjectURL(
+        blob
+      );
+
+    const a =
+      document.createElement(
+        "a"
+      );
+
+    a.href = url;
+
+    a.download =
+      `survey-team-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
+
+    document.body.appendChild(
+      a
+    );
+
+    a.click();
+
+    a.remove();
+
+    window.URL.revokeObjectURL(
+      url
+    );
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
+    alert(
+      "Failed to download Excel"
+    );
+
+  } finally {
+    setExporting(false);
+  }
+};
 
   const handleWorkReport = async (range: "weekly" | "monthly") => {
     try {
       setReportLoading(range);
-      const res = await fetch(`/api/survey/work-report?range=${range}`);
+      // Scope the report to this team lead + their team only.
+      const res = await fetch(
+        `/api/survey/work-report?range=${range}&teamLeadId=${currentUserId}`
+      );
       if (!res.ok) throw new Error("Report generation failed");
 
       const blob = await res.blob();
@@ -353,8 +464,8 @@ export default function SurveyPageTeamLead({
 
       if (json.success) {
         fetchData();
-        if (mainTab === "TESTER_DATA" && !selectedTester) {
-          fetchTesters();
+        if (mainTab === "TEAM_DATA" && !selectedMember) {
+          fetchTeamMembers();
         }
         setMessage({ type: "success", text: "Record deleted successfully" });
       } else {
@@ -491,7 +602,7 @@ export default function SurveyPageTeamLead({
             Survey Data Module – Team Lead
           </h4>
           <p className="text-gray-500 mt-1">
-            Welcome, {currentUserName}. Manage your data and survey testers • Edit & Delete enabled
+            Welcome, {currentUserName}. Manage your own survey data and your team&apos;s data • Edit & Delete enabled
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -539,7 +650,7 @@ export default function SurveyPageTeamLead({
         <button
           onClick={() => {
             setMainTab("MY_DATA");
-            setSelectedTester(null);
+            setSelectedMember(null);
             setPage(1);
             setActiveTab("ALL");
           }}
@@ -554,23 +665,23 @@ export default function SurveyPageTeamLead({
         </button>
         <button
           onClick={() => {
-            setMainTab("TESTER_DATA");
-            setSelectedTester(null);
+            setMainTab("TEAM_DATA");
+            setSelectedMember(null);
             setPage(1);
             setActiveTab("ALL");
           }}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-            mainTab === "TESTER_DATA"
+            mainTab === "TEAM_DATA"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >
           <Users className="w-4 h-4" />
-          Survey Tester Data
+          My Team&apos;s Survey Data
         </button>
       </div>
 
-      {/* Paste Section (only on My Data) */}
+      {/* Paste Section (only on My Data — team lead submits their own survey data) */}
       {mainTab === "MY_DATA" && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -650,43 +761,43 @@ export default function SurveyPageTeamLead({
 
       {/* Content */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Tester List */}
-        {mainTab === "TESTER_DATA" && !selectedTester && (
+        {/* Team Member List (scoped to this team lead's team only) */}
+        {mainTab === "TEAM_DATA" && !selectedMember && (
           <>
             <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search tester by name or email..."
-                  value={testerSearch}
-                  onChange={(e) => setTesterSearch(e.target.value)}
+                  placeholder="Search team member by name or email..."
+                  value={teamSearch}
+                  onChange={(e) => setTeamSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <button
-                onClick={fetchTesters}
+                onClick={fetchTeamMembers}
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm"
               >
                 Refresh
               </button>
             </div>
 
-            {testersLoading ? (
+            {teamLoading ? (
               <div className="flex justify-center py-16">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
               </div>
-            ) : testers.length === 0 ? (
+            ) : teamMembers.length === 0 ? (
               <div className="text-center py-16 text-gray-500">
-                No survey testers found with submitted data.
+                No team members with submitted survey data found.
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {testers.map((tester) => (
+                {teamMembers.map((member) => (
                   <button
-                    key={tester._id}
+                    key={member._id}
                     onClick={() => {
-                      setSelectedTester(tester);
+                      setSelectedMember(member);
                       setPage(1);
                       setActiveTab("ALL");
                       setSearch("");
@@ -695,25 +806,25 @@ export default function SurveyPageTeamLead({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-semibold text-sm shrink-0">
-                        {(tester.name || "T").charAt(0).toUpperCase()}
+                        {(member.name || "T").charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-gray-900 truncate">
-                          {tester.name || "Unknown Tester"}
+                          {member.name || "Unknown Member"}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {tester.email || "No email"}
+                          {member.email || "No email"}
                         </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-lg font-bold text-blue-600">
-                        {tester.totalRecords}
+                        {member.totalRecords}
                       </p>
                       <p className="text-xs text-gray-400">records</p>
-                      {tester.lastSubmitted && (
+                      {member.lastSubmitted && (
                         <p className="text-xs text-gray-400 mt-0.5">
-                          Last: {new Date(tester.lastSubmitted).toLocaleDateString()}
+                          Last: {new Date(member.lastSubmitted).toLocaleDateString()}
                         </p>
                       )}
                     </div>
@@ -724,24 +835,24 @@ export default function SurveyPageTeamLead({
           </>
         )}
 
-        {/* Records (My Data or selected tester) */}
-        {(mainTab === "MY_DATA" || (mainTab === "TESTER_DATA" && selectedTester)) && (
+        {/* Records (My Data or selected team member) */}
+        {(mainTab === "MY_DATA" || (mainTab === "TEAM_DATA" && selectedMember)) && (
           <>
-            {mainTab === "TESTER_DATA" && selectedTester && (
+            {mainTab === "TEAM_DATA" && selectedMember && (
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
                 <button
                   onClick={() => {
-                    setSelectedTester(null);
+                    setSelectedMember(null);
                     setPage(1);
                   }}
                   className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Back to all testers
+                  Back to my team
                 </button>
                 <span className="text-sm text-gray-600">
-                  Viewing data of <strong>{selectedTester.name}</strong> (
-                  {selectedTester.totalRecords} total records)
+                  Viewing data of <strong>{selectedMember.name}</strong> (
+                  {selectedMember.totalRecords} total records)
                 </span>
               </div>
             )}

@@ -1,11 +1,10 @@
-// app/api/teams/[id]/route.js
-
 import { NextResponse } from "next/server";
 
 import { connectDB } from "@/config/db";
 import Team from "@/models/Team";
 import Auth from "@/models/Auth";
 import { getCurrentUser } from "@/lib/getuser";
+import { createAuditLog } from "@/lib/auditLog";
 
 
 /* =========================================================
@@ -260,6 +259,16 @@ export async function PUT(req, { params }) {
 
     await team.save();
 
+    await createAuditLog({
+      userId: currentUser.userId,
+      action: "UPDATE",
+      module: "Team",
+      description: `Updated team '${team.name}'`,
+      entityType: "Team",
+      entityId: id,
+      metadata: { name: team.name, isActive: team.isActive },
+    });
+
     /* -----------------------------------------
        RETURN UPDATED TEAM
     ----------------------------------------- */
@@ -385,6 +394,15 @@ export async function DELETE(
       );
     }
 
+    await createAuditLog({
+      userId: currentUser.userId,
+      action: "DELETE",
+      module: "Team",
+      description: `Soft deleted team '${team.name}'`,
+      entityType: "Team",
+      entityId: id,
+    });
+
     return NextResponse.json({
       success: true,
       message:
@@ -406,4 +424,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+}

@@ -284,31 +284,137 @@ export default function SurveyPageAdmin({
   };
 
   // ---------- Export ----------
+  // const handleExport = async () => {
+  //   try {
+  //     setExporting(true);
+  //     const params = new URLSearchParams();
+  //     if (activeTab !== "ALL") params.set("category", activeTab);
+  //     if (selectedPerson) {
+  //       params.set("createdBy", selectedPerson._id);
+  //     }
+
+  //     const res = await fetch(`/api/survey/export?${params}`);
+  //     if (!res.ok) throw new Error("Export failed");
+
+  //     const blob = await res.blob();
+  //     const url = window.URL.createObjectURL(blob);
+  //     const a = document.createElement("a");
+  //     a.href = url;
+  //     a.download = `survey-${selectedPerson?.name || "all"}-${Date.now()}.xlsx`;
+  //     a.click();
+  //     window.URL.revokeObjectURL(url);
+  //   } catch {
+  //     alert("Failed to download Excel");
+  //   } finally {
+  //     setExporting(false);
+  //   }
+  // };
+
   const handleExport = async () => {
-    try {
-      setExporting(true);
-      const params = new URLSearchParams();
-      if (activeTab !== "ALL") params.set("category", activeTab);
-      if (selectedPerson) {
-        params.set("createdBy", selectedPerson._id);
-      }
-
-      const res = await fetch(`/api/survey/export?${params}`);
-      if (!res.ok) throw new Error("Export failed");
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `survey-${selectedPerson?.name || "all"}-${Date.now()}.xlsx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      alert("Failed to download Excel");
-    } finally {
-      setExporting(false);
+  try {
+    if (!selectedTeam) {
+      alert(
+        "Please select a team first."
+      );
+      return;
     }
-  };
+
+    setExporting(true);
+
+    const params =
+      new URLSearchParams();
+
+    if (
+      activeTab !== "ALL"
+    ) {
+      params.set(
+        "category",
+        activeTab
+      );
+    }
+
+    /*
+     * ADMIN / HR:
+     * Send ONLY selected team.
+     *
+     * Backend validates that the
+     * logged-in user is admin/hr.
+     */
+    params.set(
+      "teamId",
+      selectedTeam._id
+    );
+
+    const res =
+      await fetch(
+        `/api/survey/export?${params.toString()}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+    if (!res.ok) {
+      const errorText =
+        await res.text();
+
+      console.error(
+        "Admin/HR export error:",
+        errorText
+      );
+
+      throw new Error(
+        "Export failed"
+      );
+    }
+
+    const blob =
+      await res.blob();
+
+    const url =
+      window.URL.createObjectURL(
+        blob
+      );
+
+    const a =
+      document.createElement(
+        "a"
+      );
+
+    a.href = url;
+
+    a.download =
+      `survey-${selectedTeam.name
+        .replace(
+          /[^a-zA-Z0-9-_]/g,
+          "-"
+        )}-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
+
+    document.body.appendChild(
+      a
+    );
+
+    a.click();
+
+    a.remove();
+
+    window.URL.revokeObjectURL(
+      url
+    );
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
+    alert(
+      "Failed to download Excel"
+    );
+
+  } finally {
+    setExporting(false);
+  }
+};
 
   const handleWorkReport = async (range: "weekly" | "monthly") => {
     try {

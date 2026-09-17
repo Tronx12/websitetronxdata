@@ -1,12 +1,1742 @@
+// // import { NextRequest, NextResponse } from "next/server";
+// // import mongoose from "mongoose";
+
+// // import { connectDB } from "@/config/db";
+// // import SurveyData from "@/models/SurveyData";
+// // import { parseBulkPaste } from "@/lib/parseSurveyBulk";
+// // import { SurveyCategory } from "@/lib/survey-fields";
+// // import { getCurrentUser } from "@/lib/getuser";
+// // import { createAuditLog } from "@/lib/auditLog";
+
+// // const VALID_CATEGORIES: SurveyCategory[] = [
+// //   "B2B",
+// //   "B2H",
+// //   "B2C",
+// // ];
+
+// // export async function POST(req: NextRequest) {
+// //   try {
+// //     await connectDB();
+
+// //     /* ============================================
+// //        AUTHENTICATED USER
+// //     ============================================ */
+
+// //     const currentUser = await getCurrentUser();
+
+// //     if (!currentUser?.userId) {
+// //       return NextResponse.json(
+// //         {
+// //           success: false,
+// //           message: "Unauthorized",
+// //         },
+// //         { status: 401 }
+// //       );
+// //     }
+
+// //     if (
+// //       !mongoose.Types.ObjectId.isValid(
+// //         currentUser.userId
+// //       )
+// //     ) {
+// //       return NextResponse.json(
+// //         {
+// //           success: false,
+// //           message: "Invalid authenticated user ID",
+// //         },
+// //         { status: 401 }
+// //       );
+// //     }
+
+// //     const authenticatedUserId =
+// //       new mongoose.Types.ObjectId(
+// //         currentUser.userId
+// //       );
+
+// //     /* ============================================
+// //        REQUEST
+// //     ============================================ */
+
+// //     const body = await req.json();
+
+// //     const category =
+// //       body?.category as
+// //         | SurveyCategory
+// //         | undefined;
+
+// //     const paste = body?.paste;
+
+// //     /* ============================================
+// //        CATEGORY
+// //     ============================================ */
+
+// //     if (
+// //       category &&
+// //       !VALID_CATEGORIES.includes(category)
+// //     ) {
+// //       return NextResponse.json(
+// //         {
+// //           success: false,
+// //           message:
+// //             "Category must be one of B2B | B2H | B2C",
+// //         },
+// //         { status: 400 }
+// //       );
+// //     }
+
+// //     /* ============================================
+// //        PASTE
+// //     ============================================ */
+
+// //     if (
+// //       typeof paste !== "string" ||
+// //       !paste.trim()
+// //     ) {
+// //       return NextResponse.json(
+// //         {
+// //           success: false,
+// //           message: "Paste data is required",
+// //         },
+// //         { status: 400 }
+// //       );
+// //     }
+
+// //     const fallbackCategory: SurveyCategory =
+// //       category &&
+// //       VALID_CATEGORIES.includes(category)
+// //         ? category
+// //         : "B2C";
+
+// //     /* ============================================
+// //        PARSE
+// //     ============================================ */
+
+// //     const { records, errors } =
+// //       parseBulkPaste(
+// //         paste,
+// //         fallbackCategory
+// //       );
+
+// //     if (!records.length) {
+// //       return NextResponse.json(
+// //         {
+// //           success: false,
+// //           message:
+// //             "No valid records found. Use Key: Value lines or separate records with =====.",
+// //           errors,
+// //         },
+// //         { status: 400 }
+// //       );
+// //     }
+
+// //     /* ============================================
+// //        BATCH ID
+// //     ============================================ */
+
+// //     const batchId =
+// //       records.length > 1
+// //         ? new mongoose.Types.ObjectId().toString()
+// //         : null;
+
+// //     /* ============================================
+// //        DOCUMENTS
+// //     ============================================ */
+
+// //     const documents = records.map(
+// //       (record) => ({
+// //         category: record.category,
+
+// //         accountType:
+// //           record.accountType || undefined,
+
+// //         projectNo:
+// //           record.projectNo || undefined,
+
+// //         panelCode:
+// //           record.panelCode || undefined,
+
+// //         description:
+// //           record.description || undefined,
+
+// //         pid:
+// //           record.pid || undefined,
+
+// //         supplierId:
+// //           record.supplierId || undefined,
+
+// //         country:
+// //           record.country || undefined,
+
+// //         ip:
+// //           record.ip || undefined,
+
+// //         status:
+// //           record.status || undefined,
+
+// //         data:
+// //           record.data || {},
+
+// //         rawPaste:
+// //           record.rawBlock || paste,
+
+// //         batchId,
+
+// //         // IMPORTANT:
+// //         // Always use authenticated user.
+// //         createdBy:
+// //           authenticatedUserId,
+// //       })
+// //     );
+
+// //     /* ============================================
+// //        SAVE
+// //     ============================================ */
+
+// //     const docs =
+// //       await SurveyData.insertMany(
+// //         documents
+// //       );
+
+// //     /* ============================================
+// //        AUDIT LOG
+// //     ============================================ */
+
+// //     await createAuditLog({
+// //       userId:
+// //         currentUser.userId,
+
+// //       action: "UPLOAD",
+
+// //       module: "Survey",
+
+// //       description:
+// //         `Uploaded ${docs.length} survey record${
+// //           docs.length === 1
+// //             ? ""
+// //             : "s"
+// //         }`,
+
+// //       entityType: "SurveyData",
+
+// //       entityId:
+// //         docs.length === 1
+// //           ? docs[0]._id.toString()
+// //           : batchId || undefined,
+
+// //       metadata: {
+// //         count: docs.length,
+
+// //         categories: [
+// //           ...new Set(
+// //             docs.map(
+// //               (doc) => doc.category
+// //             )
+// //           ),
+// //         ],
+
+// //         batchId,
+// //       },
+// //     });
+
+// //     /* ============================================
+// //        RESPONSE
+// //     ============================================ */
+
+// //     return NextResponse.json(
+// //       {
+// //         success: true,
+
+// //         message:
+// //           docs.length === 1
+// //             ? "1 record saved"
+// //             : `${docs.length} records saved`,
+
+// //         count: docs.length,
+
+// //         errors,
+
+// //         data: docs.map((doc) => {
+// //           const object =
+// //             doc.toObject();
+
+// //           return {
+// //             ...object,
+// //             data:
+// //               object.data || {},
+// //           };
+// //         }),
+// //       },
+// //       { status: 201 }
+// //     );
+// //   } catch (error: any) {
+// //     console.error(
+// //       "SURVEY POST ERROR:",
+// //       error
+// //     );
+
+// //     /* ============================================
+// //        VALIDATION
+// //     ============================================ */
+
+// //     if (
+// //       error?.name ===
+// //       "ValidationError"
+// //     ) {
+// //       const validationErrors =
+// //         Object.entries(
+// //           error.errors || {}
+// //         ).map(
+// //           ([field, err]: [
+// //             string,
+// //             any
+// //           ]) => ({
+// //             field,
+// //             message:
+// //               err?.message ||
+// //               "Validation failed",
+// //             value: err?.value,
+// //             kind: err?.kind,
+// //           })
+// //         );
+
+// //       return NextResponse.json(
+// //         {
+// //           success: false,
+// //           message:
+// //             "Survey validation failed",
+// //           error: error.message,
+// //           validationErrors,
+// //         },
+// //         { status: 400 }
+// //       );
+// //     }
+
+// //     /* ============================================
+// //        CAST
+// //     ============================================ */
+
+// //     if (
+// //       error?.name === "CastError"
+// //     ) {
+// //       return NextResponse.json(
+// //         {
+// //           success: false,
+// //           message:
+// //             `Invalid value for ${error.path}`,
+// //           error: error.message,
+// //           path: error.path,
+// //           value: error.value,
+// //         },
+// //         { status: 400 }
+// //       );
+// //     }
+
+// //     /* ============================================
+// //        DUPLICATE
+// //     ============================================ */
+
+// //     if (error?.code === 11000) {
+// //       return NextResponse.json(
+// //         {
+// //           success: false,
+// //           message:
+// //             "Duplicate survey record",
+// //           error: error.message,
+// //           keyValue:
+// //             error.keyValue,
+// //         },
+// //         { status: 409 }
+// //       );
+// //     }
+
+// //     /* ============================================
+// //        UNKNOWN
+// //     ============================================ */
+
+// //     return NextResponse.json(
+// //       {
+// //         success: false,
+// //         message:
+// //           "Failed to save survey data",
+// //         error:
+// //           error?.message ||
+// //           String(error),
+// //         name:
+// //           error?.name ||
+// //           "UnknownError",
+// //         code:
+// //           error?.code || null,
+// //       },
+// //       { status: 500 }
+// //     );
+// //   }
+// // }
+// // /* ======================================================
+// //    GET - FETCH SURVEY RECORDS
+// // ====================================================== */
+
+// // export async function GET(req: NextRequest) {
+// //   try {
+// //     await connectDB();
+
+// //     const { searchParams } =
+// //       new URL(req.url);
+
+// //     const category =
+// //       searchParams.get("category");
+
+// //     const projectNo =
+// //       searchParams.get("projectNo");
+
+// //     const accountType =
+// //       searchParams.get("accountType");
+
+// //     const pid =
+// //       searchParams.get("pid");
+
+// //     const country =
+// //       searchParams.get("country");
+
+// //     const status =
+// //       searchParams.get("status");
+
+// //     const createdBy =
+// //       searchParams.get("createdBy");
+
+// //     const excludeCreatedBy =
+// //       searchParams.get("excludeCreatedBy");
+
+// //     const includeUnassigned =
+// //       searchParams.get("includeUnassigned");
+
+// //     const sortBy =
+// //       searchParams.get("sortBy") ||
+// //       "createdAt";
+
+// //     const sortOrder =
+// //       searchParams.get("sortOrder") === "asc"
+// //         ? 1
+// //         : -1;
+
+// //     const search =
+// //       searchParams.get("search") || "";
+
+// //     const page = Math.max(
+// //       1,
+// //       Number(
+// //         searchParams.get("page") || "1"
+// //       )
+// //     );
+
+// //     const limit = Math.min(
+// //       100,
+// //       Math.max(
+// //         1,
+// //         Number(
+// //           searchParams.get("limit") || "20"
+// //         )
+// //       )
+// //     );
+
+// //     const skip =
+// //       (page - 1) * limit;
+
+// //     /* ==================================================
+// //        FILTER
+// //     ================================================== */
+
+// //     const filter: any = {};
+
+// //     /* -----------------------------------------------
+// //        Category
+// //     ------------------------------------------------ */
+
+// //     if (
+// //       category &&
+// //       VALID_CATEGORIES.includes(
+// //         category as SurveyCategory
+// //       )
+// //     ) {
+// //       filter.category = category;
+// //     }
+
+// //     /* -----------------------------------------------
+// //        Project
+// //     ------------------------------------------------ */
+
+// //     if (projectNo) {
+// //       filter.projectNo = projectNo;
+// //     }
+
+// //     /* -----------------------------------------------
+// //        Account type
+// //     ------------------------------------------------ */
+
+// //     if (accountType) {
+// //       filter.accountType =
+// //         accountType.toUpperCase();
+// //     }
+
+// //     /* -----------------------------------------------
+// //        PID
+// //     ------------------------------------------------ */
+
+// //     if (pid) {
+// //       filter.pid = pid;
+// //     }
+
+// //     /* -----------------------------------------------
+// //        Country
+// //     ------------------------------------------------ */
+
+// //     if (country) {
+// //       filter.country = {
+// //         $regex: country,
+// //         $options: "i",
+// //       };
+// //     }
+
+// //     /* -----------------------------------------------
+// //        Status
+// //     ------------------------------------------------ */
+
+// //     if (status) {
+// //       filter.status = {
+// //         $regex: status,
+// //         $options: "i",
+// //       };
+// //     }
+
+// //     /* ==================================================
+// //        CREATOR FILTER
+// //     ================================================== */
+
+// //     if (createdBy) {
+// //       if (
+// //         !mongoose.Types.ObjectId.isValid(
+// //           createdBy
+// //         )
+// //       ) {
+// //         return NextResponse.json(
+// //           {
+// //             success: false,
+// //             message:
+// //               "Invalid createdBy ObjectId",
+// //             createdBy,
+// //           },
+// //           { status: 400 }
+// //         );
+// //       }
+
+// //       filter.createdBy =
+// //         new mongoose.Types.ObjectId(
+// //           createdBy
+// //         );
+// //     }
+
+// //     /* -----------------------------------------------
+// //        Exclude creator
+// //     ------------------------------------------------ */
+
+// //     else if (excludeCreatedBy) {
+// //       if (
+// //         !mongoose.Types.ObjectId.isValid(
+// //           excludeCreatedBy
+// //         )
+// //       ) {
+// //         return NextResponse.json(
+// //           {
+// //             success: false,
+// //             message:
+// //               "Invalid excludeCreatedBy ObjectId",
+// //             excludeCreatedBy,
+// //           },
+// //           { status: 400 }
+// //         );
+// //       }
+
+// //       const excludedId =
+// //         new mongoose.Types.ObjectId(
+// //           excludeCreatedBy
+// //         );
+
+// //       if (
+// //         includeUnassigned === "true"
+// //       ) {
+// //         filter.$or = [
+// //           {
+// //             createdBy: null,
+// //           },
+// //           {
+// //             createdBy: {
+// //               $ne: excludedId,
+// //             },
+// //           },
+// //         ];
+// //       } else {
+// //         filter.createdBy = {
+// //           $ne: excludedId,
+// //         };
+// //       }
+// //     }
+
+// //     /* ==================================================
+// //        SEARCH
+// //     ================================================== */
+
+// //     if (search.trim()) {
+// //       const searchRegex = {
+// //         $regex: search.trim(),
+// //         $options: "i",
+// //       };
+
+// //       const searchOr = [
+// //         {
+// //           rawPaste: searchRegex,
+// //         },
+// //         {
+// //           pid: searchRegex,
+// //         },
+// //         {
+// //           projectNo: searchRegex,
+// //         },
+// //         {
+// //           supplierId: searchRegex,
+// //         },
+// //         {
+// //           country: searchRegex,
+// //         },
+// //         {
+// //           accountType: searchRegex,
+// //         },
+// //         {
+// //           status: searchRegex,
+// //         },
+// //       ];
+
+// //       if (filter.$or) {
+// //         filter.$and = [
+// //           {
+// //             $or: filter.$or,
+// //           },
+// //           {
+// //             $or: searchOr,
+// //           },
+// //         ];
+
+// //         delete filter.$or;
+// //       } else {
+// //         filter.$or = searchOr;
+// //       }
+// //     }
+
+// //     /* ==================================================
+// //        DATABASE QUERY
+// //     ================================================== */
+
+// //     const [items, total] =
+// //       await Promise.all([
+// //         SurveyData.find(filter)
+// //           .sort({
+// //             [sortBy]: sortOrder,
+// //           })
+// //           .skip(skip)
+// //           .limit(limit)
+// //           .lean(),
+
+// //         SurveyData.countDocuments(
+// //           filter
+// //         ),
+// //       ]);
+
+// //     /* ==================================================
+// //        RESPONSE
+// //     ================================================== */
+
+// //     const data = items.map(
+// //       (item: any) => ({
+// //         ...item,
+// //         data: item.data || {},
+// //       })
+// //     );
+
+// //     return NextResponse.json({
+// //       success: true,
+
+// //       data,
+
+// //       pagination: {
+// //         page,
+// //         limit,
+// //         total,
+// //         totalPages:
+// //           Math.ceil(total / limit),
+// //       },
+// //     });
+// //   } catch (error: any) {
+// //     console.error(
+// //       "Survey GET error:",
+// //       error
+// //     );
+
+// //     return NextResponse.json(
+// //       {
+// //         success: false,
+// //         message:
+// //           "Failed to fetch survey data",
+// //         error:
+// //           error?.message ||
+// //           String(error),
+// //       },
+// //       { status: 500 }
+// //     );
+// //   }
+// // }
+
+
+
+// import { NextRequest, NextResponse } from "next/server";
+// import mongoose from "mongoose";
+
+// import { connectDB } from "@/config/db";
+// import SurveyData from "@/models/SurveyData";
+// import { SurveyCategory } from "@/lib/survey-fields";
+// import { getCurrentUser } from "@/lib/getuser";
+// import { createAuditLog } from "@/lib/auditLog";
+// import { normalizeSurveyWithGroq } from "@/lib/groqSurveyNormalizer";
+
+// const VALID_CATEGORIES: SurveyCategory[] = [
+//   "B2B",
+//   "B2H",
+//   "B2C",
+// ];
+
+// /* ======================================================
+//    POST - CREATE SURVEY RECORDS
+// ====================================================== */
+
+// export async function POST(req: NextRequest) {
+//   try {
+//     await connectDB();
+
+//     /* ==================================================
+//        AUTHENTICATED USER
+//     ================================================== */
+
+//     const currentUser = await getCurrentUser();
+
+//     if (!currentUser?.userId) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message: "Unauthorized",
+//         },
+//         { status: 401 }
+//       );
+//     }
+
+//     if (
+//       !mongoose.Types.ObjectId.isValid(
+//         currentUser.userId
+//       )
+//     ) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message: "Invalid authenticated user ID",
+//         },
+//         { status: 401 }
+//       );
+//     }
+
+//     const authenticatedUserId =
+//       new mongoose.Types.ObjectId(
+//         currentUser.userId
+//       );
+
+//     /* ==================================================
+//        REQUEST
+//     ================================================== */
+
+//     const body = await req.json();
+
+//     const category =
+//       body?.category as
+//         | SurveyCategory
+//         | undefined;
+
+//     const paste = body?.paste;
+
+//     /* ==================================================
+//        CATEGORY
+//     ================================================== */
+
+//     if (
+//       category &&
+//       !VALID_CATEGORIES.includes(category)
+//     ) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message:
+//             "Category must be one of B2B | B2H | B2C",
+//         },
+//         { status: 400 }
+//       );
+//     }
+
+//     /* ==================================================
+//        PASTE
+//     ================================================== */
+
+//     if (
+//       typeof paste !== "string" ||
+//       !paste.trim()
+//     ) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message: "Paste data is required",
+//         },
+//         { status: 400 }
+//       );
+//     }
+
+//     const fallbackCategory: SurveyCategory =
+//       category &&
+//       VALID_CATEGORIES.includes(category)
+//         ? category
+//         : "B2C";
+
+//     /* ==================================================
+//        GROQ AI NORMALIZATION
+       
+//        IMPORTANT:
+//        We use the structured records returned by Groq
+//        directly. We DO NOT send the AI output through
+//        parseBulkPaste().
+//     ================================================== */
+
+//     let aiRecords: any[];
+
+//     try {
+//       const aiResult =
+//         await normalizeSurveyWithGroq(
+//           paste
+//         );
+
+//       if (
+//         !aiResult ||
+//         !Array.isArray(aiResult.records)
+//       ) {
+//         console.error(
+//           "GROQ INVALID RESULT:",
+//           aiResult
+//         );
+
+//         return NextResponse.json(
+//           {
+//             success: false,
+//             message:
+//               "AI returned an invalid record list.",
+//           },
+//           { status: 502 }
+//         );
+//       }
+
+//       aiRecords = aiResult.records;
+
+//       console.log(
+//         `GROQ: normalized ${aiRecords.length} record(s)`
+//       );
+
+//       if (aiRecords.length === 0) {
+//         return NextResponse.json(
+//           {
+//             success: false,
+//             message:
+//               "AI normalized the input, but returned no survey records.",
+//           },
+//           { status: 400 }
+//         );
+//       }
+//     } catch (error: any) {
+//       console.error(
+//         "GROQ NORMALIZATION ERROR:",
+//         error
+//       );
+
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message: "AI normalization failed",
+//           error:
+//             error?.message ||
+//             "Unknown Groq error",
+//         },
+//         { status: 502 }
+//       );
+//     }
+
+//     /* ==================================================
+//        VALIDATE / CLEAN AI RECORDS
+//     ================================================== */
+
+//     const validRecords = aiRecords.filter(
+//       (record: any) =>
+//         record &&
+//         typeof record === "object"
+//     );
+
+//     if (validRecords.length === 0) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message:
+//             "Groq returned no usable survey records.",
+//         },
+//         { status: 400 }
+//       );
+//     }
+
+//     /* ==================================================
+//        BATCH ID
+//     ================================================== */
+
+//     const batchId =
+//       validRecords.length > 1
+//         ? new mongoose.Types.ObjectId().toString()
+//         : null;
+
+//     /* ==================================================
+//        BUILD MONGODB DOCUMENTS
+//     ================================================== */
+
+//     const documents = validRecords.map(
+//       (record: any) => {
+
+//         /*
+//          * Start with any additional fields that
+//          * Groq placed into data.
+//          */
+//         const data: Record<string, string> = {
+//           ...(record.data &&
+//           typeof record.data === "object"
+//             ? record.data
+//             : {}),
+//         };
+
+//         /*
+//          * Helper:
+//          * Only add values that actually exist.
+//          */
+//         const addData = (
+//           key: string,
+//           value: unknown
+//         ) => {
+//           if (
+//             value !== undefined &&
+//             value !== null &&
+//             String(value).trim() !== ""
+//           ) {
+//             data[key] = String(value);
+//           }
+//         };
+
+//         /* ----------------------------------------------
+//            RESPONDENT FIELDS
+//         ---------------------------------------------- */
+
+//         addData(
+//           "Age",
+//           record.age
+//         );
+
+//         addData(
+//           "Gender",
+//           record.gender
+//         );
+
+//         addData(
+//           "Job Title",
+//           record.jobTitle
+//         );
+
+//         addData(
+//           "Industry",
+//           record.industry
+//         );
+
+//         addData(
+//           "Zip code",
+//           record.zipCode
+//         );
+
+//         addData(
+//           "Department",
+//           record.department
+//         );
+
+//         addData(
+//           "Employees",
+//           record.employees
+//         );
+
+//         addData(
+//           "Brand",
+//           record.brand
+//         );
+
+//         addData(
+//           "Revenue",
+//           record.revenue
+//         );
+
+//         addData(
+//           "Company",
+//           record.company
+//         );
+
+//         addData(
+//           "Country",
+//           record.country
+//         );
+
+//         addData(
+//           "Nationality",
+//           record.nationality
+//         );
+
+//         addData(
+//           "Household Income",
+//           record.householdIncome
+//         );
+
+//         addData(
+//           "Oppo",
+//           record.oppo
+//         );
+
+//         addData(
+//           "Study Topic",
+//           record.studyTopic
+//         );
+
+//         addData(
+//           "Record ID",
+//           record.recordId
+//         );
+
+//         /* ----------------------------------------------
+//            TNX / LOCATION
+//         ---------------------------------------------- */
+
+//         addData(
+//           "TNX-ID",
+//           record.tnxId
+//         );
+
+//         addData(
+//           "Location",
+//           record.location
+//         );
+
+//         /* ----------------------------------------------
+//            CREATE DOCUMENT
+//         ---------------------------------------------- */
+
+//         return {
+//           category:
+//             record.category ||
+//             fallbackCategory,
+
+//           accountType:
+//             record.accountType ||
+//             undefined,
+
+//           projectNo:
+//             record.projectNo ||
+//             undefined,
+
+//           panelCode:
+//             record.panelCode ||
+//             undefined,
+
+//           description:
+//             record.surveyName ||
+//             record.description ||
+//             undefined,
+
+//           pid:
+//             record.pid ||
+//             undefined,
+
+//           supplierId:
+//             record.supplierId ||
+//             undefined,
+
+//           country:
+//             record.country ||
+//             record.location ||
+//             undefined,
+
+//           ip:
+//             record.ip ||
+//             undefined,
+
+//           status:
+//             record.status ||
+//             undefined,
+
+//           data,
+
+//           /*
+//            * IMPORTANT:
+//            * Save the original user paste.
+//            * Do not save AI-generated text here.
+//            */
+//           rawPaste: paste,
+
+//           batchId,
+
+//           /*
+//            * Always associate the upload with
+//            * the authenticated user.
+//            */
+//           createdBy:
+//             authenticatedUserId,
+//         };
+//       }
+//     );
+
+//     /* ==================================================
+//        SAFETY CHECK
+//     ================================================== */
+
+//     if (
+//       !Array.isArray(documents) ||
+//       documents.length === 0
+//     ) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message:
+//             "No MongoDB documents were created from the AI records.",
+//         },
+//         { status: 400 }
+//       );
+//     }
+
+//     console.log(
+//       `SURVEY: saving ${documents.length} document(s)`
+//     );
+
+//     /* ==================================================
+//        SAVE
+//     ================================================== */
+
+//     const docs =
+//       await SurveyData.insertMany(
+//         documents
+//       );
+
+//     /* ==================================================
+//        AUDIT LOG
+//     ================================================== */
+
+//     await createAuditLog({
+//       userId:
+//         currentUser.userId,
+
+//       action: "UPLOAD",
+
+//       module: "Survey",
+
+//       description:
+//         `Uploaded ${docs.length} survey record${
+//           docs.length === 1
+//             ? ""
+//             : "s"
+//         } using AI normalization`,
+
+//       entityType: "SurveyData",
+
+//       entityId:
+//         docs.length === 1
+//           ? docs[0]._id.toString()
+//           : batchId ||
+//             undefined,
+
+//       metadata: {
+//         count: docs.length,
+
+//         categories: [
+//           ...new Set(
+//             docs.map(
+//               (doc) =>
+//                 doc.category
+//             )
+//           ),
+//         ],
+
+//         batchId,
+
+//         aiNormalized: true,
+//       },
+//     });
+
+//     /* ==================================================
+//        RESPONSE
+//     ================================================== */
+
+//     return NextResponse.json(
+//       {
+//         success: true,
+
+//         message:
+//           docs.length === 1
+//             ? "1 record saved"
+//             : `${docs.length} records saved`,
+
+//         count: docs.length,
+
+//         errors: [],
+
+//         aiNormalized: true,
+
+//         data: docs.map(
+//           (doc) => {
+//             const object =
+//               doc.toObject();
+
+//             return {
+//               ...object,
+
+//               data:
+//                 object.data || {},
+//             };
+//           }
+//         ),
+//       },
+//       { status: 201 }
+//     );
+
+//   } catch (error: any) {
+//     console.error(
+//       "SURVEY POST ERROR:",
+//       error
+//     );
+
+//     /* ==================================================
+//        MONGOOSE VALIDATION ERROR
+//     ================================================== */
+
+//     if (
+//       error?.name ===
+//       "ValidationError"
+//     ) {
+//       const validationErrors =
+//         Object.entries(
+//           error.errors || {}
+//         ).map(
+//           ([field, err]: [
+//             string,
+//             any
+//           ]) => ({
+//             field,
+
+//             message:
+//               err?.message ||
+//               "Validation failed",
+
+//             value:
+//               err?.value,
+
+//             kind:
+//               err?.kind,
+//           })
+//         );
+
+//       return NextResponse.json(
+//         {
+//           success: false,
+
+//           message:
+//             "Survey validation failed",
+
+//           error:
+//             error.message,
+
+//           validationErrors,
+//         },
+//         { status: 400 }
+//       );
+//     }
+
+//     /* ==================================================
+//        CAST ERROR
+//     ================================================== */
+
+//     if (
+//       error?.name ===
+//       "CastError"
+//     ) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+
+//           message:
+//             `Invalid value for ${error.path}`,
+
+//           error:
+//             error.message,
+
+//           path:
+//             error.path,
+
+//           value:
+//             error.value,
+//         },
+//         { status: 400 }
+//       );
+//     }
+
+//     /* ==================================================
+//        DUPLICATE ERROR
+//     ================================================== */
+
+//     if (
+//       error?.code === 11000
+//     ) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+
+//           message:
+//             "Duplicate survey record",
+
+//           error:
+//             error.message,
+
+//           keyValue:
+//             error.keyValue,
+//         },
+//         { status: 409 }
+//       );
+//     }
+
+//     /* ==================================================
+//        UNKNOWN ERROR
+//     ================================================== */
+
+//     return NextResponse.json(
+//       {
+//         success: false,
+
+//         message:
+//           "Failed to save survey data",
+
+//         error:
+//           error?.message ||
+//           String(error),
+
+//         name:
+//           error?.name ||
+//           "UnknownError",
+
+//         code:
+//           error?.code ||
+//           null,
+//       },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+// /* ======================================================
+//    GET - FETCH SURVEY RECORDS
+// ====================================================== */
+
+// export async function GET(
+//   req: NextRequest
+// ) {
+//   try {
+//     await connectDB();
+
+//     const { searchParams } =
+//       new URL(req.url);
+
+//     const category =
+//       searchParams.get(
+//         "category"
+//       );
+
+//     const projectNo =
+//       searchParams.get(
+//         "projectNo"
+//       );
+
+//     const accountType =
+//       searchParams.get(
+//         "accountType"
+//       );
+
+//     const pid =
+//       searchParams.get("pid");
+
+//     const country =
+//       searchParams.get("country");
+
+//     const status =
+//       searchParams.get("status");
+
+//     const createdBy =
+//       searchParams.get(
+//         "createdBy"
+//       );
+
+//     const excludeCreatedBy =
+//       searchParams.get(
+//         "excludeCreatedBy"
+//       );
+
+//     const includeUnassigned =
+//       searchParams.get(
+//         "includeUnassigned"
+//       );
+
+//     const sortBy =
+//       searchParams.get(
+//         "sortBy"
+//       ) || "createdAt";
+
+//     const sortOrder =
+//       searchParams.get(
+//         "sortOrder"
+//       ) === "asc"
+//         ? 1
+//         : -1;
+
+//     const search =
+//       searchParams.get(
+//         "search"
+//       ) || "";
+
+//     const page = Math.max(
+//       1,
+//       Number(
+//         searchParams.get(
+//           "page"
+//         ) || "1"
+//       )
+//     );
+
+//     const limit = Math.min(
+//       100,
+//       Math.max(
+//         1,
+//         Number(
+//           searchParams.get(
+//             "limit"
+//           ) || "20"
+//         )
+//       )
+//     );
+
+//     const skip =
+//       (page - 1) * limit;
+
+//     /* ==================================================
+//        FILTER
+//     ================================================== */
+
+//     const filter: any = {};
+
+//     /* -----------------------------------------------
+//        Category
+//     ------------------------------------------------ */
+
+//     if (
+//       category &&
+//       VALID_CATEGORIES.includes(
+//         category as SurveyCategory
+//       )
+//     ) {
+//       filter.category =
+//         category;
+//     }
+
+//     /* -----------------------------------------------
+//        Project
+//     ------------------------------------------------ */
+
+//     if (projectNo) {
+//       filter.projectNo =
+//         projectNo;
+//     }
+
+//     /* -----------------------------------------------
+//        Account Type
+//     ------------------------------------------------ */
+
+//     if (accountType) {
+//       filter.accountType =
+//         accountType.toUpperCase();
+//     }
+
+//     /* -----------------------------------------------
+//        PID
+//     ------------------------------------------------ */
+
+//     if (pid) {
+//       filter.pid = pid;
+//     }
+
+//     /* -----------------------------------------------
+//        Country
+//     ------------------------------------------------ */
+
+//     if (country) {
+//       filter.country = {
+//         $regex: country,
+//         $options: "i",
+//       };
+//     }
+
+//     /* -----------------------------------------------
+//        Status
+//     ------------------------------------------------ */
+
+//     if (status) {
+//       filter.status = {
+//         $regex: status,
+//         $options: "i",
+//       };
+//     }
+
+//     /* ==================================================
+//        CREATOR FILTER
+//     ================================================== */
+
+//     if (createdBy) {
+//       if (
+//         !mongoose.Types.ObjectId.isValid(
+//           createdBy
+//         )
+//       ) {
+//         return NextResponse.json(
+//           {
+//             success: false,
+//             message:
+//               "Invalid createdBy ObjectId",
+//             createdBy,
+//           },
+//           { status: 400 }
+//         );
+//       }
+
+//       filter.createdBy =
+//         new mongoose.Types.ObjectId(
+//           createdBy
+//         );
+
+//     } else if (
+//       excludeCreatedBy
+//     ) {
+//       if (
+//         !mongoose.Types.ObjectId.isValid(
+//           excludeCreatedBy
+//         )
+//       ) {
+//         return NextResponse.json(
+//           {
+//             success: false,
+//             message:
+//               "Invalid excludeCreatedBy ObjectId",
+//             excludeCreatedBy,
+//           },
+//           { status: 400 }
+//         );
+//       }
+
+//       const excludedId =
+//         new mongoose.Types.ObjectId(
+//           excludeCreatedBy
+//         );
+
+//       if (
+//         includeUnassigned ===
+//         "true"
+//       ) {
+//         filter.$or = [
+//           {
+//             createdBy: null,
+//           },
+//           {
+//             createdBy: {
+//               $ne: excludedId,
+//             },
+//           },
+//         ];
+//       } else {
+//         filter.createdBy = {
+//           $ne: excludedId,
+//         };
+//       }
+//     }
+
+//     /* ==================================================
+//        SEARCH
+//     ================================================== */
+
+//     if (search.trim()) {
+//       const searchRegex = {
+//         $regex:
+//           search.trim(),
+//         $options: "i",
+//       };
+
+//       const searchOr = [
+//         {
+//           rawPaste:
+//             searchRegex,
+//         },
+//         {
+//           pid:
+//             searchRegex,
+//         },
+//         {
+//           projectNo:
+//             searchRegex,
+//         },
+//         {
+//           supplierId:
+//             searchRegex,
+//         },
+//         {
+//           country:
+//             searchRegex,
+//         },
+//         {
+//           accountType:
+//             searchRegex,
+//         },
+//         {
+//           status:
+//             searchRegex,
+//         },
+//       ];
+
+//       if (filter.$or) {
+//         filter.$and = [
+//           {
+//             $or:
+//               filter.$or,
+//           },
+//           {
+//             $or:
+//               searchOr,
+//           },
+//         ];
+
+//         delete filter.$or;
+//       } else {
+//         filter.$or =
+//           searchOr;
+//       }
+//     }
+
+//     /* ==================================================
+//        DATABASE QUERY
+//     ================================================== */
+
+//     const [
+//       items,
+//       total,
+//     ] = await Promise.all([
+//       SurveyData.find(filter)
+//         .sort({
+//           [sortBy]:
+//             sortOrder,
+//         })
+//         .skip(skip)
+//         .limit(limit)
+//         .lean(),
+
+//       SurveyData.countDocuments(
+//         filter
+//       ),
+//     ]);
+
+//     /* ==================================================
+//        RESPONSE
+//     ================================================== */
+
+//     const data =
+//       items.map(
+//         (item: any) => ({
+//           ...item,
+
+//           data:
+//             item.data || {},
+//         })
+//       );
+
+//     return NextResponse.json({
+//       success: true,
+
+//       data,
+
+//       pagination: {
+//         page,
+//         limit,
+//         total,
+
+//         totalPages:
+//           Math.ceil(
+//             total / limit
+//           ),
+//       },
+//     });
+
+//   } catch (error: any) {
+//     console.error(
+//       "Survey GET error:",
+//       error
+//     );
+
+//     return NextResponse.json(
+//       {
+//         success: false,
+
+//         message:
+//           "Failed to fetch survey data",
+
+//         error:
+//           error?.message ||
+//           String(error),
+//       },
+//       { status: 500 }
+//     );
+//   }
+// }
+
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import { connectDB } from "@/config/db";
 import SurveyData from "@/models/SurveyData";
-import { parseBulkPaste } from "@/lib/parseSurveyBulk";
+import Auth from "@/models/Auth";
 import { SurveyCategory } from "@/lib/survey-fields";
 import { getCurrentUser } from "@/lib/getuser";
 import { createAuditLog } from "@/lib/auditLog";
+import { normalizeSurveyWithGroq } from "@/lib/groqSurveyNormalizer";
+
+
+// ============================================================
+// VALID CATEGORIES
+// ============================================================
 
 const VALID_CATEGORIES: SurveyCategory[] = [
   "B2B",
@@ -14,15 +1744,52 @@ const VALID_CATEGORIES: SurveyCategory[] = [
   "B2C",
 ];
 
-export async function POST(req: NextRequest) {
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function normalizeRole(role: unknown): string {
+  return String(role || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+}
+
+
+function isValidObjectId(
+  value: unknown
+): boolean {
+  return (
+    typeof value === "string" &&
+    mongoose.Types.ObjectId.isValid(value)
+  );
+}
+
+
+function objectId(
+  value: string
+): mongoose.Types.ObjectId {
+  return new mongoose.Types.ObjectId(value);
+}
+
+
+// ============================================================
+// POST - CREATE SURVEY RECORDS
+// ============================================================
+
+export async function POST(
+  req: NextRequest
+) {
   try {
     await connectDB();
 
-    /* ============================================
-       AUTHENTICATED USER
-    ============================================ */
+    // ========================================================
+    // AUTHENTICATED USER
+    // ========================================================
 
-    const currentUser = await getCurrentUser();
+    const currentUser =
+      await getCurrentUser();
 
     if (!currentUser?.userId) {
       return NextResponse.json(
@@ -30,49 +1797,60 @@ export async function POST(req: NextRequest) {
           success: false,
           message: "Unauthorized",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
     if (
-      !mongoose.Types.ObjectId.isValid(
+      !isValidObjectId(
         currentUser.userId
       )
     ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Invalid authenticated user ID",
+          message:
+            "Invalid authenticated user ID",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
     const authenticatedUserId =
-      new mongoose.Types.ObjectId(
+      objectId(
         currentUser.userId
       );
 
-    /* ============================================
-       REQUEST
-    ============================================ */
 
-    const body = await req.json();
+    // ========================================================
+    // REQUEST
+    // ========================================================
+
+    const body =
+      await req.json();
 
     const category =
       body?.category as
         | SurveyCategory
         | undefined;
 
-    const paste = body?.paste;
+    const paste =
+      body?.paste;
 
-    /* ============================================
-       CATEGORY
-    ============================================ */
+
+    // ========================================================
+    // CATEGORY
+    // ========================================================
 
     if (
       category &&
-      !VALID_CATEGORIES.includes(category)
+      !VALID_CATEGORIES.includes(
+        category
+      )
     ) {
       return NextResponse.json(
         {
@@ -80,13 +1858,16 @@ export async function POST(req: NextRequest) {
           message:
             "Category must be one of B2B | B2H | B2C",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /* ============================================
-       PASTE
-    ============================================ */
+
+    // ========================================================
+    // PASTE
+    // ========================================================
 
     if (
       typeof paste !== "string" ||
@@ -95,152 +1876,435 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Paste data is required",
+          message:
+            "Paste data is required",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
+
     const fallbackCategory: SurveyCategory =
       category &&
-      VALID_CATEGORIES.includes(category)
+      VALID_CATEGORIES.includes(
+        category
+      )
         ? category
         : "B2C";
 
-    /* ============================================
-       PARSE
-    ============================================ */
 
-    const { records, errors } =
-      parseBulkPaste(
-        paste,
-        fallbackCategory
+    // ========================================================
+    // GROQ AI NORMALIZATION
+    // ========================================================
+
+    let aiRecords: any[];
+
+    try {
+      const aiResult =
+        await normalizeSurveyWithGroq(
+          paste
+        );
+
+      if (
+        !aiResult ||
+        !Array.isArray(
+          aiResult.records
+        )
+      ) {
+        console.error(
+          "GROQ INVALID RESULT:",
+          aiResult
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "AI returned an invalid record list.",
+          },
+          {
+            status: 502,
+          }
+        );
+      }
+
+      aiRecords =
+        aiResult.records;
+
+      console.log(
+        `GROQ: normalized ${aiRecords.length} record(s)`
       );
 
-    if (!records.length) {
+      if (
+        aiRecords.length === 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "AI normalized the input, but returned no survey records.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+    } catch (error: any) {
+      console.error(
+        "GROQ NORMALIZATION ERROR:",
+        error
+      );
+
       return NextResponse.json(
         {
           success: false,
           message:
-            "No valid records found. Use Key: Value lines or separate records with =====.",
-          errors,
+            "AI normalization failed",
+          error:
+            error?.message ||
+            "Unknown Groq error",
         },
-        { status: 400 }
+        {
+          status: 502,
+        }
       );
     }
 
-    /* ============================================
-       BATCH ID
-    ============================================ */
+
+    // ========================================================
+    // VALID RECORDS
+    // ========================================================
+
+    const validRecords =
+      aiRecords.filter(
+        (record: any) =>
+          record &&
+          typeof record === "object"
+      );
+
+    if (
+      validRecords.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Groq returned no usable survey records.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+
+    // ========================================================
+    // BATCH ID
+    // ========================================================
 
     const batchId =
-      records.length > 1
+      validRecords.length > 1
         ? new mongoose.Types.ObjectId().toString()
         : null;
 
-    /* ============================================
-       DOCUMENTS
-    ============================================ */
 
-    const documents = records.map(
-      (record) => ({
-        category: record.category,
+    // ========================================================
+    // BUILD MONGODB DOCUMENTS
+    // ========================================================
 
-        accountType:
-          record.accountType || undefined,
+    const documents =
+      validRecords.map(
+        (record: any) => {
 
-        projectNo:
-          record.projectNo || undefined,
+          const data: Record<
+            string,
+            string
+          > = {
+            ...(record.data &&
+            typeof record.data ===
+              "object"
+              ? record.data
+              : {}),
+          };
 
-        panelCode:
-          record.panelCode || undefined,
 
-        description:
-          record.description || undefined,
+          const addData = (
+            key: string,
+            value: unknown
+          ) => {
+            if (
+              value !== undefined &&
+              value !== null &&
+              String(value).trim() !== ""
+            ) {
+              data[key] =
+                String(value);
+            }
+          };
 
-        pid:
-          record.pid || undefined,
 
-        supplierId:
-          record.supplierId || undefined,
+          // --------------------------------------------------
+          // RESPONDENT FIELDS
+          // --------------------------------------------------
 
-        country:
-          record.country || undefined,
+          addData(
+            "Age",
+            record.age
+          );
 
-        ip:
-          record.ip || undefined,
+          addData(
+            "Gender",
+            record.gender
+          );
 
-        status:
-          record.status || undefined,
+          addData(
+            "Job Title",
+            record.jobTitle
+          );
 
-        data:
-          record.data || {},
+          addData(
+            "Industry",
+            record.industry
+          );
 
-        rawPaste:
-          record.rawBlock || paste,
+          addData(
+            "Zip code",
+            record.zipCode
+          );
 
-        batchId,
+          addData(
+            "Department",
+            record.department
+          );
 
-        // IMPORTANT:
-        // Always use authenticated user.
-        createdBy:
-          authenticatedUserId,
-      })
+          addData(
+            "Employees",
+            record.employees
+          );
+
+          addData(
+            "Brand",
+            record.brand
+          );
+
+          addData(
+            "Revenue",
+            record.revenue
+          );
+
+          addData(
+            "Company",
+            record.company
+          );
+
+          addData(
+            "Country",
+            record.country
+          );
+
+          addData(
+            "Nationality",
+            record.nationality
+          );
+
+          addData(
+            "Household Income",
+            record.householdIncome
+          );
+
+          addData(
+            "Oppo",
+            record.oppo
+          );
+
+          addData(
+            "Study Topic",
+            record.studyTopic
+          );
+
+          addData(
+            "Record ID",
+            record.recordId
+          );
+
+
+          // --------------------------------------------------
+          // TNX / LOCATION
+          // --------------------------------------------------
+
+          addData(
+            "TNX-ID",
+            record.tnxId
+          );
+
+          addData(
+            "Location",
+            record.location
+          );
+
+
+          // --------------------------------------------------
+          // CREATE DOCUMENT
+          // --------------------------------------------------
+
+          return {
+            category:
+              record.category ||
+              fallbackCategory,
+
+            accountType:
+              record.accountType ||
+              undefined,
+
+            projectNo:
+              record.projectNo ||
+              undefined,
+
+            panelCode:
+              record.panelCode ||
+              undefined,
+
+            description:
+              record.surveyName ||
+              record.description ||
+              undefined,
+
+            pid:
+              record.pid ||
+              undefined,
+
+            supplierId:
+              record.supplierId ||
+              undefined,
+
+            country:
+              record.country ||
+              record.location ||
+              undefined,
+
+            ip:
+              record.ip ||
+              undefined,
+
+            status:
+              record.status ||
+              undefined,
+
+            data,
+
+            // Original user input
+            rawPaste:
+              paste,
+
+            batchId,
+
+            // =================================================
+            // IMPORTANT
+            //
+            // NEVER take createdBy from req.body.
+            // Always use authenticated user.
+            // =================================================
+
+            createdBy:
+              authenticatedUserId,
+          };
+        }
+      );
+
+
+    // ========================================================
+    // SAFETY CHECK
+    // ========================================================
+
+    if (
+      !Array.isArray(documents) ||
+      documents.length === 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "No MongoDB documents were created from the AI records.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+
+    console.log(
+      `SURVEY: saving ${documents.length} document(s)`
     );
 
-    /* ============================================
-       SAVE
-    ============================================ */
+
+    // ========================================================
+    // SAVE
+    // ========================================================
 
     const docs =
       await SurveyData.insertMany(
         documents
       );
 
-    /* ============================================
-       AUDIT LOG
-    ============================================ */
+
+    // ========================================================
+    // AUDIT LOG
+    // ========================================================
 
     await createAuditLog({
       userId:
         currentUser.userId,
 
-      action: "UPLOAD",
+      action:
+        "UPLOAD",
 
-      module: "Survey",
+      module:
+        "Survey",
 
       description:
         `Uploaded ${docs.length} survey record${
           docs.length === 1
             ? ""
             : "s"
-        }`,
+        } using AI normalization`,
 
-      entityType: "SurveyData",
+      entityType:
+        "SurveyData",
 
       entityId:
         docs.length === 1
           ? docs[0]._id.toString()
-          : batchId || undefined,
+          : batchId ||
+            undefined,
 
       metadata: {
-        count: docs.length,
+        count:
+          docs.length,
 
         categories: [
           ...new Set(
             docs.map(
-              (doc) => doc.category
+              (doc) =>
+                doc.category
             )
           ),
         ],
 
         batchId,
+
+        aiNormalized:
+          true,
       },
     });
 
-    /* ============================================
-       RESPONSE
-    ============================================ */
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
 
     return NextResponse.json(
       {
@@ -251,32 +2315,45 @@ export async function POST(req: NextRequest) {
             ? "1 record saved"
             : `${docs.length} records saved`,
 
-        count: docs.length,
+        count:
+          docs.length,
 
-        errors,
+        errors: [],
 
-        data: docs.map((doc) => {
-          const object =
-            doc.toObject();
+        aiNormalized:
+          true,
 
-          return {
-            ...object,
-            data:
-              object.data || {},
-          };
-        }),
+        data:
+          docs.map(
+            (doc) => {
+              const object =
+                doc.toObject();
+
+              return {
+                ...object,
+                data:
+                  object.data ||
+                  {},
+              };
+            }
+          ),
       },
-      { status: 201 }
+      {
+        status: 201,
+      }
     );
+
   } catch (error: any) {
+
     console.error(
       "SURVEY POST ERROR:",
       error
     );
 
-    /* ============================================
-       VALIDATION
-    ============================================ */
+
+    // ========================================================
+    // VALIDATION ERROR
+    // ========================================================
 
     if (
       error?.name ===
@@ -291,165 +2368,339 @@ export async function POST(req: NextRequest) {
             any
           ]) => ({
             field,
+
             message:
               err?.message ||
               "Validation failed",
-            value: err?.value,
-            kind: err?.kind,
+
+            value:
+              err?.value,
+
+            kind:
+              err?.kind,
           })
         );
 
       return NextResponse.json(
         {
           success: false,
+
           message:
             "Survey validation failed",
-          error: error.message,
+
+          error:
+            error.message,
+
           validationErrors,
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /* ============================================
-       CAST
-    ============================================ */
+
+    // ========================================================
+    // CAST ERROR
+    // ========================================================
 
     if (
-      error?.name === "CastError"
+      error?.name ===
+      "CastError"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          message:
+            `Invalid value for ${error.path}`,
+
+          error:
+            error.message,
+
+          path:
+            error.path,
+
+          value:
+            error.value,
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+
+    // ========================================================
+    // DUPLICATE
+    // ========================================================
+
+    if (
+      error?.code === 11000
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+
+          message:
+            "Duplicate survey record",
+
+          error:
+            error.message,
+
+          keyValue:
+            error.keyValue,
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+
+    // ========================================================
+    // UNKNOWN
+    // ========================================================
+
+    return NextResponse.json(
+      {
+        success: false,
+
+        message:
+          "Failed to save survey data",
+
+        error:
+          error?.message ||
+          String(error),
+
+        name:
+          error?.name ||
+          "UnknownError",
+
+        code:
+          error?.code ||
+          null,
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+
+// ============================================================
+// GET - FETCH SURVEY RECORDS
+// ============================================================
+
+export async function GET(
+  req: NextRequest
+) {
+  try {
+    await connectDB();
+
+
+    // ========================================================
+    // AUTHENTICATION
+    // ========================================================
+
+    const currentUser =
+      await getCurrentUser();
+
+    if (!currentUser?.userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Unauthorized",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
+
+    if (
+      !isValidObjectId(
+        currentUser.userId
+      )
     ) {
       return NextResponse.json(
         {
           success: false,
           message:
-            `Invalid value for ${error.path}`,
-          error: error.message,
-          path: error.path,
-          value: error.value,
+            "Invalid authenticated user ID",
         },
-        { status: 400 }
-      );
-    }
-
-    /* ============================================
-       DUPLICATE
-    ============================================ */
-
-    if (error?.code === 11000) {
-      return NextResponse.json(
         {
-          success: false,
-          message:
-            "Duplicate survey record",
-          error: error.message,
-          keyValue:
-            error.keyValue,
-        },
-        { status: 409 }
+          status: 401,
+        }
       );
     }
 
-    /* ============================================
-       UNKNOWN
-    ============================================ */
 
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Failed to save survey data",
-        error:
-          error?.message ||
-          String(error),
-        name:
-          error?.name ||
-          "UnknownError",
-        code:
-          error?.code || null,
-      },
-      { status: 500 }
+    const currentUserId =
+      objectId(
+        currentUser.userId
+      );
+
+
+    const role =
+      normalizeRole(
+        currentUser.role
+      );
+
+
+    console.log(
+      "======================================"
     );
-  }
-}
-/* ======================================================
-   GET - FETCH SURVEY RECORDS
-====================================================== */
 
-export async function GET(req: NextRequest) {
-  try {
-    await connectDB();
+    console.log(
+      "SURVEY GET AUTH"
+    );
 
-    const { searchParams } =
-      new URL(req.url);
+    console.log(
+      "User ID:",
+      currentUser.userId
+    );
+
+    console.log(
+      "Role:",
+      currentUser.role
+    );
+
+    console.log(
+      "Team ID:",
+      (currentUser as any).teamId
+    );
+
+    console.log(
+      "======================================"
+    );
+
+
+    // ========================================================
+    // URL PARAMETERS
+    // ========================================================
+
+    const {
+      searchParams,
+    } = new URL(
+      req.url
+    );
+
 
     const category =
-      searchParams.get("category");
+      searchParams.get(
+        "category"
+      );
 
     const projectNo =
-      searchParams.get("projectNo");
+      searchParams.get(
+        "projectNo"
+      );
 
     const accountType =
-      searchParams.get("accountType");
+      searchParams.get(
+        "accountType"
+      );
 
     const pid =
-      searchParams.get("pid");
+      searchParams.get(
+        "pid"
+      );
 
     const country =
-      searchParams.get("country");
+      searchParams.get(
+        "country"
+      );
 
     const status =
-      searchParams.get("status");
+      searchParams.get(
+        "status"
+      );
 
-    const createdBy =
-      searchParams.get("createdBy");
+    /*
+     * These parameters are intentionally read,
+     * but creator access is NOT trusted from
+     * the browser.
+     */
+    const requestedCreatedBy =
+      searchParams.get(
+        "createdBy"
+      );
 
     const excludeCreatedBy =
-      searchParams.get("excludeCreatedBy");
+      searchParams.get(
+        "excludeCreatedBy"
+      );
 
     const includeUnassigned =
-      searchParams.get("includeUnassigned");
+      searchParams.get(
+        "includeUnassigned"
+      );
+
 
     const sortBy =
-      searchParams.get("sortBy") ||
-      "createdAt";
+      searchParams.get(
+        "sortBy"
+      ) || "createdAt";
+
 
     const sortOrder =
-      searchParams.get("sortOrder") === "asc"
+      searchParams.get(
+        "sortOrder"
+      ) === "asc"
         ? 1
         : -1;
 
+
     const search =
-      searchParams.get("search") || "";
+      searchParams.get(
+        "search"
+      ) || "";
 
-    const page = Math.max(
-      1,
-      Number(
-        searchParams.get("page") || "1"
-      )
-    );
 
-    const limit = Math.min(
-      100,
+    const page =
       Math.max(
         1,
         Number(
-          searchParams.get("limit") || "20"
+          searchParams.get(
+            "page"
+          ) || "1"
         )
-      )
-    );
+      );
+
+
+    const limit =
+      Math.min(
+        100,
+        Math.max(
+          1,
+          Number(
+            searchParams.get(
+              "limit"
+            ) || "20"
+          )
+        )
+      );
+
 
     const skip =
-      (page - 1) * limit;
+      (page - 1) *
+      limit;
 
-    /* ==================================================
-       FILTER
-    ================================================== */
+
+    // ========================================================
+    // BASE FILTER
+    // ========================================================
 
     const filter: any = {};
 
-    /* -----------------------------------------------
-       Category
-    ------------------------------------------------ */
+
+    // ========================================================
+    // CATEGORY
+    // ========================================================
 
     if (
       category &&
@@ -457,238 +2708,526 @@ export async function GET(req: NextRequest) {
         category as SurveyCategory
       )
     ) {
-      filter.category = category;
+      filter.category =
+        category;
     }
 
-    /* -----------------------------------------------
-       Project
-    ------------------------------------------------ */
 
-    if (projectNo) {
-      filter.projectNo = projectNo;
+    // ========================================================
+    // PROJECT
+    // ========================================================
+
+    if (
+      projectNo
+    ) {
+      filter.projectNo =
+        projectNo;
     }
 
-    /* -----------------------------------------------
-       Account type
-    ------------------------------------------------ */
 
-    if (accountType) {
+    // ========================================================
+    // ACCOUNT TYPE
+    // ========================================================
+
+    if (
+      accountType
+    ) {
       filter.accountType =
         accountType.toUpperCase();
     }
 
-    /* -----------------------------------------------
-       PID
-    ------------------------------------------------ */
 
-    if (pid) {
-      filter.pid = pid;
+    // ========================================================
+    // PID
+    // ========================================================
+
+    if (
+      pid
+    ) {
+      filter.pid =
+        pid;
     }
 
-    /* -----------------------------------------------
-       Country
-    ------------------------------------------------ */
 
-    if (country) {
+    // ========================================================
+    // COUNTRY
+    // ========================================================
+
+    if (
+      country
+    ) {
       filter.country = {
-        $regex: country,
-        $options: "i",
+        $regex:
+          country,
+        $options:
+          "i",
       };
     }
 
-    /* -----------------------------------------------
-       Status
-    ------------------------------------------------ */
 
-    if (status) {
+    // ========================================================
+    // STATUS
+    // ========================================================
+
+    if (
+      status
+    ) {
       filter.status = {
-        $regex: status,
-        $options: "i",
+        $regex:
+          status,
+        $options:
+          "i",
       };
     }
 
-    /* ==================================================
-       CREATOR FILTER
-    ================================================== */
 
-    if (createdBy) {
-      if (
-        !mongoose.Types.ObjectId.isValid(
-          createdBy
-        )
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "Invalid createdBy ObjectId",
-            createdBy,
-          },
-          { status: 400 }
-        );
-      }
+    // ========================================================
+    // ROLE-BASED CREATOR ACCESS
+    // ========================================================
 
+    /*
+     * IMPORTANT:
+     *
+     * Never trust:
+     *
+     * ?createdBy=someOtherUserId
+     *
+     * from the frontend.
+     *
+     * The server determines the allowed
+     * createdBy values from the logged-in
+     * user's role.
+     */
+
+
+    // --------------------------------------------------------
+    // SURVEY TESTER
+    // --------------------------------------------------------
+
+    const isSurveyTester =
+      role === "survey" ||
+      role === "surveytester" ||
+      role === "tester";
+
+
+    if (
+      isSurveyTester
+    ) {
+      /*
+       * Survey Tester can ONLY see
+       * records created by himself.
+       */
       filter.createdBy =
-        new mongoose.Types.ObjectId(
-          createdBy
-        );
+        currentUserId;
+
+      console.log(
+        "SURVEY ACCESS: OWN DATA ONLY"
+      );
     }
 
-    /* -----------------------------------------------
-       Exclude creator
-    ------------------------------------------------ */
 
-    else if (excludeCreatedBy) {
+    // --------------------------------------------------------
+    // TEAM LEAD
+    // --------------------------------------------------------
+
+    else if (
+      role === "teamlead"
+    ) {
+      /*
+       * Team Lead must have a team.
+       */
+
       if (
-        !mongoose.Types.ObjectId.isValid(
-          excludeCreatedBy
+        !(currentUser as any).teamId ||
+        !isValidObjectId(
+          String(
+            (currentUser as any).teamId
+          )
         )
       ) {
         return NextResponse.json(
           {
             success: false,
             message:
-              "Invalid excludeCreatedBy ObjectId",
-            excludeCreatedBy,
+              "Team Lead does not have a valid team",
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
-      const excludedId =
-        new mongoose.Types.ObjectId(
-          excludeCreatedBy
+
+      const teamId =
+        objectId(
+          String(
+            (currentUser as any).teamId
+          )
         );
 
-      if (
-        includeUnassigned === "true"
-      ) {
-        filter.$or = [
+
+      /*
+       * Find every user belonging
+       * to this Team Lead's team.
+       *
+       * This includes:
+       * - Team Lead
+       * - Survey Testers
+       * - Other team members
+       */
+
+      const teamUsers =
+        await Auth.find(
           {
-            createdBy: null,
-          },
-          {
-            createdBy: {
-              $ne: excludedId,
+            teamId,
+
+            isDeleted: {
+              $ne: true,
+            },
+
+            isActive: {
+              $ne: false,
             },
           },
-        ];
-      } else {
-        filter.createdBy = {
-          $ne: excludedId,
-        };
+          {
+            _id: 1,
+          }
+        ).lean();
+
+
+      const teamUserIds =
+        teamUsers.map(
+          (
+            member: any
+          ) =>
+            member._id
+        );
+
+
+      /*
+       * Always include current Team Lead.
+       *
+       * This protects against an inconsistent
+       * User.teamId record.
+       */
+
+      const alreadyIncluded =
+        teamUserIds.some(
+          (
+            id: any
+          ) =>
+            String(id) ===
+            String(
+              currentUserId
+            )
+        );
+
+
+      if (
+        !alreadyIncluded
+      ) {
+        teamUserIds.push(
+          currentUserId
+        );
       }
+
+
+      filter.createdBy = {
+        $in:
+          teamUserIds,
+      };
+
+
+      console.log(
+        "TEAM LEAD ACCESS"
+      );
+
+      console.log(
+        "Team ID:",
+        String(
+          teamId
+        )
+      );
+
+      console.log(
+        "Team Users:",
+        teamUserIds.map(
+          (id: any) =>
+            String(id)
+        )
+      );
     }
 
-    /* ==================================================
-       SEARCH
-    ================================================== */
 
-    if (search.trim()) {
+    // --------------------------------------------------------
+    // ADMIN
+    // HR
+    // --------------------------------------------------------
+
+    else if (
+      role === "admin" ||
+      role === "hr"
+    ) {
+      /*
+       * Admin and HR can see all survey records.
+       *
+       * Do NOT apply createdBy from URL.
+       */
+
+      console.log(
+        "ADMIN/HR ACCESS: ALL SURVEY DATA"
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // UNKNOWN ROLE
+    // --------------------------------------------------------
+
+    else {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "You do not have permission to view survey data",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+
+    // ========================================================
+    // IMPORTANT SECURITY RULE
+    // ========================================================
+
+    /*
+     * Ignore these frontend filters:
+     *
+     * ?createdBy=
+     * ?excludeCreatedBy=
+     *
+     * for role authorization.
+     *
+     * Otherwise a user could potentially
+     * manipulate the URL and access data
+     * outside their scope.
+     */
+
+    void requestedCreatedBy;
+    void excludeCreatedBy;
+    void includeUnassigned;
+
+
+    // ========================================================
+    // SEARCH
+    // ========================================================
+
+    if (
+      search.trim()
+    ) {
       const searchRegex = {
-        $regex: search.trim(),
-        $options: "i",
+        $regex:
+          search.trim(),
+        $options:
+          "i",
       };
+
 
       const searchOr = [
         {
-          rawPaste: searchRegex,
+          rawPaste:
+            searchRegex,
         },
+
         {
-          pid: searchRegex,
+          pid:
+            searchRegex,
         },
+
         {
-          projectNo: searchRegex,
+          projectNo:
+            searchRegex,
         },
+
         {
-          supplierId: searchRegex,
+          supplierId:
+            searchRegex,
         },
+
         {
-          country: searchRegex,
+          country:
+            searchRegex,
         },
+
         {
-          accountType: searchRegex,
+          accountType:
+            searchRegex,
         },
+
         {
-          status: searchRegex,
+          status:
+            searchRegex,
         },
       ];
 
-      if (filter.$or) {
-        filter.$and = [
-          {
-            $or: filter.$or,
-          },
-          {
-            $or: searchOr,
-          },
-        ];
 
-        delete filter.$or;
-      } else {
-        filter.$or = searchOr;
+      /*
+       * Keep role filter AND search filter together.
+       */
+
+      filter.$and = [
+        {
+          $or:
+            searchOr,
+        },
+
+        /*
+         * Preserve every existing
+         * security/filter condition.
+         */
+        {
+          ...Object.fromEntries(
+            Object.entries(
+              filter
+            ).filter(
+              ([key]) =>
+                key !== "$and" &&
+                key !== "$or"
+            )
+          ),
+        },
+      ];
+
+
+      /*
+       * If there is no security filter,
+       * simply use search.
+       */
+
+      if (
+        Object.keys(
+          filter
+        ).length === 0
+      ) {
+        delete filter.$and;
+        filter.$or =
+          searchOr;
       }
     }
 
-    /* ==================================================
-       DATABASE QUERY
-    ================================================== */
 
-    const [items, total] =
-      await Promise.all([
-        SurveyData.find(filter)
-          .sort({
-            [sortBy]: sortOrder,
-          })
-          .skip(skip)
-          .limit(limit)
-          .lean(),
+    // ========================================================
+    // DATABASE QUERY
+    // ========================================================
 
-        SurveyData.countDocuments(
-          filter
-        ),
-      ]);
-
-    /* ==================================================
-       RESPONSE
-    ================================================== */
-
-    const data = items.map(
-      (item: any) => ({
-        ...item,
-        data: item.data || {},
-      })
+    console.log(
+      "======================================"
     );
 
-    return NextResponse.json({
-      success: true,
+    console.log(
+      "FINAL SURVEY FILTER:"
+    );
 
-      data,
+    console.log(
+      JSON.stringify(
+        filter,
+        null,
+        2
+      )
+    );
 
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages:
-          Math.ceil(total / limit),
-      },
-    });
+    console.log(
+      "======================================"
+    );
+
+
+    const [
+      items,
+      total,
+    ] = await Promise.all([
+      SurveyData.find(
+        filter
+      )
+        .sort({
+          [sortBy]:
+            sortOrder,
+        })
+        .skip(
+          skip
+        )
+        .limit(
+          limit
+        )
+        .lean(),
+
+      SurveyData.countDocuments(
+        filter
+      ),
+    ]);
+
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    const data =
+      items.map(
+        (item: any) => ({
+          ...item,
+
+          data:
+            item.data ||
+            {},
+        })
+      );
+
+
+    return NextResponse.json(
+      {
+        success: true,
+
+        data,
+
+        pagination: {
+          page,
+
+          limit,
+
+          total,
+
+          totalPages:
+            Math.ceil(
+              total /
+                limit
+            ),
+        },
+      }
+    );
+
   } catch (error: any) {
+
     console.error(
       "Survey GET error:",
       error
     );
 
+
     return NextResponse.json(
       {
         success: false,
+
         message:
           "Failed to fetch survey data",
+
         error:
           error?.message ||
           String(error),
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

@@ -68,6 +68,14 @@ export default function SurveyPage({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportRange, setExportRange] = useState<
+  "all" | "today" | "weekly" | "monthly" | "custom"
+>("all");
+
+const [exportStartDate, setExportStartDate] = useState("");
+const [exportEndDate, setExportEndDate] = useState("");
+
+const [showExportOptions, setShowExportOptions] = useState(false);
   const [reportLoading, setReportLoading] = useState<"weekly" | "monthly" | null>(
     null
   );
@@ -85,32 +93,63 @@ export default function SurveyPage({
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: "20",
-        sortBy,
-        sortOrder,
-      });
-      if (activeTab !== "ALL") params.set("category", activeTab);
-      if (search.trim()) params.set("search", search.trim());
 
-      const res = await fetch(`/api/survey?${params}`);
-      const json = await res.json();
+const fetchData = useCallback(async () => {
+  try {
+    setLoading(true);
 
-      if (json.success) {
-        setItems(json.data);
-        setTotalPages(json.pagination.totalPages);
-        setTotal(json.pagination.total);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: "20",
+      sortBy,
+      sortOrder,
+      createdBy: userId, // IMPORTANT: only this user's records
+    });
+
+    if (activeTab !== "ALL") {
+      params.set("category", activeTab);
     }
-  }, [activeTab, page, sortBy, sortOrder, search]);
+
+    if (search.trim()) {
+      params.set("search", search.trim());
+    }
+
+    console.log("===== FETCH SURVEY DATA =====");
+    console.log("Logged-in user ID:", userId);
+    console.log("API URL:", `/api/survey?${params.toString()}`);
+
+    const res = await fetch(`/api/survey?${params.toString()}`);
+
+    const json = await res.json();
+
+    if (json.success) {
+      setItems(json.data);
+      setTotalPages(json.pagination.totalPages);
+      setTotal(json.pagination.total);
+    } else {
+      console.error("Survey API error:", json.message);
+      setItems([]);
+      setTotalPages(1);
+      setTotal(0);
+    }
+  } catch (err) {
+    console.error("Failed to fetch survey data:", err);
+    setItems([]);
+    setTotalPages(1);
+    setTotal(0);
+  } finally {
+    setLoading(false);
+  }
+}, [
+  userId,
+  activeTab,
+  page,
+  sortBy,
+  sortOrder,
+  search,
+]);
+
+
 
   useEffect(() => {
     fetchData();
@@ -173,28 +212,162 @@ export default function SurveyPage({
     }
   };
 
-  const handleExport = async () => {
-    try {
-      setExporting(true);
-      const params = new URLSearchParams();
-      if (activeTab !== "ALL") params.set("category", activeTab);
+  // const handleExport = async () => {
+  //   try {
+  //     setExporting(true);
+  //     const params = new URLSearchParams();
+  //     if (activeTab !== "ALL") params.set("category", activeTab);
 
-      const res = await fetch(`/api/survey/export?${params}`);
-      if (!res.ok) throw new Error("Export failed");
+  //     const res = await fetch(`/api/survey/export?${params}`);
+  //     if (!res.ok) throw new Error("Export failed");
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `survey-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      alert("Failed to download Excel");
-    } finally {
-      setExporting(false);
+  //     const blob = await res.blob();
+  //     const url = window.URL.createObjectURL(blob);
+  //     const a = document.createElement("a");
+  //     a.href = url;
+  //     a.download = `survey-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
+  //     a.click();
+  //     window.URL.revokeObjectURL(url);
+  //   } catch (err) {
+  //     alert("Failed to download Excel");
+  //   } finally {
+  //     setExporting(false);
+  //   }
+  // };
+
+const handleExport = async () => {
+  try {
+    if (exportRange === "custom") {
+      if (
+        !exportStartDate ||
+        !exportEndDate
+      ) {
+        alert(
+          "Please select both start date and end date."
+        );
+        return;
+      }
+
+      if (
+        exportStartDate >
+        exportEndDate
+      ) {
+        alert(
+          "Start date cannot be after end date."
+        );
+        return;
+      }
     }
-  };
+
+    setExporting(true);
+
+    const params =
+      new URLSearchParams();
+
+    if (
+      activeTab !== "ALL"
+    ) {
+      params.set(
+        "category",
+        activeTab
+      );
+    }
+
+    params.set(
+      "range",
+      exportRange
+    );
+
+    if (
+      exportRange === "custom"
+    ) {
+      params.set(
+        "startDate",
+        exportStartDate
+      );
+
+      params.set(
+        "endDate",
+        exportEndDate
+      );
+    }
+
+    const res =
+      await fetch(
+        `/api/survey/export?${params.toString()}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+    if (!res.ok) {
+      const errorText =
+        await res.text();
+
+      console.error(
+        "Export error:",
+        errorText
+      );
+
+      throw new Error(
+        "Export failed"
+      );
+    }
+
+    const blob =
+      await res.blob();
+
+    const url =
+      window.URL.createObjectURL(
+        blob
+      );
+
+    const a =
+      document.createElement(
+        "a"
+      );
+
+    const rangeName =
+      exportRange ===
+      "custom"
+        ? `${exportStartDate}-to-${exportEndDate}`
+        : exportRange;
+
+    a.href = url;
+
+    a.download =
+      `survey-${activeTab.toLowerCase()}-${rangeName}.xlsx`;
+
+    document.body.appendChild(
+      a
+    );
+
+    a.click();
+
+    a.remove();
+
+    window.URL.revokeObjectURL(
+      url
+    );
+
+    setShowExportOptions(
+      false
+    );
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
+    alert(
+      "Failed to download Excel. Please try again."
+    );
+
+  } finally {
+    setExporting(false);
+  }
+};
 
   const handleWorkReport = async (range: "weekly" | "monthly") => {
     try {
@@ -232,7 +405,177 @@ export default function SurveyPage({
             Paste one record, or many at once — category is detected automatically • Export to Excel
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="relative">
+  <button
+    onClick={() =>
+      setShowExportOptions((prev) => !prev)
+    }
+    disabled={exporting || total === 0}
+    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+  >
+    {exporting ? (
+      <Loader2 className="w-4 h-4 animate-spin" />
+    ) : (
+      <Download className="w-4 h-4" />
+    )}
+
+    Download Excel
+  </button>
+
+  {showExportOptions && (
+    <div className="absolute right-0 top-full mt-2 z-50 w-80 bg-white border border-gray-200 rounded-xl shadow-xl p-4">
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-gray-900">
+          Export Data
+        </h3>
+
+        <p className="text-xs text-gray-500 mt-1">
+          Select the data period you want to export.
+        </p>
+      </div>
+
+      {/* Range */}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-gray-700">
+          Date Range
+        </label>
+
+        <select
+          value={exportRange}
+          onChange={(e) =>
+            setExportRange(
+              e.target.value as
+                | "all"
+                | "today"
+                | "weekly"
+                | "monthly"
+                | "custom"
+            )
+          }
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">
+            All Data
+          </option>
+
+          <option value="today">
+            Today
+          </option>
+
+          <option value="weekly">
+            This Week
+          </option>
+
+          <option value="monthly">
+            This Month
+          </option>
+
+          <option value="custom">
+            Custom Date Range
+          </option>
+        </select>
+      </div>
+
+      {/* Custom dates */}
+      {exportRange === "custom" && (
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              From
+            </label>
+
+            <input
+              type="date"
+              value={exportStartDate}
+              onChange={(e) =>
+                setExportStartDate(
+                  e.target.value
+                )
+              }
+              className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              To
+            </label>
+
+            <input
+              type="date"
+              value={exportEndDate}
+              onChange={(e) =>
+                setExportEndDate(
+                  e.target.value
+                )
+              }
+              className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Current selection */}
+      <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div className="text-xs text-gray-500">
+          Exporting
+        </div>
+
+        <div className="text-sm font-medium text-gray-900 mt-1">
+          {activeTab === "ALL"
+            ? "All Categories"
+            : activeTab}
+        </div>
+
+        <div className="text-xs text-gray-500 mt-1">
+          {exportRange === "all" &&
+            "All available records"}
+
+          {exportRange === "today" &&
+            "Today's records"}
+
+          {exportRange === "weekly" &&
+            "Current week's records"}
+
+          {exportRange === "monthly" &&
+            "Current month's records"}
+
+          {exportRange === "custom" &&
+            exportStartDate &&
+            exportEndDate &&
+            `${exportStartDate} → ${exportEndDate}`}
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex gap-2 mt-4">
+        <button
+          type="button"
+          onClick={() =>
+            setShowExportOptions(false)
+          }
+          className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={exporting}
+          className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm disabled:opacity-50"
+        >
+          {exporting && (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          )}
+
+          Export
+        </button>
+      </div>
+    </div>
+  )}
+</div>
+        {/* <div className="flex gap-2">
           <button
             onClick={() => handleWorkReport("weekly")}
             disabled={reportLoading !== null}
@@ -269,7 +612,7 @@ export default function SurveyPage({
             )}
             Download Excel
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* Paste Section — no category picker; every block carries its own B2B/B2H/B2C line */}

@@ -4,6 +4,7 @@ import MissingAttendanceRequest from "@/models/missing-attendance";
 import Attendance from "@/models/Attendance";
 import Auth from "@/models/Auth";
 import { connectDB } from "@/config/db";
+import { createAuditLog } from "@/lib/auditLog";
 
 // GET /api/missing-attendance
 export async function GET(request: NextRequest) {
@@ -127,6 +128,16 @@ export async function POST(request: NextRequest) {
       status: "pending",
     });
 
+    await createAuditLog({
+      userId,
+      action: "CREATE",
+      module: "Missing Attendance",
+      description: `Submitted missing attendance request for date ${targetDate.toDateString()}`,
+      entityType: "MissingAttendanceRequest",
+      entityId: String(newRequest._id),
+      metadata: { reason: reason.trim(), date: targetDate },
+    });
+
     const populated = await MissingAttendanceRequest.findById(newRequest._id)
       .populate("userId", "name email workingShift role");
 
@@ -144,4 +155,4 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+}

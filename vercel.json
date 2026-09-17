@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/work-report?range=monthly",
       "schedule": "0 6 1 * *"
+    },
+    {
+      "path": "/api/cron/mark-absent?shift=day",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/mark-absent?shift=night",
+      "schedule": "30 1 * * *"
     }
   ]
 }

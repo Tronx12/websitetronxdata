@@ -10,6 +10,11 @@ interface IAttendance extends Document {
   lunchStart?: Date | null;
   lunchEnd?: Date | null;
 
+  status?: "present" | "absent" | "half-day" | "office-off";
+  lunchDurationMinutes?: number;
+  excessLunchMinutes?: number;
+  remarks?: string;
+
   isLate?: boolean;
   lateByMinutes?: number;
   isManual?: boolean;
@@ -57,6 +62,27 @@ const AttendanceSchema = new Schema<IAttendance>(
 
     lunchEnd: {
       type: Date,
+      default: null,
+    },
+
+    status: {
+      type: String,
+      enum: ["present", "absent", "half-day", "office-off"],
+      default: "present",
+    },
+
+    lunchDurationMinutes: {
+      type: Number,
+      default: 0,
+    },
+
+    excessLunchMinutes: {
+      type: Number,
+      default: 0,
+    },
+
+    remarks: {
+      type: String,
       default: null,
     },
 

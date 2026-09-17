@@ -4,6 +4,7 @@ import MissingAttendanceRequest from "@/models/missing-attendance";
 import Attendance from "@/models/Attendance";
 import Auth from "@/models/Auth";
 import { connectDB } from "@/config/db";
+import { createAuditLog } from "@/lib/auditLog";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -81,6 +82,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
       requestDoc.reviewComment = reviewComment || null;
       requestDoc.reviewedAt = new Date();
       await requestDoc.save();
+
+      await createAuditLog({
+        userId: reviewedBy,
+        action: "UPDATE",
+        module: "Missing Attendance",
+        description: `Rejected missing attendance request for user ${requestDoc.userId}`,
+        entityType: "MissingAttendanceRequest",
+        entityId: id,
+        metadata: { status: "rejected", reviewComment },
+      });
 
       const populated = await MissingAttendanceRequest.findById(id)
         .populate("userId", "name email")
@@ -160,6 +171,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
     requestDoc.attendanceId = attendance._id;
     await requestDoc.save();
 
+    await createAuditLog({
+      userId: reviewedBy,
+      action: "UPDATE",
+      module: "Missing Attendance",
+      description: `Approved missing attendance request for user ${requestDoc.userId}`,
+      entityType: "MissingAttendanceRequest",
+      entityId: id,
+      metadata: { status: "approved", attendanceId: String(attendance._id) },
+    });
+
     const populated = await MissingAttendanceRequest.findById(id)
       .populate("userId", "name email")
       .populate("reviewedBy", "name email")
@@ -188,9 +209,18 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
+    await createAuditLog({
+      userId: (deleted as any).userId || null,
+      action: "DELETE",
+      module: "Missing Attendance",
+      description: `Deleted missing attendance request ${id}`,
+      entityType: "MissingAttendanceRequest",
+      entityId: id,
+    });
+
     return NextResponse.json({ message: "Request deleted successfully" });
   } catch (error) {
     console.error("DELETE /api/missing-attendance/[id] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+}

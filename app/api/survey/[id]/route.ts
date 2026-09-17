@@ -4,6 +4,8 @@ import mongoose from "mongoose";
 import { connectDB } from "@/config/db";
 import SurveyData from "@/models/SurveyData";
 import { SurveyCategory } from "@/lib/survey-fields";
+import { getCurrentUser } from "@/lib/getuser";
+import { createAuditLog } from "@/lib/auditLog";
 
 const VALID_CATEGORIES: SurveyCategory[] = ["B2B", "B2H", "B2C"];
 
@@ -17,6 +19,7 @@ export async function PUT(
   try {
     await connectDB();
 
+    const currentUser = await getCurrentUser();
     const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -67,6 +70,18 @@ export async function PUT(
       );
     }
 
+    if (currentUser?.userId) {
+      await createAuditLog({
+        userId: currentUser.userId,
+        action: "UPDATE",
+        module: "Survey",
+        description: `Updated survey record ${id}`,
+        entityType: "SurveyData",
+        entityId: id,
+        metadata: { updatedFields: Object.keys(allowed) },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: "Record updated successfully",
@@ -110,6 +125,7 @@ export async function DELETE(
   try {
     await connectDB();
 
+    const currentUser = await getCurrentUser();
     const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -126,6 +142,17 @@ export async function DELETE(
         { success: false, message: "Survey record not found" },
         { status: 404 }
       );
+    }
+
+    if (currentUser?.userId) {
+      await createAuditLog({
+        userId: currentUser.userId,
+        action: "DELETE",
+        module: "Survey",
+        description: `Deleted survey record ${id}`,
+        entityType: "SurveyData",
+        entityId: id,
+      });
     }
 
     return NextResponse.json({
@@ -147,4 +174,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+}

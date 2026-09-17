@@ -8,7 +8,8 @@ type ApiResponse<T = any> = {
 
 async function api<T = any>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  isRetry = false
 ): Promise<ApiResponse<T>> {
   const res = await fetch(path, {
     ...options,
@@ -18,6 +19,23 @@ async function api<T = any>(
     },
     credentials: "include", // important for httpOnly cookies
   });
+
+  // Handle 401 Unauthorized by attempting automatic refresh
+  if (res.status === 401 && !isRetry && path !== "/api/auth/login" && path !== "/api/auth/refresh") {
+    try {
+      const refreshRes = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (refreshRes.ok) {
+        // Retry original request
+        return api<T>(path, options, true);
+      }
+    } catch (refreshErr) {
+      console.error("Auto refresh failed:", refreshErr);
+    }
+  }
 
   const json = await res.json();
   if (!res.ok) {

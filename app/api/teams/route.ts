@@ -3,6 +3,7 @@ import { connectDB } from "@/config/db";
 import Team from "@/models/Team";
 import Auth from "@/models/Auth";
 import { getCurrentUser } from "@/lib/getuser";
+import { createAuditLog } from "@/lib/auditLog";
 
 export async function GET(req: NextRequest) {
   try {
@@ -109,6 +110,16 @@ export async function POST(req: NextRequest) {
       createdBy: currentUser.userId,
     });
 
+    await createAuditLog({
+      userId: currentUser.userId,
+      action: "CREATE",
+      module: "Team",
+      description: `Created team '${team.name}'`,
+      entityType: "Team",
+      entityId: String(team._id),
+      metadata: { name: team.name, teamLeadId, memberCount: memberIds.length },
+    });
+
     const populated = await Team.findById(team._id)
       .populate("teamLead", "name email")
       .populate("members", "name email");
@@ -123,4 +134,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+}

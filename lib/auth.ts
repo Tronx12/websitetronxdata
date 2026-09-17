@@ -17,7 +17,7 @@ export function createAccessToken(
     },
     ACCESS_SECRET,
     {
-      expiresIn: "15m",
+      expiresIn: "1d",
     }
   );
 }
@@ -30,7 +30,7 @@ export function createRefreshToken(userId: string) {
     },
     REFRESH_SECRET,
     {
-      expiresIn: "7d",
+      expiresIn: "30d",
     }
   );
 }

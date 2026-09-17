@@ -10,10 +10,10 @@ import AuthButton from "@/components/auth/AuthButton";
 import { authApi } from "@/lib/auth-client";
 
 const ROLE_REDIRECT: Record<string, string> = {
-  admin: "/admin",
-  hr: "/hr",
-  "team-lead": "/team-lead",
-  "survey-tester": "/survey-tester",
+  admin: "/admin/survey-data",
+  hr: "/hr/survey-data",
+  "team-lead": "/team-lead/survey-data",
+  "survey-tester": "/survey-tester/survey-data",
 };
 
 export default function LoginPage() {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
+import { formatLateTime } from "@/lib/shiftValidation";
 
 interface AttendenceRecord {
   _id: string;
@@ -17,6 +18,10 @@ interface AttendenceRecord {
   logoutTime: string | null;
   lunchStart: string | null;
   lunchEnd: string | null;
+  status?: "present" | "absent" | "half-day" | "office-off";
+  lunchDurationMinutes?: number;
+  excessLunchMinutes?: number;
+  remarks?: string;
   isLate?: boolean;
   lateByMinutes?: number;
   updatedBy?: {
@@ -128,7 +133,6 @@ export default function AttendencePage({ currentUserId }: Props) {
           const location = await getCurrentLocation();
           body.latitude = location.latitude;
           body.longitude = location.longitude;
-          // Optional: you can later add reverse geocoding for address
         } catch (locError: any) {
           alert(locError.message || "Failed to get location");
           setMarking(false);
@@ -149,7 +153,11 @@ export default function AttendencePage({ currentUserId }: Props) {
         return;
       }
 
-      alert(`${action} successful`);
+      if (data.remarks) {
+        alert(`${action} successful: ${data.remarks}`);
+      } else {
+        alert(`${action} successful`);
+      }
       fetchRecords();
     } catch (err) {
       console.error(err);
@@ -161,41 +169,14 @@ export default function AttendencePage({ currentUserId }: Props) {
 
   // ── Download Excel ──
   const downloadExcel = () => {
-    if (records.length === 0) {
-      alert("No data to download");
-      return;
-    }
+    const params = new URLSearchParams();
+    params.append("userId", userId || currentUserId);
+    if (fromDate) params.append("from", fromDate);
+    if (toDate) params.append("to", toDate);
 
-    const excelData = records.map((r) => ({
-      Date: format(new Date(r.date), "dd MMM yyyy"),
-      Employee: r.userId?.name || "—",
-      Email: r.userId?.email || "—",
-      "Login Time": r.loggingTime
-        ? format(new Date(r.loggingTime), "hh:mm a")
-        : "—",
-      "Logout Time": r.logoutTime
-        ? format(new Date(r.logoutTime), "hh:mm a")
-        : "—",
-      "Lunch Start": r.lunchStart
-        ? format(new Date(r.lunchStart), "hh:mm a")
-        : "—",
-      "Lunch End": r.lunchEnd
-        ? format(new Date(r.lunchEnd), "hh:mm a")
-        : "—",
-      Late: r.isLate ? `Yes (${r.lateByMinutes} min)` : "No",
-      "Updated By": r.updatedBy?.name || "—",
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
-
-    const colWidths = Object.keys(excelData[0] || {}).map(() => ({ wch: 18 }));
-    worksheet["!cols"] = colWidths;
-
-    const fileName = `Attendance_${fromDate || "all"}_to_${toDate || "all"}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+    window.open(`/api/attendence/export?${params.toString()}`, "_blank");
   };
+
 
   const formatTime = (date: string | null) => {
     if (!date) return "—";
@@ -209,6 +190,33 @@ export default function AttendencePage({ currentUserId }: Props) {
         <div>
           <h4 className="text-3xl font-bold text-gray-900">Attendance</h4>
           <p className="text-gray-500 mt-1">Mark & track daily attendance</p>
+        </div>
+
+        {/* Shift Timings & Guidelines Card */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-2 text-blue-900 font-semibold">
+              <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded uppercase">Day Shift</span>
+              <span>11:00 AM - 7:30 PM</span>
+            </div>
+            <ul className="text-xs text-blue-800 space-y-1">
+              <li>• <strong>Login:</strong> 11:00 AM to 11:30 AM</li>
+              <li>• <strong>Lunch:</strong> 30 to 35 minutes</li>
+              <li>• <strong>Logout:</strong> 7:00 PM to 7:30 PM</li>
+            </ul>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-2 text-purple-900 font-semibold">
+              <span className="px-2 py-0.5 bg-purple-600 text-white text-xs rounded uppercase">Night Shift</span>
+              <span>9:30 PM - 6:00 AM</span>
+            </div>
+            <ul className="text-xs text-purple-800 space-y-1">
+              <li>• <strong>Login:</strong> 9:30 PM to 10:10 PM</li>
+              <li>• <strong>Lunch:</strong> 30 to 35 minutes</li>
+              <li>• <strong>Logout:</strong> After 6:00 AM</li>
+            </ul>
+          </div>
         </div>
 
         {/* Mark Attendance */}
@@ -327,7 +335,7 @@ export default function AttendencePage({ currentUserId }: Props) {
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Employee
+                    Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Login
@@ -336,13 +344,13 @@ export default function AttendencePage({ currentUserId }: Props) {
                     Logout
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Lunch Start
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    Lunch End
+                    Lunch
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Late
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Remarks
                   </th>
                 </tr>
               </thead>
@@ -365,11 +373,20 @@ export default function AttendencePage({ currentUserId }: Props) {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {format(new Date(r.date), "dd MMM yyyy")}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        <div className="font-medium">{r.userId?.name}</div>
-                        <div className="text-xs text-gray-400">
-                          {r.userId?.email}
-                        </div>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {r.status === "absent" ? (
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 uppercase">
+                            Absent
+                          </span>
+                        ) : r.status === "office-off" ? (
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 uppercase">
+                            Office Off
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 uppercase">
+                            Present
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {formatTime(r.loggingTime)}
@@ -378,19 +395,33 @@ export default function AttendencePage({ currentUserId }: Props) {
                         {formatTime(r.logoutTime)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {formatTime(r.lunchStart)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {formatTime(r.lunchEnd)}
+                        {r.lunchStart || r.lunchEnd ? (
+                          <div>
+                            <div>{formatTime(r.lunchStart)} → {formatTime(r.lunchEnd)}</div>
+                            {r.lunchDurationMinutes ? (
+                              <div className="text-xs text-gray-400">
+                                {r.lunchDurationMinutes} mins
+                                {r.excessLunchMinutes ? (
+                                  <span className="text-amber-600 font-medium"> ({r.excessLunchMinutes}m excess)</span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {r.isLate ? (
                           <span className="text-red-600 font-medium">
-                            Yes ({r.lateByMinutes} min)
+                            Yes {r.lateByMinutes ? `(${formatLateTime(r.lateByMinutes)})` : ""}
                           </span>
                         ) : (
                           <span className="text-green-600">No</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-xs text-gray-500 max-w-xs truncate">
+                        {r.remarks || "—"}
                       </td>
                     </tr>
                   ))
@@ -402,4 +433,4 @@ export default function AttendencePage({ currentUserId }: Props) {
       </div>
     </div>
   );
-}
+}
