@@ -8,6 +8,13 @@ const authSchema = new mongoose.Schema(
       trim: true,
     },
 
+    employeeId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
     email: {
       type: String,
       required: true,

@@ -58,6 +58,7 @@ export const authApi = {
   register: (payload: {
     name: string;
     email: string;
+    employeeId?: string;
     phoneNumber?: string;
     password: string;
     workingShift?: "day" | "night";

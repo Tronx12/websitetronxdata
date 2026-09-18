@@ -43,7 +43,7 @@ h1 { font-size: clamp(56px, 6vw, 86px); line-height: .95; margin-bottom: 27px; }
 em { color: #e77c63; font-family: Georgia, serif; font-style: italic; font-weight: 400; }
 .hero-description { color: #66716c; font-size: 14px; line-height: 1.75; max-width: 390px; }
 .hero-actions { align-items: center; display: flex; gap: 25px; margin-top: 34px; }
-.text-link { border-bottom: 1px solid #b5bbb4; color: #34413c; font-size: 12px; padding-bottom: 3px; }
+.text-link { border-bottom: 1px solid #b5bbb4; color: #5898d3; font-size: 12px; padding-bottom: 3px; }
 .text-link span { color: #e77c63; font-size: 16px; margin-left: 6px; }
 .proof-row { align-items: center; display: flex; gap: 14px; margin-top: 60px; }
 .proof-row p { color: #78817a; font-size: 10px; margin: 0; }
@@ -248,3 +248,45 @@ AUTH CSS
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+.form-field select.form-input {
+  width: 100%;
+  height: 48px;
+  padding: 0.75rem 1rem;
+
+  background: rgba(0, 0, 0, 0.25);
+  color: #f4f4f5;
+
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+
+  font-size: 0.95rem;
+  font-family: inherit;
+
+  cursor: pointer;
+  outline: none;
+
+  /* Prevent browser native dark/light mismatch */
+  color-scheme: dark;
+
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.form-field select.form-input:focus {
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Dropdown options */
+.form-field select.form-input option {
+  background: #171a1f;
+  color: #f4f4f5;
+  padding: 10px;
+}
+
+/* Disabled select */
+.form-field select.form-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

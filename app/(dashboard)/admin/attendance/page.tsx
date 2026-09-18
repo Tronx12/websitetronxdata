@@ -264,7 +264,7 @@ export default function AttendancePage() {
             {/* Left: Employee List */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <div className="px-5 py-4 border-b bg-gray-50">
+                <div className="px-3 py-2 border-b bg-gray-50">
                   <h2 className="font-semibold text-gray-800">
                     Employees ({filteredEmployees.length})
                   </h2>
@@ -280,7 +280,7 @@ export default function AttendancePage() {
                       <button
                         key={user._id}
                         onClick={() => setSelectedEmployee(user)}
-                        className={`w-full text-left px-5 py-4 hover:bg-blue-50 transition ${
+                        className={`w-full text-left px-5 py-1 hover:bg-blue-50 transition ${
                           selectedEmployee?._id === user._id
                             ? "bg-blue-50 border-l-4 border-blue-600"
                             : ""
@@ -288,7 +288,7 @@ export default function AttendancePage() {
                       >
                         <div className="font-medium text-gray-900">{user.name}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{user.email}</div>
-                        <div className="flex items-center gap-3 mt-2 text-xs">
+                        <div className="flex items-center gap-2 mt-1 text-xs">
                           <span className="capitalize px-2 py-0.5 bg-gray-100 rounded text-gray-600">
                             {user.role?.replace("-", " ")}
                           </span>
@@ -432,4 +432,4 @@ export default function AttendancePage() {
       </div>
     </div>
   );
-}
+}

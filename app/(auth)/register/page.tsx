@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     name: "",
     email: "",
+    employeeId: "",
     phoneNumber: "",
     password: "",
     workingShift: "day" as "day" | "night",
@@ -35,6 +36,7 @@ export default function RegisterPage() {
 
     const name = form.name.trim();
     const email = form.email.trim().toLowerCase();
+    const employeeId = form.employeeId.trim() || undefined;
     const phoneNumber = form.phoneNumber.trim() || undefined;
     const password = form.password;
     const workingShift = form.workingShift;
@@ -56,6 +58,7 @@ export default function RegisterPage() {
       await authApi.register({
         name,
         email,
+        employeeId,
         phoneNumber,
         password,
         workingShift,
@@ -89,6 +92,16 @@ export default function RegisterPage() {
         />
 
         <FormField
+          label="Employee ID (optional)"
+          name="employeeId"
+          placeholder="EMP-001"
+          value={form.employeeId}
+          onChange={handleChange}
+          autoComplete="off"
+          disabled={loading}
+        />
+
+        <FormField
           label="Work email"
           name="email"
           type="email"
@@ -112,7 +125,7 @@ export default function RegisterPage() {
         />
 
         {/* Working Shift Select */}
-        <div className="form-field">
+        {/* <div className="form-field">
           <label htmlFor="workingShift" className="form-label">
             Working Shift
           </label>
@@ -128,7 +141,25 @@ export default function RegisterPage() {
             <option value="day">Day Shift</option>
             <option value="night">Night Shift</option>
           </select>
-        </div>
+        </div> */}
+        <div className="form-field">
+  <label htmlFor="workingShift" className="form-label">
+    Working Shift
+  </label>
+
+  <select
+    id="workingShift"
+    name="workingShift"
+    value={form.workingShift}
+    onChange={handleChange}
+    disabled={loading}
+    className="form-input"
+    required
+  >
+    <option value="day">Day Shift</option>
+    <option value="night">Night Shift</option>
+  </select>
+</div>
 
         <FormField
           label="Password"

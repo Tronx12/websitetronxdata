@@ -14,12 +14,14 @@ import {
   Loader2,
   Clock,
   ChevronDown,
+  Briefcase,
 } from "lucide-react";
 
 interface UserProfile {
   _id: string;
   name: string;
   email: string;
+  employeeId?: string;
   workingShift: "day" | "night";
   phoneNumber?: string;
   role: string;
@@ -37,6 +39,7 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    employeeId: "",
     phoneNumber: "",
     workingShift: "day" as "day" | "night",
   });
@@ -95,6 +98,7 @@ export default function ProfilePage() {
         setFormData({
           name: data.data.name,
           email: data.data.email,
+          employeeId: data.data.employeeId || "",
           phoneNumber: data.data.phoneNumber || "",
           workingShift: data.data.workingShift || "day",
         });
@@ -142,6 +146,7 @@ export default function ProfilePage() {
         setFormData({
           name: data.data.name,
           email: data.data.email,
+          employeeId: data.data.employeeId || "",
           phoneNumber: data.data.phoneNumber || "",
           workingShift: data.data.workingShift || "day",
         });
@@ -163,6 +168,7 @@ export default function ProfilePage() {
       setFormData({
         name: user.name,
         email: user.email,
+        employeeId: user.employeeId || "",
         phoneNumber: user.phoneNumber || "",
         workingShift: user.workingShift || "day",
       });
@@ -290,6 +296,36 @@ export default function ProfilePage() {
                 </div>
               </div>
 
+              {/* Employee ID */}
+              <div>
+                <label
+                  htmlFor="employeeId"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Employee ID
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Briefcase className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="employeeId"
+                    name="employeeId"
+                    type="text"
+                    value={formData.employeeId}
+                    onChange={handleInputChange}
+                    // disabled={fieldsDisabled}
+                    disabled
+                    placeholder="EMP-001"
+                    className={`block w-full pl-10 cursor-not-allowed  pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      isEditing
+                        ? "border-gray-300 bg-white"
+                        : "border-gray-200 bg-gray-50 cursor-not-allowed"
+                    }`}
+                  />
+                </div>
+              </div>
+
               {/* Email */}
               <div>
                 <label
@@ -306,10 +342,12 @@ export default function ProfilePage() {
                     id="email"
                     name="email"
                     type="email"
-                    value={formData.email}
+                    // value={formData.email}
+                      value={user.email.replace("-", " ")}
                     onChange={handleInputChange}
-                    disabled={fieldsDisabled}
-                    className={`block w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    disabled
+                    // disabled={fieldsDisabled}
+                    className={`block w-full pl-10  cursor-not-allowed pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       isEditing
                         ? "border-gray-300 bg-white"
                         : "border-gray-200 bg-gray-50 cursor-not-allowed"

@@ -478,7 +478,7 @@ export default function DqaView() {
       )}
 
       {/* Header */}
-      <div className="rounded-t-2xl bg-[#e06666] px-5 py-5 text-center text-white">
+      <div className="rounded-t-2xl bg-black px-5 py-5 text-center text-white">
         <div className="flex items-center justify-center gap-2">
           <ShieldCheck size={22} />
           <h3 className="text-xl font-bold">DQA Review Panel</h3>
@@ -593,7 +593,7 @@ export default function DqaView() {
 
             {/* PID Reference Panel */}
             <div className="mb-4 rounded-xl border-2 border-purple-300 bg-purple-50 p-4">
-              <div className="mb-2 text-sm font-bold text-purple-700">
+              <div className="mb-2 text-sm font-bold text-black">
                 📋 Check Approved OEs by PID — see what’s already approved
               </div>
               <div className="flex gap-2">

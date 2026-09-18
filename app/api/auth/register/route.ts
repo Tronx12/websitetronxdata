@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
     const {
       name,
       email,
+      employeeId,
       phoneNumber,
       password,
       role,
@@ -88,6 +89,26 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================================
+    // CHECK EXISTING EMPLOYEE ID
+    // ============================================
+
+    if (employeeId?.trim()) {
+      const existingEmployee = await Auth.findOne({
+        employeeId: employeeId.trim(),
+      });
+
+      if (existingEmployee) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Employee ID already registered",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // ============================================
     // CHECK EXISTING PHONE
     // ============================================
 
@@ -135,6 +156,7 @@ export async function POST(req: NextRequest) {
     const user = await Auth.create({
       name: name.trim(),
       email: normalizedEmail,
+      employeeId: employeeId?.trim() || undefined,
       phoneNumber: phoneNumber?.trim() || undefined,
       password: hashedPassword,
       role: role || "survey-tester",
@@ -158,6 +180,7 @@ export async function POST(req: NextRequest) {
       metadata: {
         name: user.name,
         email: user.email,
+        employeeId: user.employeeId,
         role: user.role,
         workingShift: user.workingShift,
         isEmailVerified: user.isEmailVerified,
@@ -197,6 +220,7 @@ export async function POST(req: NextRequest) {
           id: user._id,
           name: user.name,
           email: user.email,
+          employeeId: user.employeeId,
           role: user.role,
           workingShift: user.workingShift,
         },

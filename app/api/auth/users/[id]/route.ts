@@ -176,7 +176,9 @@ export async function PATCH(
     const allowedFields = [
       "name",
       "email",
+      "employeeId",
       "phoneNumber",
+      "workingShift",
       "role",
     ];
 
