@@ -1729,6 +1729,7 @@ import { connectDB } from "@/config/db";
 import SurveyData from "@/models/SurveyData";
 import Auth from "@/models/Auth";
 import { SurveyCategory } from "@/lib/survey-fields";
+import Team from "@/models/Team";
 import { getCurrentUser } from "@/lib/getuser";
 import { createAuditLog } from "@/lib/auditLog";
 import { normalizeSurveyWithGroq } from "@/lib/groqSurveyNormalizer";
@@ -2493,214 +2494,869 @@ export async function POST(
 // GET - FETCH SURVEY RECORDS
 // ============================================================
 
-export async function GET(
-  req: NextRequest
-) {
+// export async function GET(
+//   req: NextRequest
+// ) {
+//   try {
+//     await connectDB();
+
+
+//     // ========================================================
+//     // AUTHENTICATION
+//     // ========================================================
+
+//     const currentUser =
+//       await getCurrentUser();
+
+//     if (!currentUser?.userId) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message:
+//             "Unauthorized",
+//         },
+//         {
+//           status: 401,
+//         }
+//       );
+//     }
+
+
+//     if (
+//       !isValidObjectId(
+//         currentUser.userId
+//       )
+//     ) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message:
+//             "Invalid authenticated user ID",
+//         },
+//         {
+//           status: 401,
+//         }
+//       );
+//     }
+
+
+//     const currentUserId =
+//       objectId(
+//         currentUser.userId
+//       );
+
+
+//     const role =
+//       normalizeRole(
+//         currentUser.role
+//       );
+
+
+//     console.log(
+//       "======================================"
+//     );
+
+//     console.log(
+//       "SURVEY GET AUTH"
+//     );
+
+//     console.log(
+//       "User ID:",
+//       currentUser.userId
+//     );
+
+//     console.log(
+//       "Role:",
+//       currentUser.role
+//     );
+
+//     console.log(
+//       "Team ID:",
+//       (currentUser as any).teamId
+//     );
+
+//     console.log(
+//       "======================================"
+//     );
+
+
+//     // ========================================================
+//     // URL PARAMETERS
+//     // ========================================================
+
+//     const {
+//       searchParams,
+//     } = new URL(
+//       req.url
+//     );
+
+
+//     const category =
+//       searchParams.get(
+//         "category"
+//       );
+
+//     const projectNo =
+//       searchParams.get(
+//         "projectNo"
+//       );
+
+//     const accountType =
+//       searchParams.get(
+//         "accountType"
+//       );
+
+//     const pid =
+//       searchParams.get(
+//         "pid"
+//       );
+
+//     const country =
+//       searchParams.get(
+//         "country"
+//       );
+
+//     const status =
+//       searchParams.get(
+//         "status"
+//       );
+
+//     /*
+//      * These parameters are intentionally read,
+//      * but creator access is NOT trusted from
+//      * the browser.
+//      */
+//     const requestedCreatedBy =
+//       searchParams.get(
+//         "createdBy"
+//       );
+
+//     const excludeCreatedBy =
+//       searchParams.get(
+//         "excludeCreatedBy"
+//       );
+
+//     const includeUnassigned =
+//       searchParams.get(
+//         "includeUnassigned"
+//       );
+
+
+//     const sortBy =
+//       searchParams.get(
+//         "sortBy"
+//       ) || "createdAt";
+
+
+//     const sortOrder =
+//       searchParams.get(
+//         "sortOrder"
+//       ) === "asc"
+//         ? 1
+//         : -1;
+
+
+//     const search =
+//       searchParams.get(
+//         "search"
+//       ) || "";
+
+
+//     const page =
+//       Math.max(
+//         1,
+//         Number(
+//           searchParams.get(
+//             "page"
+//           ) || "1"
+//         )
+//       );
+
+
+//     const limit =
+//       Math.min(
+//         100,
+//         Math.max(
+//           1,
+//           Number(
+//             searchParams.get(
+//               "limit"
+//             ) || "20"
+//           )
+//         )
+//       );
+
+
+//     const skip =
+//       (page - 1) *
+//       limit;
+
+
+//     // ========================================================
+//     // BASE FILTER
+//     // ========================================================
+
+//     const filter: any = {};
+
+
+//     // ========================================================
+//     // CATEGORY
+//     // ========================================================
+
+//     if (
+//       category &&
+//       VALID_CATEGORIES.includes(
+//         category as SurveyCategory
+//       )
+//     ) {
+//       filter.category =
+//         category;
+//     }
+
+
+//     // ========================================================
+//     // PROJECT
+//     // ========================================================
+
+//     if (
+//       projectNo
+//     ) {
+//       filter.projectNo =
+//         projectNo;
+//     }
+
+
+//     // ========================================================
+//     // ACCOUNT TYPE
+//     // ========================================================
+
+//     if (
+//       accountType
+//     ) {
+//       filter.accountType =
+//         accountType.toUpperCase();
+//     }
+
+
+//     // ========================================================
+//     // PID
+//     // ========================================================
+
+//     if (
+//       pid
+//     ) {
+//       filter.pid =
+//         pid;
+//     }
+
+
+//     // ========================================================
+//     // COUNTRY
+//     // ========================================================
+
+//     if (
+//       country
+//     ) {
+//       filter.country = {
+//         $regex:
+//           country,
+//         $options:
+//           "i",
+//       };
+//     }
+
+
+//     // ========================================================
+//     // STATUS
+//     // ========================================================
+
+//     if (
+//       status
+//     ) {
+//       filter.status = {
+//         $regex:
+//           status,
+//         $options:
+//           "i",
+//       };
+//     }
+
+
+//     // ========================================================
+//     // ROLE-BASED CREATOR ACCESS
+//     // ========================================================
+
+//     /*
+//      * IMPORTANT:
+//      *
+//      * Never trust:
+//      *
+//      * ?createdBy=someOtherUserId
+//      *
+//      * from the frontend.
+//      *
+//      * The server determines the allowed
+//      * createdBy values from the logged-in
+//      * user's role.
+//      */
+
+
+//     // --------------------------------------------------------
+//     // SURVEY TESTER
+//     // --------------------------------------------------------
+
+//     const isSurveyTester =
+//       role === "survey" ||
+//       role === "surveytester" ||
+//       role === "tester";
+
+
+//     if (
+//       isSurveyTester
+//     ) {
+//       /*
+//        * Survey Tester can ONLY see
+//        * records created by himself.
+//        */
+//       filter.createdBy =
+//         currentUserId;
+
+//       console.log(
+//         "SURVEY ACCESS: OWN DATA ONLY"
+//       );
+//     }
+
+
+//     // --------------------------------------------------------
+//     // TEAM LEAD
+//     // --------------------------------------------------------
+
+//     else if (
+//       role === "teamlead"
+//     ) {
+//       /*
+//        * Team Lead must have a team.
+//        */
+
+//       if (
+//         !(currentUser as any).teamId ||
+//         !isValidObjectId(
+//           String(
+//             (currentUser as any).teamId
+//           )
+//         )
+//       ) {
+//         return NextResponse.json(
+//           {
+//             success: false,
+//             message:
+//               "Team Lead does not have a valid team",
+//           },
+//           {
+//             status: 400,
+//           }
+//         );
+//       }
+
+
+//       const teamId =
+//         objectId(
+//           String(
+//             (currentUser as any).teamId
+//           )
+//         );
+
+
+//       /*
+//        * Find every user belonging
+//        * to this Team Lead's team.
+//        *
+//        * This includes:
+//        * - Team Lead
+//        * - Survey Testers
+//        * - Other team members
+//        */
+
+//       const teamUsers =
+//         await Auth.find(
+//           {
+//             teamId,
+
+//             isDeleted: {
+//               $ne: true,
+//             },
+
+//             isActive: {
+//               $ne: false,
+//             },
+//           },
+//           {
+//             _id: 1,
+//           }
+//         ).lean();
+
+
+//       const teamUserIds =
+//         teamUsers.map(
+//           (
+//             member: any
+//           ) =>
+//             member._id
+//         );
+
+
+//       /*
+//        * Always include current Team Lead.
+//        *
+//        * This protects against an inconsistent
+//        * User.teamId record.
+//        */
+
+//       const alreadyIncluded =
+//         teamUserIds.some(
+//           (
+//             id: any
+//           ) =>
+//             String(id) ===
+//             String(
+//               currentUserId
+//             )
+//         );
+
+
+//       if (
+//         !alreadyIncluded
+//       ) {
+//         teamUserIds.push(
+//           currentUserId
+//         );
+//       }
+
+
+//       filter.createdBy = {
+//         $in:
+//           teamUserIds,
+//       };
+
+
+//       console.log(
+//         "TEAM LEAD ACCESS"
+//       );
+
+//       console.log(
+//         "Team ID:",
+//         String(
+//           teamId
+//         )
+//       );
+
+//       console.log(
+//         "Team Users:",
+//         teamUserIds.map(
+//           (id: any) =>
+//             String(id)
+//         )
+//       );
+//     }
+
+
+//     // --------------------------------------------------------
+//     // ADMIN
+//     // HR
+//     // --------------------------------------------------------
+
+//     else if (
+//       role === "admin" ||
+//       role === "hr"
+//     ) {
+//       /*
+//        * Admin and HR can see all survey records.
+//        *
+//        * Do NOT apply createdBy from URL.
+//        */
+
+//       console.log(
+//         "ADMIN/HR ACCESS: ALL SURVEY DATA"
+//       );
+//     }
+
+
+//     // --------------------------------------------------------
+//     // UNKNOWN ROLE
+//     // --------------------------------------------------------
+
+//     else {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message:
+//             "You do not have permission to view survey data",
+//         },
+//         {
+//           status: 403,
+//         }
+//       );
+//     }
+
+
+//     // ========================================================
+//     // IMPORTANT SECURITY RULE
+//     // ========================================================
+
+//     /*
+//      * Ignore these frontend filters:
+//      *
+//      * ?createdBy=
+//      * ?excludeCreatedBy=
+//      *
+//      * for role authorization.
+//      *
+//      * Otherwise a user could potentially
+//      * manipulate the URL and access data
+//      * outside their scope.
+//      */
+
+//     void requestedCreatedBy;
+//     void excludeCreatedBy;
+//     void includeUnassigned;
+
+
+//     // ========================================================
+//     // SEARCH
+//     // ========================================================
+
+//     if (
+//       search.trim()
+//     ) {
+//       const searchRegex = {
+//         $regex:
+//           search.trim(),
+//         $options:
+//           "i",
+//       };
+
+
+//       const searchOr = [
+//         {
+//           rawPaste:
+//             searchRegex,
+//         },
+
+//         {
+//           pid:
+//             searchRegex,
+//         },
+
+//         {
+//           projectNo:
+//             searchRegex,
+//         },
+
+//         {
+//           supplierId:
+//             searchRegex,
+//         },
+
+//         {
+//           country:
+//             searchRegex,
+//         },
+
+//         {
+//           accountType:
+//             searchRegex,
+//         },
+
+//         {
+//           status:
+//             searchRegex,
+//         },
+//       ];
+
+
+//       /*
+//        * Keep role filter AND search filter together.
+//        */
+
+//       filter.$and = [
+//         {
+//           $or:
+//             searchOr,
+//         },
+
+//         /*
+//          * Preserve every existing
+//          * security/filter condition.
+//          */
+//         {
+//           ...Object.fromEntries(
+//             Object.entries(
+//               filter
+//             ).filter(
+//               ([key]) =>
+//                 key !== "$and" &&
+//                 key !== "$or"
+//             )
+//           ),
+//         },
+//       ];
+
+
+//       /*
+//        * If there is no security filter,
+//        * simply use search.
+//        */
+
+//       if (
+//         Object.keys(
+//           filter
+//         ).length === 0
+//       ) {
+//         delete filter.$and;
+//         filter.$or =
+//           searchOr;
+//       }
+//     }
+
+
+//     // ========================================================
+//     // DATABASE QUERY
+//     // ========================================================
+
+//     console.log(
+//       "======================================"
+//     );
+
+//     console.log(
+//       "FINAL SURVEY FILTER:"
+//     );
+
+//     console.log(
+//       JSON.stringify(
+//         filter,
+//         null,
+//         2
+//       )
+//     );
+
+//     console.log(
+//       "======================================"
+//     );
+
+
+//     const [
+//       items,
+//       total,
+//     ] = await Promise.all([
+//       SurveyData.find(
+//         filter
+//       )
+//         .sort({
+//           [sortBy]:
+//             sortOrder,
+//         })
+//         .skip(
+//           skip
+//         )
+//         .limit(
+//           limit
+//         )
+//         .lean(),
+
+//       SurveyData.countDocuments(
+//         filter
+//       ),
+//     ]);
+
+
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
+
+//     const data =
+//       items.map(
+//         (item: any) => ({
+//           ...item,
+
+//           data:
+//             item.data ||
+//             {},
+//         })
+//       );
+
+
+//     return NextResponse.json(
+//       {
+//         success: true,
+
+//         data,
+
+//         pagination: {
+//           page,
+
+//           limit,
+
+//           total,
+
+//           totalPages:
+//             Math.ceil(
+//               total /
+//                 limit
+//             ),
+//         },
+//       }
+//     );
+
+//   } catch (error: any) {
+
+//     console.error(
+//       "Survey GET error:",
+//       error
+//     );
+
+
+//     return NextResponse.json(
+//       {
+//         success: false,
+
+//         message:
+//           "Failed to fetch survey data",
+
+//         error:
+//           error?.message ||
+//           String(error),
+//       },
+//       {
+//         status: 500,
+//       }
+//     );
+//   }
+// }
+/* ======================================================
+   GET - FETCH SURVEY RECORDS
+   ====================================================== */
+
+export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
+    /* ==================================================
+       AUTHENTICATED USER
+    ================================================== */
 
-    // ========================================================
-    // AUTHENTICATION
-    // ========================================================
-
-    const currentUser =
-      await getCurrentUser();
+    const currentUser = await getCurrentUser();
 
     if (!currentUser?.userId) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Unauthorized",
+          message: "Unauthorized",
         },
-        {
-          status: 401,
-        }
+        { status: 401 }
       );
     }
 
-
     if (
-      !isValidObjectId(
+      !mongoose.Types.ObjectId.isValid(
         currentUser.userId
       )
     ) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Invalid authenticated user ID",
+          message: "Invalid authenticated user ID",
         },
-        {
-          status: 401,
-        }
+        { status: 401 }
       );
     }
 
-
-    const currentUserId =
-      objectId(
+    const authenticatedUserId =
+      new mongoose.Types.ObjectId(
         currentUser.userId
       );
 
+    /* ==================================================
+       REQUEST PARAMETERS
+    ================================================== */
 
-    const role =
-      normalizeRole(
-        currentUser.role
-      );
-
-
-    console.log(
-      "======================================"
-    );
-
-    console.log(
-      "SURVEY GET AUTH"
-    );
-
-    console.log(
-      "User ID:",
-      currentUser.userId
-    );
-
-    console.log(
-      "Role:",
-      currentUser.role
-    );
-
-    console.log(
-      "Team ID:",
-      (currentUser as any).teamId
-    );
-
-    console.log(
-      "======================================"
-    );
-
-
-    // ========================================================
-    // URL PARAMETERS
-    // ========================================================
-
-    const {
-      searchParams,
-    } = new URL(
-      req.url
-    );
-
+    const { searchParams } = new URL(req.url);
 
     const category =
-      searchParams.get(
-        "category"
-      );
+      searchParams.get("category");
 
     const projectNo =
-      searchParams.get(
-        "projectNo"
-      );
+      searchParams.get("projectNo");
 
     const accountType =
-      searchParams.get(
-        "accountType"
-      );
+      searchParams.get("accountType");
 
     const pid =
-      searchParams.get(
-        "pid"
-      );
+      searchParams.get("pid");
 
     const country =
-      searchParams.get(
-        "country"
-      );
+      searchParams.get("country");
 
     const status =
-      searchParams.get(
-        "status"
-      );
+      searchParams.get("status");
 
-    /*
-     * These parameters are intentionally read,
-     * but creator access is NOT trusted from
-     * the browser.
-     */
     const requestedCreatedBy =
-      searchParams.get(
-        "createdBy"
-      );
+      searchParams.get("createdBy");
 
     const excludeCreatedBy =
-      searchParams.get(
-        "excludeCreatedBy"
-      );
+      searchParams.get("excludeCreatedBy");
 
     const includeUnassigned =
-      searchParams.get(
-        "includeUnassigned"
-      );
-
+      searchParams.get("includeUnassigned");
 
     const sortBy =
-      searchParams.get(
-        "sortBy"
-      ) || "createdAt";
-
+      searchParams.get("sortBy") ||
+      "createdAt";
 
     const sortOrder =
-      searchParams.get(
-        "sortOrder"
-      ) === "asc"
+      searchParams.get("sortOrder") === "asc"
         ? 1
         : -1;
 
-
     const search =
-      searchParams.get(
-        "search"
-      ) || "";
+      searchParams.get("search") || "";
 
+    const pageNumber = Number(
+      searchParams.get("page") || "1"
+    );
 
-    const page =
+    const limitNumber = Number(
+      searchParams.get("limit") || "20"
+    );
+
+    const page = Math.max(
+      1,
+      Number.isFinite(pageNumber)
+        ? pageNumber
+        : 1
+    );
+
+    const limit = Math.min(
+      100,
       Math.max(
         1,
-        Number(
-          searchParams.get(
-            "page"
-          ) || "1"
-        )
-      );
-
-
-    const limit =
-      Math.min(
-        100,
-        Math.max(
-          1,
-          Number(
-            searchParams.get(
-              "limit"
-            ) || "20"
-          )
-        )
-      );
-
+        Number.isFinite(limitNumber)
+          ? limitNumber
+          : 20
+      )
+    );
 
     const skip =
-      (page - 1) *
-      limit;
+      (page - 1) * limit;
 
-
-    // ========================================================
-    // BASE FILTER
-    // ========================================================
+    /* ==================================================
+       BASE FILTER
+    ================================================== */
 
     const filter: any = {};
 
-
-    // ========================================================
-    // CATEGORY
-    // ========================================================
+    /* ==================================================
+       CATEGORY
+    ================================================== */
 
     if (
       category &&
@@ -2708,429 +3364,393 @@ export async function GET(
         category as SurveyCategory
       )
     ) {
-      filter.category =
-        category;
+      filter.category = category;
     }
 
+    /* ==================================================
+       PROJECT
+    ================================================== */
 
-    // ========================================================
-    // PROJECT
-    // ========================================================
-
-    if (
-      projectNo
-    ) {
-      filter.projectNo =
-        projectNo;
+    if (projectNo) {
+      filter.projectNo = projectNo;
     }
 
+    /* ==================================================
+       ACCOUNT TYPE
+    ================================================== */
 
-    // ========================================================
-    // ACCOUNT TYPE
-    // ========================================================
-
-    if (
-      accountType
-    ) {
+    if (accountType) {
       filter.accountType =
         accountType.toUpperCase();
     }
 
+    /* ==================================================
+       PID
+    ================================================== */
 
-    // ========================================================
-    // PID
-    // ========================================================
-
-    if (
-      pid
-    ) {
-      filter.pid =
-        pid;
+    if (pid) {
+      filter.pid = pid;
     }
 
+    /* ==================================================
+       COUNTRY
+    ================================================== */
 
-    // ========================================================
-    // COUNTRY
-    // ========================================================
-
-    if (
-      country
-    ) {
+    if (country) {
       filter.country = {
-        $regex:
-          country,
-        $options:
-          "i",
+        $regex: country,
+        $options: "i",
       };
     }
 
+    /* ==================================================
+       STATUS
+    ================================================== */
 
-    // ========================================================
-    // STATUS
-    // ========================================================
-
-    if (
-      status
-    ) {
+    if (status) {
       filter.status = {
-        $regex:
-          status,
-        $options:
-          "i",
+        $regex: status,
+        $options: "i",
       };
     }
 
+    /* ==================================================
+       TEAM LEAD AUTHORIZATION
+       
+       IMPORTANT:
+       
+       MY_DATA:
+       Team Lead can always read their own records.
+       
+       TEAM_DATA:
+       Team Lead can only read records created by
+       members of their own active team.
+       
+       Team Lead does NOT need a team to read MY_DATA.
+    ================================================== */
 
-    // ========================================================
-    // ROLE-BASED CREATOR ACCESS
-    // ========================================================
+    if (currentUser.role === "team-lead") {
+      const ownUserId =
+        authenticatedUserId;
 
-    /*
-     * IMPORTANT:
-     *
-     * Never trust:
-     *
-     * ?createdBy=someOtherUserId
-     *
-     * from the frontend.
-     *
-     * The server determines the allowed
-     * createdBy values from the logged-in
-     * user's role.
-     */
-
-
-    // --------------------------------------------------------
-    // SURVEY TESTER
-    // --------------------------------------------------------
-
-    const isSurveyTester =
-      role === "survey" ||
-      role === "surveytester" ||
-      role === "tester";
-
-
-    if (
-      isSurveyTester
-    ) {
       /*
-       * Survey Tester can ONLY see
-       * records created by himself.
+       * No createdBy means the request is not explicitly
+       * asking for a particular user's records.
+       *
+       * For security, Team Lead is restricted to their
+       * own records in this case.
        */
-      filter.createdBy =
-        currentUserId;
+      if (!requestedCreatedBy) {
+        filter.createdBy = ownUserId;
+      } else {
+        /*
+         * Validate requested creator ID
+         */
+        if (
+          !mongoose.Types.ObjectId.isValid(
+            requestedCreatedBy
+          )
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                "Invalid createdBy ObjectId",
+              createdBy:
+                requestedCreatedBy,
+            },
+            { status: 400 }
+          );
+        }
 
-      console.log(
-        "SURVEY ACCESS: OWN DATA ONLY"
-      );
+        const requestedCreatorId =
+          new mongoose.Types.ObjectId(
+            requestedCreatedBy
+          );
+
+        /*
+         * ==============================================
+         * CASE 1: MY DATA
+         *
+         * Team Lead is requesting their own data.
+         *
+         * DO NOT require a Team document here.
+         * ==============================================
+         */
+
+        if (
+          requestedCreatorId.equals(
+            ownUserId
+          )
+        ) {
+          filter.createdBy =
+            ownUserId;
+        }
+
+        /*
+         * ==============================================
+         * CASE 2: TEAM DATA
+         *
+         * Team Lead is requesting another user's data.
+         *
+         * That user MUST be a member of the Team Lead's
+         * active team.
+         * ==============================================
+         */
+        else {
+          const teams =
+            await Team.find({
+              teamLead:
+                ownUserId,
+              isActive: true,
+            })
+              .select(
+                "members"
+              )
+              .lean();
+
+          /*
+           * No active team:
+           *
+           * This is NOT an error for MY_DATA,
+           * but it means the Team Lead cannot access
+           * another user's data.
+           */
+          if (!teams.length) {
+            return NextResponse.json(
+              {
+                success: false,
+                message:
+                  "You do not have an active team or this user is not part of your team",
+              },
+              { status: 403 }
+            );
+          }
+
+          /*
+           * Collect all members from all active teams
+           * owned by this Team Lead.
+           */
+          const teamMemberIds =
+            teams.flatMap(
+              (team: any) =>
+                (team.members || []).map(
+                  (memberId: any) =>
+                    String(memberId)
+                )
+            );
+
+          /*
+           * Remove duplicates
+           */
+          const uniqueTeamMemberIds =
+            [
+              ...new Set(
+                teamMemberIds
+              ),
+            ];
+
+          /*
+           * Check whether requested creator
+           * belongs to this Team Lead's team.
+           */
+          const isTeamMember =
+            uniqueTeamMemberIds.includes(
+              String(
+                requestedCreatorId
+              )
+            );
+
+          if (!isTeamMember) {
+            return NextResponse.json(
+              {
+                success: false,
+                message:
+                  "You can only view survey data submitted by members of your own team",
+              },
+              { status: 403 }
+            );
+          }
+
+          filter.createdBy =
+            requestedCreatorId;
+        }
+      }
     }
 
+    /* ==================================================
+       ADMIN / HR / OTHER AUTHORIZED ROLES
+       
+       Preserve normal createdBy filtering.
+    ================================================== */
 
-    // --------------------------------------------------------
-    // TEAM LEAD
-    // --------------------------------------------------------
-
-    else if (
-      role === "teamlead"
-    ) {
-      /*
-       * Team Lead must have a team.
-       */
-
+    else if (requestedCreatedBy) {
       if (
-        !(currentUser as any).teamId ||
-        !isValidObjectId(
-          String(
-            (currentUser as any).teamId
-          )
+        !mongoose.Types.ObjectId.isValid(
+          requestedCreatedBy
         )
       ) {
         return NextResponse.json(
           {
             success: false,
             message:
-              "Team Lead does not have a valid team",
+              "Invalid createdBy ObjectId",
+            createdBy:
+              requestedCreatedBy,
           },
-          {
-            status: 400,
-          }
+          { status: 400 }
         );
       }
 
-
-      const teamId =
-        objectId(
-          String(
-            (currentUser as any).teamId
-          )
+      filter.createdBy =
+        new mongoose.Types.ObjectId(
+          requestedCreatedBy
         );
-
-
-      /*
-       * Find every user belonging
-       * to this Team Lead's team.
-       *
-       * This includes:
-       * - Team Lead
-       * - Survey Testers
-       * - Other team members
-       */
-
-      const teamUsers =
-        await Auth.find(
-          {
-            teamId,
-
-            isDeleted: {
-              $ne: true,
-            },
-
-            isActive: {
-              $ne: false,
-            },
-          },
-          {
-            _id: 1,
-          }
-        ).lean();
-
-
-      const teamUserIds =
-        teamUsers.map(
-          (
-            member: any
-          ) =>
-            member._id
-        );
-
-
-      /*
-       * Always include current Team Lead.
-       *
-       * This protects against an inconsistent
-       * User.teamId record.
-       */
-
-      const alreadyIncluded =
-        teamUserIds.some(
-          (
-            id: any
-          ) =>
-            String(id) ===
-            String(
-              currentUserId
-            )
-        );
-
-
-      if (
-        !alreadyIncluded
-      ) {
-        teamUserIds.push(
-          currentUserId
-        );
-      }
-
-
-      filter.createdBy = {
-        $in:
-          teamUserIds,
-      };
-
-
-      console.log(
-        "TEAM LEAD ACCESS"
-      );
-
-      console.log(
-        "Team ID:",
-        String(
-          teamId
-        )
-      );
-
-      console.log(
-        "Team Users:",
-        teamUserIds.map(
-          (id: any) =>
-            String(id)
-        )
-      );
     }
 
-
-    // --------------------------------------------------------
-    // ADMIN
-    // HR
-    // --------------------------------------------------------
-
-    else if (
-      role === "admin" ||
-      role === "hr"
-    ) {
-      /*
-       * Admin and HR can see all survey records.
-       *
-       * Do NOT apply createdBy from URL.
-       */
-
-      console.log(
-        "ADMIN/HR ACCESS: ALL SURVEY DATA"
-      );
-    }
-
-
-    // --------------------------------------------------------
-    // UNKNOWN ROLE
-    // --------------------------------------------------------
-
-    else {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "You do not have permission to view survey data",
-        },
-        {
-          status: 403,
-        }
-      );
-    }
-
-
-    // ========================================================
-    // IMPORTANT SECURITY RULE
-    // ========================================================
-
-    /*
-     * Ignore these frontend filters:
-     *
-     * ?createdBy=
-     * ?excludeCreatedBy=
-     *
-     * for role authorization.
-     *
-     * Otherwise a user could potentially
-     * manipulate the URL and access data
-     * outside their scope.
-     */
-
-    void requestedCreatedBy;
-    void excludeCreatedBy;
-    void includeUnassigned;
-
-
-    // ========================================================
-    // SEARCH
-    // ========================================================
+    /* ==================================================
+       EXCLUDE CREATOR
+    ================================================== */
 
     if (
-      search.trim()
+      excludeCreatedBy &&
+      currentUser.role !== "team-lead"
     ) {
+      if (
+        !mongoose.Types.ObjectId.isValid(
+          excludeCreatedBy
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Invalid excludeCreatedBy ObjectId",
+            excludeCreatedBy,
+          },
+          { status: 400 }
+        );
+      }
+
+      const excludedId =
+        new mongoose.Types.ObjectId(
+          excludeCreatedBy
+        );
+
+      /*
+       * If createdBy already exists, don't overwrite it.
+       *
+       * Otherwise apply the exclusion.
+       */
+      if (!filter.createdBy) {
+        if (
+          includeUnassigned ===
+          "true"
+        ) {
+          filter.$or = [
+            {
+              createdBy: null,
+            },
+            {
+              createdBy: {
+                $ne: excludedId,
+              },
+            },
+          ];
+        } else {
+          filter.createdBy = {
+            $ne: excludedId,
+          };
+        }
+      }
+    }
+
+    /* ==================================================
+       SEARCH
+    ================================================== */
+
+    if (search.trim()) {
       const searchRegex = {
         $regex:
           search.trim(),
-        $options:
-          "i",
+        $options: "i",
       };
-
 
       const searchOr = [
         {
-          rawPaste:
-            searchRegex,
+          rawPaste: searchRegex,
         },
-
         {
-          pid:
-            searchRegex,
+          pid: searchRegex,
         },
-
         {
           projectNo:
             searchRegex,
         },
-
         {
           supplierId:
             searchRegex,
         },
-
         {
           country:
             searchRegex,
         },
-
         {
           accountType:
             searchRegex,
         },
-
         {
           status:
             searchRegex,
         },
       ];
 
-
       /*
-       * Keep role filter AND search filter together.
+       * If another $or already exists,
+       * combine both conditions with $and.
        */
+      if (filter.$or) {
+        filter.$and = [
+          {
+            $or: filter.$or,
+          },
+          {
+            $or: searchOr,
+          },
+        ];
 
-      filter.$and = [
-        {
-          $or:
-            searchOr,
-        },
-
-        /*
-         * Preserve every existing
-         * security/filter condition.
-         */
-        {
-          ...Object.fromEntries(
-            Object.entries(
-              filter
-            ).filter(
-              ([key]) =>
-                key !== "$and" &&
-                key !== "$or"
-            )
-          ),
-        },
-      ];
-
-
-      /*
-       * If there is no security filter,
-       * simply use search.
-       */
-
-      if (
-        Object.keys(
-          filter
-        ).length === 0
-      ) {
-        delete filter.$and;
+        delete filter.$or;
+      } else {
         filter.$or =
           searchOr;
       }
     }
 
-
-    // ========================================================
-    // DATABASE QUERY
-    // ========================================================
+    /* ==================================================
+       DATABASE QUERY
+    ================================================== */
 
     console.log(
-      "======================================"
+      "===== SURVEY GET ====="
     );
 
     console.log(
-      "FINAL SURVEY FILTER:"
+      "User:",
+      {
+        userId:
+          currentUser.userId,
+        role:
+          currentUser.role,
+      }
     );
 
     console.log(
+      "Requested createdBy:",
+      requestedCreatedBy
+    );
+
+    console.log(
+      "Final survey filter:",
       JSON.stringify(
         filter,
         null,
@@ -3138,28 +3758,17 @@ export async function GET(
       )
     );
 
-    console.log(
-      "======================================"
-    );
-
-
     const [
       items,
       total,
     ] = await Promise.all([
-      SurveyData.find(
-        filter
-      )
+      SurveyData.find(filter)
         .sort({
           [sortBy]:
             sortOrder,
         })
-        .skip(
-          skip
-        )
-        .limit(
-          limit
-        )
+        .skip(skip)
+        .limit(limit)
         .lean(),
 
       SurveyData.countDocuments(
@@ -3167,67 +3776,50 @@ export async function GET(
       ),
     ]);
 
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+    /* ==================================================
+       RESPONSE
+    ================================================== */
 
     const data =
       items.map(
         (item: any) => ({
           ...item,
-
           data:
-            item.data ||
-            {},
+            item.data || {},
         })
       );
 
+    return NextResponse.json({
+      success: true,
 
-    return NextResponse.json(
-      {
-        success: true,
+      data,
 
-        data,
-
-        pagination: {
-          page,
-
-          limit,
-
-          total,
-
-          totalPages:
-            Math.ceil(
-              total /
-                limit
-            ),
-        },
-      }
-    );
-
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages:
+          Math.ceil(
+            total / limit
+          ),
+      },
+    });
   } catch (error: any) {
-
     console.error(
       "Survey GET error:",
       error
     );
 
-
     return NextResponse.json(
       {
         success: false,
-
         message:
           "Failed to fetch survey data",
-
         error:
           error?.message ||
           String(error),
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }

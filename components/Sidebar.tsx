@@ -246,12 +246,9 @@ export function Sidebar({
 
         <div className="flex items-center justify-between h-16 px-3 border-b border-gray-700 flex-shrink-0">
           {!isCollapsed && (
-            <span className="text-xl font-bold whitespace-nowrap">
-              Tron{" "}
-              <span className="text-green-300 text-2xl">
-                X.
-              </span>
-            </span>
+                <a className="brand " href="#top" aria-label="Tronx home">
+  <img src="/2.svg" alt="Tronx" className="bg-white rounded-lg w-36 h-12 flex items-center" />
+</a>
           )}
 
           <button

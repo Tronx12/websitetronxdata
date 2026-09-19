@@ -15,10 +15,9 @@ export default function AuthShell({
       <div className="auth-bg" />
       <div className="auth-inner">
         <header className="auth-header">
-          <Link href="/" className="brand" aria-label="Tronx home">
-            <span className="brand-mark">T</span>
-            tronx<span className="brand-dot">.</span>
-          </Link>
+                         <a className="brand " href="#top" aria-label="Tronx home">
+  <img src="/2.svg" alt="Tronx" className="bg-white rounded-lg w-36 h-12 flex items-center" />
+</a>
         </header>
 
         <div className="auth-card-wrap">

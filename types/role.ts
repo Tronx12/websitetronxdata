@@ -1,150 +1,4 @@
 
-// // types/role.ts
-
-// export type UserRole = "survey-tester" | "team-lead" | "hr" | "admin";
-
-// export interface SidebarItem {
-//   label: string;
-//   path: string;
-//   icon?: string; // lucide-react icon name
-//   roles: UserRole[];
-// }
-
-// export const SIDEBAR_ITEMS: SidebarItem[] = [
-//   {
-//     label: "Surveys Data",
-//     path: "/survey-tester/survey-data",
-//     icon: "FileSpreadsheet",
-//     roles: ["survey-tester"],
-//   },
-//   {
-//     label: "Team Surveys Data",
-//     path: "/team-lead/survey-data",
-//     icon: "Users",
-//     roles: ["team-lead"],
-//   },
-//   {
-//     label: "Manage Survey Data",
-//     path: "/admin/survey-data",
-//     icon: "Database",
-//     roles: ["admin", "hr"],
-//   },
-
-//   {
-//     label: "Attendance",
-//     path: "/survey-tester/attendence",
-//     icon: "CalendarCheck",
-//     roles: ["survey-tester", "team-lead", "hr"],
-//   },
-
-
-  
-//   {
-//     label: "Request Missing Attendance",
-//     path: "/survey-tester/missing-attendence",
-//     icon: "CalendarPlus",
-//     roles: ["survey-tester", "team-lead", "hr", "admin"],
-//   },
-//   {
-//     label: "Manage Team Attendance",
-//     path: "/team-lead/manage-attendance",
-//     icon: "CalendarPlus",
-//     roles: ["team-lead"],
-//   },
-//   {
-//     label: "My Profile",
-//     path: "/survey-tester/profile",
-//     icon: "UserCircle",
-//     roles: ["survey-tester", "team-lead", "hr", "admin"],
-//   },
-
-//   // Admin / HR
-//   {
-//     label: "Manage Users",
-//     path: "/admin/users",
-//     icon: "UsersRound",
-//     roles: ["admin", "hr"],
-//   },
-
-//   // OE Panel
-//   {
-//     label: "OE Panel",
-//     path: "/admin/oe",
-//     icon: "ClipboardList",
-//     roles: ["admin"],
-//   },
-//   {
-//     label: "OE Panel",
-//     path: "/hr/oe",
-//     icon: "ClipboardList",
-//     roles: ["hr"],
-//   },
-//   {
-//     label: "OE Panel",
-//     path: "/team-lead/oe",
-//     icon: "ClipboardList",
-//     roles: ["team-lead"],
-//   },
-//   {
-//     label: "OE Panel",
-//     path: "/survey-tester/oe",
-//     icon: "ClipboardList",
-//     roles: ["survey-tester"],
-//   },
-
-//   // OE DQA Panel
-//   {
-//     label: "OE DQA Panel",
-//     path: "/admin/oe/dqa",
-//     icon: "BadgeCheck",
-//     roles: ["admin"],
-//   },
-//   // {
-//   //   label: "OE DQA Panel",
-//   //   path: "/hr/oe/dqa",
-//   //   icon: "BadgeCheck",
-//   //   roles: ["hr"],
-//   // },
-//   {
-//     label: "OE DQA Panel",
-//     path: "/team-lead/oe/dqa",
-//     icon: "BadgeCheck",
-//     roles: ["team-lead"],
-//   },
-//   // {
-//   //   label: "OE DQA Panel",
-//   //   path: "/survey-tester/oe/dqa",
-//   //   icon: "BadgeCheck",
-//   //   roles: ["survey-tester"],
-//   // },
-
-//   {
-//     label: "Manage Teams",
-//     path: "/admin/teams",
-//     icon: "Network",
-//     roles: ["admin", "hr"],
-//   },
-//   {
-//     label: "Manage Attendance",
-//     path: "/admin/attendance",
-//     icon: "CalendarCog",
-//     roles: ["admin", "hr"],
-//   },
-//   {
-//     label: "Office Off Manage",
-//     path: "/admin/office-off",
-//     icon: "CalendarOff",
-//     roles: ["admin", "hr"],
-//   },
-//   {
-//     label: "Audit Logs",
-//     path: "/admin/audit-logs",
-//     icon: "ScrollText",
-//     roles: ["admin", "hr"],
-//   },
-// ];
-
-// types/role.ts
 
 export type UserRole = "survey-tester" | "team-lead" | "hr" | "admin";
 
@@ -181,18 +35,25 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["survey-tester"],
   },
 
-  {
-    label: "My Profile",
-    path: "/survey-tester/profile",
-    icon: "UserCircle",
-    roles: ["survey-tester"],
-  },
+ 
 
   {
     label: "OE Panel",
     path: "/survey-tester/oe",
     icon: "ClipboardList",
     roles: ["survey-tester"],
+  },
+   {
+    label: "OE Performance",
+    path: "/survey-tester/oe/oe-performance",
+    icon: "ClipboardList",
+    roles: ["survey-tester","team-lead","hr","admin"],
+  },
+   {
+    label: "OE OESubmissionsByDate",
+    path: "/survey-tester/oe/OESubmissionsByDate",
+    icon: "ClipboardList",
+    roles: ["survey-tester","team-lead","hr","admin"],
   },
 
   // =========================================================
@@ -227,12 +88,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["team-lead"],
   },
 
-  {
-    label: "My Profile",
-    path: "/team-lead/profile",
-    icon: "UserCircle",
-    roles: ["team-lead"],
-  },
+ 
 
   {
     label: "OE Panel",
@@ -273,12 +129,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["hr"],
   },
 
-  {
-    label: "My Profile",
-    path: "/hr/profile",
-    icon: "UserCircle",
-    roles: ["hr"],
-  },
+  
 
   {
     label: "Manage Users",
@@ -395,4 +246,22 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "UserCircle",
     roles: ["admin"],
   },
+   {
+    label: "My Profile",
+    path: "/survey-tester/profile",
+    icon: "UserCircle",
+    roles: ["survey-tester"],
+  },
+   {
+    label: "My Profile",
+    path: "/team-lead/profile",
+    icon: "UserCircle",
+    roles: ["team-lead"],
+  },
+  {
+    label: "My Profile",
+    path: "/hr/profile",
+    icon: "UserCircle",
+    roles: ["hr"],
+  }
 ];

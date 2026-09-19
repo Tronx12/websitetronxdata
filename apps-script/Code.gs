@@ -3,7 +3,8 @@ var PENDING_SHEET = "PENDING";
 var GROQ_KEY = PropertiesService
   .getScriptProperties()
   .getProperty("GROQ_KEY");
-var GROQ_MODEL = "openai/gpt-oss-20b";
+// var GROQ_MODEL = "openai/gpt-oss-20b";
+var GROQ_MODEL = "openai/gpt-oss-120b";
 
 // ═══════════════════════════════════════════
 // PAGE ROUTER
@@ -37,6 +38,20 @@ function doGet(e) {
         HtmlService.XFrameOptionsMode.ALLOWALL
       );
   }
+  if (page === "oe-performance") {
+
+  return HtmlService
+    .createHtmlOutputFromFile(
+      "oe-performance"
+    )
+    .setTitle(
+      "OE Performance"
+    )
+    .setXFrameOptionsMode(
+      HtmlService.XFrameOptionsMode.ALLOWALL
+    );
+
+}
 
   return HtmlService
     .createHtmlOutputFromFile("submit")
@@ -607,6 +622,7 @@ function checkOEQuality(oeResponse, question, isRelatedToPrevious) {
     // + "\"relevancy_reason\":\"reason the response matches or misses the question\","
     // + "\"overall\":\"PASS\",\"suggestion\":\"one specific actionable improvement tip\"}\n\n"
     // + "overall = PASS only if ai_score >= 50 AND relevancy_score >= 50. ";
+      
       var prompt =
       "You are a STRICT evaluator of open-ended market-research responses. " +
       "Evaluate the response independently on TWO separate dimensions: HUMAN-LIKENESS and RELEVANCY. " +
@@ -675,9 +691,26 @@ function checkOEQuality(oeResponse, question, isRelatedToPrevious) {
       + "- A grammatically correct answer is NOT automatically human.\n"
       + "- A casual tone is NOT automatically human.\n"
       + "- Generic answers should normally fall around 35-65.\n"
-      + "- Clearly polished/generic AI-like answers should normally fall around 20-45.\n"
+      + "- Clearly polished/generic AI-like answers with multiple AI signals should score 0-15, not 20-45.\n"
       + "- Strongly natural, specific, spontaneous answers can score 70-90.\n"
       + "- Reserve 91-100 for exceptionally convincing human-like responses.\n\n"
+
+      + "============================\n"
+      + "HARD OVERRIDE RULES (apply AFTER computing the base human score above)\n"
+      + "============================\n\n"
+
+      + "Count how many STRONG AI-signal categories are present in the response.\n"
+      + "STRONG AI signals include: AI-style transition words (Furthermore/Moreover/Additionally/In conclusion); "
+      + "list-like generic phrasing (e.g. stringing together words like teamwork, growth, collaboration, innovation); "
+      + "unnaturally comprehensive or balanced structure for a casual survey answer; "
+      + "marketing/essay-like tone; repeated formulaic phrasing; a generic statement that could answer many unrelated questions.\n\n"
+      + "- If 3 or more STRONG AI signals are present: cap ai_score at 10 maximum, regardless of any positive signals found.\n"
+      + "- If exactly 2 STRONG AI signals are present: cap ai_score at 25 maximum.\n"
+      + "- If exactly 1 STRONG AI signal is present with no offsetting concrete personal detail: cap ai_score at 40 maximum.\n"
+      + "- These caps are a final ceiling applied after the additive scoring above, not an average with it.\n"
+      + "- A single natural-sounding word or phrase (e.g. 'honestly', 'I guess', 'tbh') does NOT offset multiple STRONG AI signals. "
+      + "Polish or casual veneer layered over generic AI-like content is still AI-like and must remain capped.\n"
+      + "- If NO STRONG AI signals are present and multiple HUMAN-LIKE signals are present, no cap applies; score normally.\n\n"
 
       + "============================\n"
       + "ANTI-BIAS RULES\n"
@@ -708,7 +741,15 @@ function checkOEQuality(oeResponse, question, isRelatedToPrevious) {
       + "Example C:\n"
       + "Question: What do you enjoy most about working?\n"
       + "Response: I enjoy teamwork, growth, collaboration, learning, innovation, and achieving meaningful results.\n"
-      + "This is related but highly generic and list-like. Relevancy should not be extremely high and human-likeness should be reduced.\n\n"
+      + "This is related but highly generic and list-like. This contains 2+ STRONG AI signals (list-like generic phrasing, "
+      + "reusable-for-any-question), so ai_score must be capped at 25 maximum. Relevancy should also not be extremely high.\n\n"
+
+      + "Example D:\n"
+      + "Question: What do you enjoy most about working?\n"
+      + "Response: I find great fulfillment in fostering collaborative synergy. Furthermore, professional growth and innovation "
+      + "are deeply important to me. In conclusion, meaningful achievement drives my satisfaction.\n"
+      + "This contains 3+ STRONG AI signals (AI transition words, marketing/essay tone, generic reusable content), "
+      + "so ai_score must be capped at 10 maximum regardless of grammatical fluency.\n\n"
 
       + "============================\n"
       + "OUTPUT\n"
@@ -716,13 +757,14 @@ function checkOEQuality(oeResponse, question, isRelatedToPrevious) {
 
       + "Return ONLY valid JSON. No markdown. No explanation outside JSON.\n"
       + "Use integer scores from 0 to 100.\n"
-      + "The reason fields must cite specific evidence from the response.\n\n"
+      + "The reason fields must cite specific evidence from the response.\n"
+      + "If a hard override cap was applied, mention which STRONG AI signals triggered it in ai_reason.\n\n"
 
       + "{"
       + "\"ai_verdict\":\"HUMAN\","
-      + "\"ai_score\":55,"
-      + "\"ai_reason\":\"specific observable evidence\","
-      + "\"relevancy_score\":70,"
+      + "\"ai_score\":0,"
+      + "\"ai_reason\":\"specific observable evidence, including any hard override signals triggered\","
+      + "\"relevancy_score\":0"
       + "\"relevancy_verdict\":\"RELEVANT\","
       + "\"relevancy_reason\":\"specific explanation of how well the response answers the question\","
       + "\"overall\":\"PASS\","
@@ -730,9 +772,9 @@ function checkOEQuality(oeResponse, question, isRelatedToPrevious) {
       + "}\n\n"
 
       + "VERDICT RULES:\n"
-      + "ai_verdict = HUMAN when ai_score >= 50; otherwise AI.\n"
-      + "relevancy_verdict = RELEVANT when relevancy_score >= 50; otherwise UNRELEVANT.\n"
-      + "overall = PASS ONLY when BOTH ai_score >= 50 AND relevancy_score >= 50.";
+      + "ai_verdict = HUMAN when ai_score >= 0; otherwise AI.\n"
+      + "relevancy_verdict = RELEVANT when relevancy_score >= 0; otherwise UNRELEVANT.\n"
+      + "overall = PASS ONLY when BOTH ai_score >= 0 AND relevancy_score >= 0.";
 
   var payload = { model:GROQ_MODEL, messages:[{role:"user",content:prompt}], temperature:0, max_tokens:1200, reasoning_effort:"low", seed:42 };
   try {
@@ -1760,6 +1802,46 @@ function doPost(e) {
 
 
       // =======================================
+// OE PERFORMANCE
+// =======================================
+
+case "getOEPerformance":
+
+  result =
+    getOEPerformance(
+      data || {}
+    );
+
+  break;
+
+
+// =======================================
+// OE PERFORMANCE OEs
+// =======================================
+
+case "getPerformanceOEs":
+
+  result =
+    getPerformanceOEs(
+      data || {}
+    );
+
+  break;
+
+
+// =======================================
+// OE PERFORMANCE FILTERS
+// =======================================
+
+case "getOEPerformanceFilters":
+
+  result =
+    getOEPerformanceFilters();
+
+  break;
+
+
+      // =======================================
       // UNKNOWN ACTION
       // =======================================
 
@@ -1906,6 +1988,878 @@ function testPendingSheet() {
     );
 
   }
+
+}
+
+// ============================================================
+// OE PERFORMANCE MODULE
+// ============================================================
+
+function getOEPerformance(filters) {
+
+  filters = filters || {};
+
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(PENDING_SHEET);
+
+  var emptyResponse = {
+    success: true,
+
+    summary: {
+      totalSubmission: 0,
+      totalApproved: 0,
+      totalRejected: 0,
+      totalPending: 0,
+      approvalRate: 0,
+      rejectionRate: 0
+    },
+
+    daily: [],
+    projects: [],
+    employees: [],
+    oes: []
+  };
+
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return emptyResponse;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var lastColumn = Math.min(sheet.getLastColumn(), 19);
+
+  var data = sheet
+    .getRange(
+      2,
+      1,
+      lastRow - 1,
+      lastColumn
+    )
+    .getValues();
+
+
+  // ==========================================================
+  // FILTERS
+  // ==========================================================
+
+  var fromDate = null;
+  var toDate = null;
+
+  if (filters.fromDate) {
+
+    fromDate = new Date(
+      String(filters.fromDate) + "T00:00:00"
+    );
+
+  }
+
+  if (filters.toDate) {
+
+    toDate = new Date(
+      String(filters.toDate) + "T23:59:59"
+    );
+
+  }
+
+
+  var projectFilter = String(
+    filters.projectId || ""
+  )
+    .trim()
+    .toLowerCase();
+
+
+  var employeeFilter = String(
+    filters.employee || ""
+  )
+    .trim()
+    .toLowerCase();
+
+
+  var statusFilter = String(
+    filters.status || ""
+  )
+    .trim()
+    .toUpperCase();
+
+
+  // ==========================================================
+  // FILTER DATA
+  // ==========================================================
+
+  var filtered = [];
+
+
+  data.forEach(function(row, index) {
+
+    var timestamp = row[1];
+
+    var memberName = String(
+      row[2] || ""
+    ).trim();
+
+    var pid = String(
+      row[3] || ""
+    ).trim();
+
+    var status = String(
+      row[7] || ""
+    )
+      .trim()
+      .toUpperCase();
+
+
+    if (!timestamp) {
+      return;
+    }
+
+
+    var date = new Date(timestamp);
+
+
+    if (isNaN(date.getTime())) {
+      return;
+    }
+
+
+    // --------------------------
+    // DATE FILTER
+    // --------------------------
+
+    if (fromDate && date < fromDate) {
+      return;
+    }
+
+    if (toDate && date > toDate) {
+      return;
+    }
+
+
+    // --------------------------
+    // PROJECT FILTER
+    // --------------------------
+
+    if (
+      projectFilter &&
+      extractProjectId(pid)
+        .toLowerCase() !== projectFilter &&
+      pid.toLowerCase() !== projectFilter
+    ) {
+      return;
+    }
+
+
+    // --------------------------
+    // EMPLOYEE FILTER
+    // --------------------------
+
+    if (
+      employeeFilter &&
+      memberName.toLowerCase() !== employeeFilter
+    ) {
+      return;
+    }
+
+
+    // --------------------------
+    // STATUS FILTER
+    // --------------------------
+
+    if (
+      statusFilter &&
+      status !== statusFilter
+    ) {
+      return;
+    }
+
+
+    // ========================================================
+    // PUSH OE
+    // ========================================================
+
+    filtered.push({
+
+      rowIndex: index + 2,
+
+      id: String(
+        row[0] || ""
+      ),
+
+      timestamp:
+        timestamp instanceof Date
+          ? timestamp.toISOString()
+          : String(timestamp || ""),
+
+      date: Utilities.formatDate(
+        date,
+        Session.getScriptTimeZone(),
+        "yyyy-MM-dd"
+      ),
+
+      memberName: memberName,
+
+      pid: pid,
+
+      projectId: extractProjectId(pid),
+
+      qNumber: String(
+        row[4] || ""
+      ),
+
+      oeResponse: String(
+        row[5] || ""
+      ),
+
+      dqaCorrection: String(
+        row[6] || ""
+      ),
+
+      status: status,
+
+      approvedBy: String(
+        row[8] || ""
+      ),
+
+      actionTime: row[9]
+        ? (
+            row[9] instanceof Date
+              ? row[9].toISOString()
+              : String(row[9])
+          )
+        : "",
+
+      aiScore: String(
+        row[11] || ""
+      ),
+
+      aiReason: String(
+        row[12] || ""
+      ),
+
+      relScore: String(
+        row[13] || ""
+      ),
+
+      relReason: String(
+        row[14] || ""
+      ),
+
+      rejectReason: String(
+        row[15] || ""
+      ),
+
+      oldOEId: String(
+        row[16] || ""
+      ),
+
+      imageUrl: String(
+        row[17] || ""
+      ),
+
+      dqaViewedTime: String(
+        row[18] || ""
+      )
+
+    });
+
+  });
+
+
+  // ==========================================================
+  // SUMMARY
+  // ==========================================================
+
+  var summary = {
+
+    totalSubmission: filtered.length,
+
+    totalApproved: 0,
+
+    totalRejected: 0,
+
+    totalPending: 0,
+
+    approvalRate: 0,
+
+    rejectionRate: 0
+
+  };
+
+
+  filtered.forEach(function(item) {
+
+    if (item.status === "APPROVED") {
+      summary.totalApproved++;
+    }
+
+    else if (item.status === "REJECTED") {
+      summary.totalRejected++;
+    }
+
+    else if (item.status === "PENDING") {
+      summary.totalPending++;
+    }
+
+  });
+
+
+  if (summary.totalSubmission > 0) {
+
+    summary.approvalRate =
+      Number(
+        (
+          summary.totalApproved /
+          summary.totalSubmission *
+          100
+        ).toFixed(1)
+      );
+
+
+    summary.rejectionRate =
+      Number(
+        (
+          summary.totalRejected /
+          summary.totalSubmission *
+          100
+        ).toFixed(1)
+      );
+
+  }
+
+
+  // ==========================================================
+  // DAILY PERFORMANCE
+  // ==========================================================
+
+  var dailyMap = {};
+
+
+  filtered.forEach(function(item) {
+
+    if (!dailyMap[item.date]) {
+
+      dailyMap[item.date] = {
+
+        date: item.date,
+
+        totalSubmission: 0,
+
+        approved: 0,
+
+        rejected: 0,
+
+        pending: 0
+
+      };
+
+    }
+
+
+    dailyMap[item.date]
+      .totalSubmission++;
+
+
+    if (item.status === "APPROVED") {
+
+      dailyMap[item.date]
+        .approved++;
+
+    }
+
+
+    if (item.status === "REJECTED") {
+
+      dailyMap[item.date]
+        .rejected++;
+
+    }
+
+
+    if (item.status === "PENDING") {
+
+      dailyMap[item.date]
+        .pending++;
+
+    }
+
+  });
+
+
+  var daily = Object.keys(dailyMap)
+
+    .map(function(key) {
+
+      var d = dailyMap[key];
+
+      var approvalRate = 0;
+
+      if (d.totalSubmission > 0) {
+
+        approvalRate =
+          Number(
+            (
+              d.approved /
+              d.totalSubmission *
+              100
+            ).toFixed(1)
+          );
+
+      }
+
+
+      return {
+
+        date: d.date,
+
+        totalSubmission:
+          d.totalSubmission,
+
+        approved:
+          d.approved,
+
+        rejected:
+          d.rejected,
+
+        pending:
+          d.pending,
+
+        approvalRate:
+          approvalRate
+
+      };
+
+    })
+
+
+    .sort(function(a, b) {
+
+      return b.date.localeCompare(
+        a.date
+      );
+
+    });
+
+
+  // ==========================================================
+  // PROJECT / PID PERFORMANCE
+  // ==========================================================
+
+  var projectMap = {};
+
+
+  filtered.forEach(function(item) {
+
+    var projectId =
+      item.projectId ||
+      item.pid ||
+      "UNKNOWN";
+
+
+    if (!projectMap[projectId]) {
+
+      projectMap[projectId] = {
+
+        projectId: projectId,
+
+        totalSubmission: 0,
+
+        approved: 0,
+
+        rejected: 0,
+
+        pending: 0
+
+      };
+
+    }
+
+
+    projectMap[projectId]
+      .totalSubmission++;
+
+
+    if (item.status === "APPROVED") {
+
+      projectMap[projectId]
+        .approved++;
+
+    }
+
+
+    if (item.status === "REJECTED") {
+
+      projectMap[projectId]
+        .rejected++;
+
+    }
+
+
+    if (item.status === "PENDING") {
+
+      projectMap[projectId]
+        .pending++;
+
+    }
+
+  });
+
+
+  var projects = Object.keys(projectMap)
+
+    .map(function(key) {
+
+      var p =
+        projectMap[key];
+
+
+      var approvalRate = 0;
+
+      if (p.totalSubmission > 0) {
+
+        approvalRate =
+          Number(
+            (
+              p.approved /
+              p.totalSubmission *
+              100
+            ).toFixed(1)
+          );
+
+      }
+
+
+      return {
+
+        projectId:
+          p.projectId,
+
+        totalSubmission:
+          p.totalSubmission,
+
+        approved:
+          p.approved,
+
+        rejected:
+          p.rejected,
+
+        pending:
+          p.pending,
+
+        approvalRate:
+          approvalRate
+
+      };
+
+    })
+
+
+    .sort(function(a, b) {
+
+      return (
+        b.totalSubmission -
+        a.totalSubmission
+      );
+
+    });
+
+
+  // ==========================================================
+  // EMPLOYEE + PROJECT PERFORMANCE
+  // ==========================================================
+
+  var employeeMap = {};
+
+
+  filtered.forEach(function(item) {
+
+    var projectId =
+      item.projectId ||
+      item.pid ||
+      "UNKNOWN";
+
+
+    var employee =
+      item.memberName ||
+      "Unknown";
+
+
+    var key =
+      employee +
+      "||" +
+      projectId;
+
+
+    if (!employeeMap[key]) {
+
+      employeeMap[key] = {
+
+        employee:
+          employee,
+
+        projectId:
+          projectId,
+
+        totalSubmission: 0,
+
+        approved: 0,
+
+        rejected: 0,
+
+        pending: 0
+
+      };
+
+    }
+
+
+    employeeMap[key]
+      .totalSubmission++;
+
+
+    if (item.status === "APPROVED") {
+
+      employeeMap[key]
+        .approved++;
+
+    }
+
+
+    if (item.status === "REJECTED") {
+
+      employeeMap[key]
+        .rejected++;
+
+    }
+
+
+    if (item.status === "PENDING") {
+
+      employeeMap[key]
+        .pending++;
+
+    }
+
+  });
+
+
+  var employees = Object.keys(employeeMap)
+
+    .map(function(key) {
+
+      var e =
+        employeeMap[key];
+
+
+      var approvalRate = 0;
+
+
+      if (e.totalSubmission > 0) {
+
+        approvalRate =
+          Number(
+            (
+              e.approved /
+              e.totalSubmission *
+              100
+            ).toFixed(1)
+          );
+
+      }
+
+
+      return {
+
+        employee:
+          e.employee,
+
+        projectId:
+          e.projectId,
+
+        totalSubmission:
+          e.totalSubmission,
+
+        approved:
+          e.approved,
+
+        rejected:
+          e.rejected,
+
+        pending:
+          e.pending,
+
+        approvalRate:
+          approvalRate
+
+      };
+
+    })
+
+
+    .sort(function(a, b) {
+
+      return (
+        b.totalSubmission -
+        a.totalSubmission
+      );
+
+    });
+
+
+  // ==========================================================
+  // FINAL RESPONSE
+  // ==========================================================
+
+  return {
+
+    success: true,
+
+    summary: summary,
+
+    daily: daily,
+
+    projects: projects,
+
+    employees: employees,
+
+    oes: filtered
+
+  };
+
+}
+
+
+// ============================================================
+// GET PERFORMANCE OEs
+// ============================================================
+
+function getPerformanceOEs(filters) {
+
+  var result =
+    getOEPerformance(
+      filters || {}
+    );
+
+
+  if (
+    !result ||
+    result.success !== true
+  ) {
+
+    return [];
+
+  }
+
+
+  return result.oes || [];
+
+}
+
+
+// ============================================================
+// GET PERFORMANCE FILTER LISTS
+// ============================================================
+
+function getOEPerformanceFilters() {
+
+  var ss =
+    SpreadsheetApp.openById(
+      SHEET_ID
+    );
+
+  var sheet =
+    ss.getSheetByName(
+      PENDING_SHEET
+    );
+
+
+  if (
+    !sheet ||
+    sheet.getLastRow() <= 1
+  ) {
+
+    return {
+
+      employees: [],
+
+      projects: []
+
+    };
+
+  }
+
+
+  var data =
+    sheet.getRange(
+      2,
+      1,
+      sheet.getLastRow() - 1,
+      Math.min(
+        sheet.getLastColumn(),
+        19
+      )
+    ).getValues();
+
+
+  var employeeMap = {};
+
+  var projectMap = {};
+
+
+  data.forEach(function(row) {
+
+    var employee =
+      String(
+        row[2] || ""
+      ).trim();
+
+
+    var pid =
+      String(
+        row[3] || ""
+      ).trim();
+
+
+    if (employee) {
+
+      employeeMap[
+        employee
+      ] = true;
+
+    }
+
+
+    if (pid) {
+
+      var projectId =
+        extractProjectId(
+          pid
+        );
+
+      if (projectId) {
+
+        projectMap[
+          projectId
+        ] = true;
+
+      }
+
+    }
+
+  });
+
+
+  return {
+
+    employees:
+      Object.keys(
+        employeeMap
+      ).sort(),
+
+    projects:
+      Object.keys(
+        projectMap
+      ).sort()
+
+  };
 
 }
 
