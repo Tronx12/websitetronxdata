@@ -43,17 +43,30 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "ClipboardList",
     roles: ["survey-tester"],
   },
-   {
+
+  // {
+  //   label: "OE Performance",
+  //   path: "/survey-tester/oe/oe-performance",
+  //   icon: "ClipboardList",
+  //   roles: ["survey-tester"],
+  // },
+  {
     label: "OE Performance",
     path: "/survey-tester/oe/oe-performance",
     icon: "ClipboardList",
-    roles: ["survey-tester","team-lead","hr","admin"],
+    roles: ["team-lead"],
   },
+  // {
+  //   label: "OE Performance",
+  //   path: "/survey-tester/oe/oe-performance",
+  //   icon: "ClipboardList",
+  //   roles: ["hr"],
+  // },
    {
     label: "OE OESubmissionsByDate",
     path: "/survey-tester/oe/OESubmissionsByDate",
     icon: "ClipboardList",
-    roles: ["survey-tester","team-lead","hr","admin"],
+    roles: ["admin","team-lead"],
   },
 
   // =========================================================
@@ -86,6 +99,20 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     path: "/team-lead/manage-attendance",
     icon: "CalendarPlus",
     roles: ["team-lead"],
+  },
+
+  {
+    label: "Survey-Performance",
+    path: "/team-lead/survey-performance",
+    icon: "CalendarPlus",
+    roles: ["team-lead"],
+  },
+  
+  {
+    label: "Survey-Target",
+    path: "/admin/survey-target",
+    icon: "CalendarPlus",
+    roles: ["admin"],
   },
 
  
