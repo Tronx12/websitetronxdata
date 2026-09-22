@@ -2776,12 +2776,14 @@ export async function normalizeSurveyWithGroq(
    * Multiple blocks.
    */
 
-  const chunks =
-    chunkBlocks(
-      blocks.map(
-        (block) => [block]
-      )
-    );
+  // const chunks =
+  //   chunkBlocks(
+  //     blocks.map(
+  //       (block) => [block]
+  //     )
+  //   );
+
+  const chunks = chunkBlocks(blocks);
 
 
   const delimiter =
