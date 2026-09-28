@@ -1,8 +1,4 @@
-import {
-  NextRequest,
-  NextResponse,
-} from "next/server";
-
+import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import { connectDB } from "@/config/db";
@@ -16,131 +12,86 @@ interface Params {
   }>;
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: Params
-) {
+function getClientIp(req: NextRequest) {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    null
+  );
+}
+
+export async function DELETE(req: NextRequest, { params }: Params) {
   try {
     await connectDB();
 
-    const user =
-      await getCurrentUser();
-
+    const user = await getCurrentUser();
     if (!user?.userId) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Unauthorized",
-        },
+        { success: false, message: "Unauthorized" },
         { status: 401 }
       );
     }
 
-    if (user.role !== "admin") {
+    if (!["admin", "hr"].includes(user.role)) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Admin access required",
-        },
+        { success: false, message: "Admin or HR access required" },
         { status: 403 }
       );
     }
 
-    const { id } =
-      await params;
+    const { id } = await params;
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        id
-      )
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Invalid office off ID",
-        },
+        { success: false, message: "Invalid office off ID" },
         { status: 400 }
       );
     }
 
-    const officeOff =
-      await OfficeOff.findById(id);
-
+    const officeOff = await OfficeOff.findById(id);
     if (!officeOff) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Office off not found",
-        },
+        { success: false, message: "Office off not found" },
         { status: 404 }
       );
     }
 
-    await OfficeOff.findByIdAndDelete(
-      id
-    );
+    /*
+     * Soft delete is safer for attendance history.
+     */
+    officeOff.isActive = false;
+    officeOff.updatedBy = new mongoose.Types.ObjectId(user.userId);
+    await officeOff.save();
 
     await createAuditLog({
       userId: user.userId,
-
       action: "DELETE",
-
       module: "Office Off",
-
-      description:
-        `Deleted office off: ${officeOff.title}`,
-
-      entityType:
-        "OfficeOff",
-
+      description: `Deleted office off: ${officeOff.title}`,
+      entityType: "OfficeOff",
       entityId: id,
-
       metadata: {
         date: officeOff.date,
-        title:
-          officeOff.title,
-        type:
-          officeOff.type,
-        groupId:
-          officeOff.groupId,
+        title: officeOff.title,
+        type: officeOff.type,
+        scope: officeOff.scope,
+        groupId: officeOff.groupId,
+        teamIds: officeOff.teamIds,
+        shiftIds: officeOff.shiftIds,
+        employeeIds: officeOff.employeeIds,
       },
-
-      ipAddress:
-        req.headers
-          .get("x-forwarded-for")
-          ?.split(",")[0]
-          ?.trim() ||
-        req.headers.get(
-          "x-real-ip"
-        ) ||
-        null,
-
-      userAgent:
-        req.headers.get(
-          "user-agent"
-        ) || null,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers.get("user-agent") || null,
     });
 
     return NextResponse.json({
       success: true,
-      message:
-        "Office off deleted successfully",
+      message: "Office off deleted successfully",
     });
   } catch (error) {
-    console.error(
-      "DELETE OFFICE OFF ERROR:",
-      error
-    );
-
+    console.error("DELETE OFFICE OFF ERROR:", error);
     return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Failed to delete office off",
-      },
+      { success: false, message: "Failed to delete office off" },
       { status: 500 }
     );
   }

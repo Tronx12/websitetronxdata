@@ -75,6 +75,11 @@ const authSchema = new mongoose.Schema(
     default: null,
     },
 
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auth",

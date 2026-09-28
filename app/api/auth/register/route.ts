@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       password,
       role,
       workingShift,
+      isActive,
     } = body;
 
     // ============================================
@@ -161,6 +162,7 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       role: role || "survey-tester",
       workingShift: workingShift || "day",
+      isActive: isActive !== undefined ? isActive : true,
       isEmailVerified: false,
       emailVerificationOtp: otp,
       emailVerificationOtpExpires: otpExpires,
@@ -183,6 +185,7 @@ export async function POST(req: NextRequest) {
         employeeId: user.employeeId,
         role: user.role,
         workingShift: user.workingShift,
+        isActive: user.isActive,
         isEmailVerified: user.isEmailVerified,
       },
       ipAddress:

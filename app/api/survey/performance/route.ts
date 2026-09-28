@@ -341,6 +341,30 @@ export async function GET(
     // TARGET TOTAL
     // ========================================================
 
+    const firstTargetTotal =
+      targets.reduce(
+        (
+          total: number,
+          item: any
+        ) =>
+          total +
+          Number(item.firstTarget || 0),
+
+        0
+      );
+
+    const secondTargetTotal =
+      targets.reduce(
+        (
+          total: number,
+          item: any
+        ) =>
+          total +
+          Number(item.secondTarget || 0),
+
+        0
+      );
+
     const target =
       targets.reduce(
         (
@@ -348,7 +372,9 @@ export async function GET(
           item: any
         ) =>
           total +
-          Number(item.target || 0),
+          (Number(item.firstTarget || 0) +
+            Number(item.secondTarget || 0) ||
+            Number(item.target || 0)),
 
         0
       );
@@ -464,7 +490,21 @@ export async function GET(
               String(user._id)
             ) || 0;
 
+          const userFirstTarget =
+            Number(
+              userTarget?.firstTarget ||
+                0
+            );
+
+          const userSecondTarget =
+            Number(
+              userTarget?.secondTarget ||
+                0
+            );
+
           const userTargetValue =
+            userFirstTarget +
+              userSecondTarget ||
             Number(
               userTarget?.target ||
                 0
@@ -502,6 +542,12 @@ export async function GET(
 
             role:
               user.role || "",
+
+            firstTarget:
+              userFirstTarget,
+
+            secondTarget:
+              userSecondTarget,
 
             target:
               userTargetValue,
@@ -564,6 +610,12 @@ export async function GET(
       role,
 
       summary: {
+        firstTarget:
+          firstTargetTotal,
+
+        secondTarget:
+          secondTargetTotal,
+
         target,
 
         completed,

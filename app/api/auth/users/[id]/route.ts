@@ -180,6 +180,7 @@ export async function PATCH(
       "phoneNumber",
       "workingShift",
       "role",
+      "isActive",
     ];
 
     const updateData: Record<string, any> = {};

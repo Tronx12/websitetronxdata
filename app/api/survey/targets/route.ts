@@ -10,30 +10,23 @@ import Auth from "@/models/Auth";
 import SurveyTarget from "@/models/SurveyTarget";
 import { getCurrentUser } from "@/lib/getuser";
 
-
 // ============================================================
 // NORMALIZE ROLE
 // ============================================================
 
-function normalizeRole(
-  role: unknown
-): string {
+function normalizeRole(role: unknown): string {
   return String(role || "")
     .trim()
     .toLowerCase()
     .replace(/[\s_-]+/g, "");
 }
 
-
 // ============================================================
 // ADMIN / HR
 // ============================================================
 
-function isAdminOrHR(
-  role: unknown
-) {
-  const normalized =
-    normalizeRole(role);
+function isAdminOrHR(role: unknown) {
+  const normalized = normalizeRole(role);
 
   return (
     normalized === "admin" ||
@@ -41,10 +34,12 @@ function isAdminOrHR(
   );
 }
 
-
 // ============================================================
 // GET
-// GET USERS + THEIR TARGET
+// GET USERS + FIRST/SECOND TARGET
+//
+// Month is no longer a UI filter. The API simply uses the
+// current month when month is not supplied.
 // ============================================================
 
 export async function GET(
@@ -53,8 +48,7 @@ export async function GET(
   try {
     await connectDB();
 
-    const currentUser =
-      await getCurrentUser();
+    const currentUser = await getCurrentUser();
 
     if (!currentUser?.userId) {
       return NextResponse.json(
@@ -62,16 +56,13 @@ export async function GET(
           success: false,
           message: "Unauthorized",
         },
-        {
-          status: 401,
-        }
+        { status: 401 }
       );
     }
 
-    const role =
-      normalizeRole(
-        currentUser.role
-      );
+    const role = normalizeRole(
+      currentUser.role
+    );
 
     if (!isAdminOrHR(role)) {
       return NextResponse.json(
@@ -80,15 +71,12 @@ export async function GET(
           message:
             "Only Admin or HR can manage targets",
         },
-        {
-          status: 403,
-        }
+        { status: 403 }
       );
     }
 
-    const {
-      searchParams,
-    } = new URL(request.url);
+    const { searchParams } =
+      new URL(request.url);
 
     const month =
       searchParams.get("month") ||
@@ -103,9 +91,7 @@ export async function GET(
           message:
             "Invalid month. Use YYYY-MM",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
@@ -113,23 +99,22 @@ export async function GET(
     // USERS
     // ========================================================
 
-    const users =
-      await Auth.find({
-        isDeleted: {
-          $ne: true,
-        },
+    const users = await Auth.find({
+      isDeleted: {
+        $ne: true,
+      },
 
-        isActive: {
-          $ne: false,
-        },
+      isActive: {
+        $ne: false,
+      },
+    })
+      .select(
+        "_id name email role teamId"
+      )
+      .sort({
+        name: 1,
       })
-        .select(
-          "_id name email role teamId"
-        )
-        .sort({
-          name: 1,
-        })
-        .lean();
+      .lean();
 
     // ========================================================
     // TARGETS
@@ -140,7 +125,7 @@ export async function GET(
         month,
       })
         .select(
-          "_id userId month target"
+          "_id userId month firstTarget secondTarget"
         )
         .lean();
 
@@ -149,10 +134,7 @@ export async function GET(
     // ========================================================
 
     const targetMap =
-      new Map<
-        string,
-        any
-      >();
+      new Map<string, any>();
 
     for (const item of targets) {
       targetMap.set(
@@ -165,62 +147,50 @@ export async function GET(
     // RESPONSE
     // ========================================================
 
-    const result =
-      users.map(
-        (user: any) => {
-          const target =
-            targetMap.get(
-              String(user._id)
-            );
+    const result = users.map(
+      (user: any) => {
+        const target =
+          targetMap.get(
+            String(user._id)
+          );
 
-          return {
-            _id:
-              String(user._id),
+        return {
+          _id: String(user._id),
 
-            name:
-              user.name ||
-              user.email ||
-              "Unknown User",
+          name:
+            user.name ||
+            user.email ||
+            "Unknown User",
 
-            email:
-              user.email || "",
+          email: user.email || "",
 
-            role:
-              user.role || "",
+          role: user.role || "",
 
-            teamId:
-              user.teamId
-                ? String(
-                    user.teamId
-                  )
-                : null,
+          teamId: user.teamId
+            ? String(user.teamId)
+            : null,
 
-            target:
-              Number(
-                target?.target ||
-                  0
-              ),
+          firstTarget: Number(
+            target?.firstTarget ?? 0
+          ),
 
-            targetId:
-              target?._id
-                ? String(
-                    target._id
-                  )
-                : null,
-          };
-        }
-      );
+          secondTarget: Number(
+            target?.secondTarget ?? 0
+          ),
+
+          targetId: target?._id
+            ? String(target._id)
+            : null,
+        };
+      }
+    );
 
     return NextResponse.json({
       success: true,
-
       month,
-
       users: result,
     });
-
   } catch (error: any) {
-
     console.error(
       "GET TARGET ERROR:",
       error
@@ -229,22 +199,33 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-
         message:
           error?.message ||
           "Failed to load targets",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-
 // ============================================================
 // POST
 // CREATE / UPDATE TARGET
+//
+// Supports BOTH:
+//
+// 1. Single user:
+//    { userId, month, firstTarget, secondTarget }
+//
+// 2. Multiple users:
+//    {
+//      userIds: [...],
+//      month,
+//      firstTarget,
+//      secondTarget
+//    }
+//
+// The same first/second target is assigned to every user.
 // ============================================================
 
 export async function POST(
@@ -256,37 +237,19 @@ export async function POST(
     const currentUser =
       await getCurrentUser();
 
-    console.log(
-      "CURRENT USER:",
-      currentUser
-    );
-
     if (!currentUser?.userId) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Unauthorized",
+          message: "Unauthorized",
         },
-        {
-          status: 401,
-        }
+        { status: 401 }
       );
     }
 
-    const role =
-      normalizeRole(
-        currentUser.role
-      );
-
-    console.log(
-      "CURRENT ROLE:",
-      role
+    const role = normalizeRole(
+      currentUser.role
     );
-
-    // ========================================================
-    // ADMIN / HR
-    // ========================================================
 
     if (!isAdminOrHR(role)) {
       return NextResponse.json(
@@ -295,9 +258,7 @@ export async function POST(
           message:
             "Only Admin or HR can assign targets",
         },
-        {
-          status: 403,
-        }
+        { status: 403 }
       );
     }
 
@@ -305,62 +266,85 @@ export async function POST(
     // BODY
     // ========================================================
 
-    const body =
-      await request.json();
-
-    console.log(
-      "TARGET BODY:",
-      body
-    );
+    const body = await request.json();
 
     const {
       userId,
+      userIds,
       month,
-      target,
+      firstTarget,
+      secondTarget,
     } = body;
 
     // ========================================================
-    // VALIDATE USER
+    // NORMALIZE USER IDS
     // ========================================================
 
-    if (!userId) {
+    const normalizedUserIds: string[] =
+      Array.isArray(userIds)
+        ? userIds
+            .map((id: unknown) =>
+              String(id)
+            )
+            .filter(Boolean)
+        : userId
+          ? [String(userId)]
+          : [];
+
+    // Remove duplicate user IDs
+    const uniqueUserIds = [
+      ...new Set(normalizedUserIds),
+    ];
+
+    if (uniqueUserIds.length === 0) {
       return NextResponse.json(
         {
           success: false,
           message:
-            "userId is required",
+            "At least one user is required",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        userId
-      )
-    ) {
+    // ========================================================
+    // VALIDATE USER IDS
+    // ========================================================
+
+    const invalidUserId =
+      uniqueUserIds.find(
+        (id) =>
+          !mongoose.Types.ObjectId.isValid(
+            id
+          )
+      );
+
+    if (invalidUserId) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Invalid userId",
+          message: `Invalid userId: ${invalidUserId}`,
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
     // ========================================================
-    // VALIDATE MONTH
+    // MONTH
+    //
+    // No month selector is required by the UI.
+    // If omitted, current month is used.
     // ========================================================
 
+    const targetMonth =
+      month ||
+      new Date()
+        .toISOString()
+        .slice(0, 7);
+
     if (
-      !month ||
       !/^\d{4}-\d{2}$/.test(
-        month
+        targetMonth
       )
     ) {
       return NextResponse.json(
@@ -369,47 +353,71 @@ export async function POST(
           message:
             "Month must be YYYY-MM",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
     // ========================================================
-    // VALIDATE TARGET
+    // VALIDATE FIRST TARGET
     // ========================================================
 
-    const numericTarget =
-      Number(target);
+    const numericFirstTarget =
+      Number(firstTarget);
 
     if (
-      target === "" ||
-      target === null ||
-      target === undefined ||
+      firstTarget === "" ||
+      firstTarget === null ||
+      firstTarget === undefined ||
       !Number.isFinite(
-        numericTarget
+        numericFirstTarget
       ) ||
-      numericTarget < 0
+      numericFirstTarget < 0
     ) {
       return NextResponse.json(
         {
           success: false,
           message:
-            "Please enter a valid target",
+            "Please enter a valid first target",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
     // ========================================================
-    // CHECK USER
+    // VALIDATE SECOND TARGET
     // ========================================================
 
-    const user =
-      await Auth.findOne({
-        _id: userId,
+    const numericSecondTarget =
+      Number(secondTarget);
+
+    if (
+      secondTarget === "" ||
+      secondTarget === null ||
+      secondTarget === undefined ||
+      !Number.isFinite(
+        numericSecondTarget
+      ) ||
+      numericSecondTarget < 0
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Please enter a valid second target",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ========================================================
+    // CHECK USERS
+    // ========================================================
+
+    const users =
+      await Auth.find({
+        _id: {
+          $in: uniqueUserIds,
+        },
 
         isDeleted: {
           $ne: true,
@@ -424,79 +432,116 @@ export async function POST(
         )
         .lean();
 
-    if (!user) {
+    if (
+      users.length !==
+      uniqueUserIds.length
+    ) {
+      const foundIds = new Set(
+        users.map((user: any) =>
+          String(user._id)
+        )
+      );
+
+      const missingIds =
+        uniqueUserIds.filter(
+          (id) =>
+            !foundIds.has(id)
+        );
+
       return NextResponse.json(
         {
           success: false,
           message:
-            "User not found or inactive",
+            "One or more users were not found or are inactive",
+          missingUserIds:
+            missingIds,
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
     // ========================================================
-    // FIND EXISTING TARGET
+    // CREATE / UPDATE TARGETS
     // ========================================================
 
-    let targetRecord =
-      await SurveyTarget.findOne({
-        userId:
-          new mongoose.Types.ObjectId(
-            userId
-          ),
+    const savedTargets: any[] = [];
 
-        month,
-      });
+    for (const id of uniqueUserIds) {
+      const objectId =
+        new mongoose.Types.ObjectId(id);
 
-    // ========================================================
-    // UPDATE EXISTING
-    // ========================================================
-
-    if (targetRecord) {
-
-      targetRecord.target =
-        numericTarget;
-
-      targetRecord.updatedBy =
-        new mongoose.Types.ObjectId(
-          currentUser.userId
-        );
-
-      await targetRecord.save();
-
-    }
-
-    // ========================================================
-    // CREATE NEW
-    // ========================================================
-
-    else {
-
-      targetRecord =
-        await SurveyTarget.create({
-          userId:
-            new mongoose.Types.ObjectId(
-              userId
-            ),
-
-          month,
-
-          target:
-            numericTarget,
-
-          createdBy:
-            new mongoose.Types.ObjectId(
-              currentUser.userId
-            ),
-
-          updatedBy:
-            new mongoose.Types.ObjectId(
-              currentUser.userId
-            ),
+      let targetRecord =
+        await SurveyTarget.findOne({
+          userId: objectId,
+          month: targetMonth,
         });
+
+      if (targetRecord) {
+        targetRecord.firstTarget =
+          numericFirstTarget;
+
+        targetRecord.secondTarget =
+          numericSecondTarget;
+
+        targetRecord.updatedBy =
+          new mongoose.Types.ObjectId(
+            currentUser.userId
+          );
+
+        await targetRecord.save();
+      } else {
+        targetRecord =
+          await SurveyTarget.create({
+            userId: objectId,
+
+            month: targetMonth,
+
+            firstTarget:
+              numericFirstTarget,
+
+            secondTarget:
+              numericSecondTarget,
+
+            createdBy:
+              new mongoose.Types.ObjectId(
+                currentUser.userId
+              ),
+
+            updatedBy:
+              new mongoose.Types.ObjectId(
+                currentUser.userId
+              ),
+          });
+      }
+
+      const user = users.find(
+        (item: any) =>
+          String(item._id) === id
+      );
+
+      savedTargets.push({
+        id: String(
+          targetRecord._id
+        ),
+
+        userId: id,
+
+        userName:
+          user?.name ||
+          user?.email ||
+          "Unknown User",
+
+        month:
+          targetRecord.month,
+
+        firstTarget: Number(
+          targetRecord.firstTarget
+        ),
+
+        secondTarget: Number(
+          targetRecord.secondTarget
+        ),
+      });
     }
 
     // ========================================================
@@ -508,41 +553,24 @@ export async function POST(
         success: true,
 
         message:
-          targetRecord
+          uniqueUserIds.length === 1
             ? "Target saved successfully"
-            : "Target created successfully",
+            : `Targets assigned successfully to ${uniqueUserIds.length} users`,
 
-        target: {
-          id:
-            String(
-              targetRecord._id
-            ),
+        count:
+          savedTargets.length,
 
-          userId:
-            String(
-              targetRecord.userId
-            ),
+        targets:
+          savedTargets,
 
-          userName:
-            user.name ||
-            user.email,
-
-          month:
-            targetRecord.month,
-
-          target:
-            Number(
-              targetRecord.target
-            ),
-        },
+        // Keep single target response
+        // for compatibility with existing UI.
+        target:
+          savedTargets[0] || null,
       },
-      {
-        status: 200,
-      }
+      { status: 200 }
     );
-
   } catch (error: any) {
-
     console.error(
       "POST TARGET ERROR:",
       error
@@ -562,9 +590,7 @@ export async function POST(
             ? error?.stack
             : undefined,
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }

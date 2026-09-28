@@ -9,10 +9,11 @@ import {
   validateLogoutShift,
   validateLunchEnd,
 } from "@/lib/shiftValidation";
+import { resolveAttendanceDay } from "@/lib/attendanceRules";
 
 // ────────────────────────────────────────────────
 // Office location (change these values or move to env)
-const OFFICE_LAT = Number(process.env.OFFICE_LAT) || 28.6139;   // example: New Delhi
+const OFFICE_LAT = Number(process.env.OFFICE_LAT) || 28.6139; // example: New Delhi
 const OFFICE_LNG = Number(process.env.OFFICE_LNG) || 77.2090;
 const MAX_DISTANCE_METERS = Number(process.env.MAX_ATTENDANCE_DISTANCE) || 200; // 200 meters
 
@@ -38,7 +39,7 @@ function getDistanceInMeters(
 }
 
 // ────────────────────────────────────────────────
-// GET /api/attendance
+// GET /api/attendence
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
       }
-      filter.userId = userId;
+      filter.userId = new mongoose.Types.ObjectId(userId);
     }
 
     if (date) {
@@ -77,6 +78,8 @@ export async function GET(request: NextRequest) {
     const records = await Attendance.find(filter)
       .populate("userId", "name email workingShift role")
       .populate("updatedBy", "name email")
+      .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
+      .populate("holidayId", "title type scope isPaid")
       .sort({ date: -1 });
 
     const processed = records.map((rec) => {
@@ -94,13 +97,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(processed);
   } catch (error) {
-    console.error("GET /api/attendance error:", error);
+    console.error("GET /api/attendence error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 // ────────────────────────────────────────────────
-// POST /api/attendance
+// POST /api/attendence
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
@@ -128,7 +131,10 @@ export async function POST(request: NextRequest) {
     const targetDate = date ? new Date(date) : new Date();
     targetDate.setHours(0, 0, 0, 0);
 
-    let record = await Attendance.findOne({ userId, date: targetDate });
+    let record = await Attendance.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      date: targetDate,
+    });
     const now = new Date();
 
     // ── Action based flow (login / logout / lunch) ──
@@ -143,9 +149,10 @@ export async function POST(request: NextRequest) {
 
       if (!record) {
         record = new Attendance({
-          userId,
+          userId: new mongoose.Types.ObjectId(userId),
           date: targetDate,
-          updatedBy: updatedBy || null,
+          shiftDate: targetDate,
+          updatedBy: updatedBy ? new mongoose.Types.ObjectId(updatedBy) : null,
         });
       }
 
@@ -214,8 +221,33 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          // ── CONNECT OFFICE OFF & RULES RESOLUTION ──
+          const dayResolution = await resolveAttendanceDay({
+            userId,
+            date: targetDate,
+          });
+
+          if (dayResolution.holiday) {
+            record.status = "worked-on-holiday";
+            record.holiday = true;
+            record.holidayId = dayResolution.holidayId
+              ? new mongoose.Types.ObjectId(dayResolution.holidayId)
+              : null;
+          } else if (dayResolution.weeklyOff) {
+            record.status = "worked-on-weekly-off";
+            record.weeklyOff = true;
+          } else {
+            record.status = "present";
+            record.holiday = false;
+            record.weeklyOff = false;
+          }
+
+          if (dayResolution.resolvedShiftId) {
+            record.shiftId = new mongoose.Types.ObjectId(dayResolution.resolvedShiftId);
+          }
+
+          record.shiftDate = targetDate;
           record.loggingTime = now;
-          record.status = "present";
 
           record.loginLocation = {
             type: "Point",
@@ -335,11 +367,14 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Invalid action" }, { status: 400 });
       }
 
-      if (updatedBy) record.updatedBy = updatedBy;
+      if (updatedBy) {
+        record.updatedBy = new mongoose.Types.ObjectId(updatedBy);
+      }
       await record.save();
 
       // AUDIT LOG
-      const auditAction = action === "login" ? "LOGIN" : action === "logout" ? "LOGOUT" : "UPDATE";
+      const auditAction =
+        action === "login" ? "LOGIN" : action === "logout" ? "LOGOUT" : "UPDATE";
       await createAuditLog({
         userId,
         action: auditAction,
@@ -347,21 +382,31 @@ export async function POST(request: NextRequest) {
         description: `Marked attendance action: ${action} for ${user.name || "user"}`,
         entityType: "Attendance",
         entityId: String(record._id),
-        metadata: { action, date: targetDate },
+        metadata: { action, date: targetDate, status: record.status },
       });
 
       // Return populated record
       const populated = await Attendance.findById(record._id)
         .populate("userId", "name email workingShift role")
-        .populate("updatedBy", "name email");
+        .populate("updatedBy", "name email")
+        .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
+        .populate("holidayId", "title type scope isPaid");
 
       return NextResponse.json(populated);
     }
 
-    // ── Manual create / update (admin / TL) ──
+    // ── Manual create / update (admin / TL / HR) ──
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const updatedByObjectId = updatedBy ? new mongoose.Types.ObjectId(updatedBy) : null;
+
     if (record) {
       Object.assign(record, rest);
-      if (updatedBy) record.updatedBy = updatedBy;
+      if (rest.status === "holiday" || rest.status === "office-off") {
+        record.holiday = true;
+      } else if (rest.status === "weekly-off") {
+        record.weeklyOff = true;
+      }
+      if (updatedByObjectId) record.updatedBy = updatedByObjectId;
       await record.save();
 
       await createAuditLog({
@@ -374,13 +419,22 @@ export async function POST(request: NextRequest) {
         metadata: rest,
       });
 
-      return NextResponse.json(record);
+      const populated = await Attendance.findById(record._id)
+        .populate("userId", "name email workingShift role")
+        .populate("updatedBy", "name email")
+        .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
+        .populate("holidayId", "title type scope isPaid");
+
+      return NextResponse.json(populated);
     }
 
     const newRecord = await Attendance.create({
-      userId,
+      userId: userObjectId,
       date: targetDate,
-      updatedBy: updatedBy || null,
+      shiftDate: targetDate,
+      updatedBy: updatedByObjectId,
+      holiday: rest.status === "holiday" || rest.status === "office-off",
+      weeklyOff: rest.status === "weekly-off",
       ...rest,
     });
 
@@ -394,9 +448,15 @@ export async function POST(request: NextRequest) {
       metadata: rest,
     });
 
-    return NextResponse.json(newRecord, { status: 201 });
+    const populated = await Attendance.findById(newRecord._id)
+      .populate("userId", "name email workingShift role")
+      .populate("updatedBy", "name email")
+      .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
+      .populate("holidayId", "title type scope isPaid");
+
+    return NextResponse.json(populated, { status: 201 });
   } catch (error) {
-    console.error("POST /api/attendance error:", error);
+    console.error("POST /api/attendence error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+}

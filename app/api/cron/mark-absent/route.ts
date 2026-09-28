@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/config/db";
 import Auth from "@/models/Auth";
 import Attendance from "@/models/Attendance";
-import OfficeOff from "@/models/OfficeOff";
-import OfficeSettings from "@/models/OfficeSettings";
+import { resolveAttendanceDay } from "@/lib/attendanceRules";
 
 /**
  * Cron Endpoint: Run 1 hour after shift finish to auto-mark absent.
@@ -35,41 +35,11 @@ export async function GET(req: NextRequest) {
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // ── 1. Check Manual Office Off / Festival / Holiday ──
-    const officeOffRecord = await OfficeOff.findOne({
-      date: { $gte: startOfDay, $lte: endOfDay },
-      isActive: true,
-    });
-
-    if (officeOffRecord) {
-      return NextResponse.json({
-        success: true,
-        isOfficeOff: true,
-        message: `Office is closed today (${officeOffRecord.title}). Skip marking absent.`,
-        officeOffTitle: officeOffRecord.title,
-      });
-    }
-
-    // ── 2. Check Weekend Off Settings ──
-    const dayOfWeek = startOfDay.getDay(); // 0 = Sunday, 6 = Saturday
-    const officeSettings = await OfficeSettings.findOne().lean();
-
-    if (officeSettings) {
-      const isSundayOff = officeSettings.sundayOff && dayOfWeek === 0;
-      const isSaturdayOff = officeSettings.saturdayOff && dayOfWeek === 6;
-      const isWeekendOff = officeSettings.weekendOff && (dayOfWeek === 0 || dayOfWeek === 6);
-
-      if (isSundayOff || isSaturdayOff || isWeekendOff) {
-        return NextResponse.json({
-          success: true,
-          isOfficeOff: true,
-          message: "Today is a scheduled weekend off. Skip marking absent.",
-        });
-      }
-    }
-
-    // ── 3. Query all users for the shift ──
-    const users = await Auth.find({ workingShift: shift }).select("_id name email");
+    // Query all users for the shift
+    const users = await Auth.find({
+      workingShift: shift,
+      isActive: { $ne: false },
+    }).select("_id name email workingShift");
 
     if (users.length === 0) {
       return NextResponse.json({
@@ -80,6 +50,8 @@ export async function GET(req: NextRequest) {
     }
 
     let markedAbsentCount = 0;
+    let markedHolidayCount = 0;
+    let markedWeeklyOffCount = 0;
 
     for (const user of users) {
       // Find existing attendance record for this user and date
@@ -88,25 +60,81 @@ export async function GET(req: NextRequest) {
         date: { $gte: startOfDay, $lte: endOfDay },
       });
 
-      // If user has no record or has not logged in, mark as absent
-      if (!existing || !existing.loggingTime) {
+      // If user has already logged in, do not overwrite
+      if (existing?.loggingTime) {
+        continue;
+      }
+
+      // Check Holiday / Weekly-off rule resolution for this user on this date
+      const dayResolution = await resolveAttendanceDay({
+        userId: user._id.toString(),
+        date: startOfDay,
+      });
+
+      if (dayResolution.holiday) {
         if (!existing) {
           await Attendance.create({
             userId: user._id,
             date: startOfDay,
-            status: "absent",
-            isLate: false,
-            remarks: `Auto-marked absent: No login recorded 1hr post shift end (${shift} shift)`,
+            shiftDate: startOfDay,
+            status: "holiday",
+            holiday: true,
+            holidayId: dayResolution.holidayId
+              ? new mongoose.Types.ObjectId(dayResolution.holidayId)
+              : null,
+            remarks: `Holiday: ${dayResolution.holidayTitle || "Holiday"}`,
           });
-        } else if (existing.status !== "absent") {
-          existing.status = "absent";
-          existing.remarks = existing.remarks
-            ? `${existing.remarks} | Auto-marked absent`
-            : `Auto-marked absent: No login recorded 1hr post shift end (${shift} shift)`;
+        } else if (existing.status !== "holiday") {
+          existing.status = "holiday";
+          existing.holiday = true;
+          existing.holidayId = dayResolution.holidayId
+            ? new mongoose.Types.ObjectId(dayResolution.holidayId)
+            : null;
+          existing.remarks = `Holiday: ${dayResolution.holidayTitle || "Holiday"}`;
           await existing.save();
         }
-        markedAbsentCount++;
+        markedHolidayCount++;
+        continue;
       }
+
+      if (dayResolution.weeklyOff) {
+        if (!existing) {
+          await Attendance.create({
+            userId: user._id,
+            date: startOfDay,
+            shiftDate: startOfDay,
+            status: "weekly-off",
+            weeklyOff: true,
+            remarks: "Scheduled weekly off",
+          });
+        } else if (existing.status !== "weekly-off") {
+          existing.status = "weekly-off";
+          existing.weeklyOff = true;
+          existing.remarks = "Scheduled weekly off";
+          await existing.save();
+        }
+        markedWeeklyOffCount++;
+        continue;
+      }
+
+      // Normal working day & no login recorded → mark as absent
+      if (!existing) {
+        await Attendance.create({
+          userId: user._id,
+          date: startOfDay,
+          shiftDate: startOfDay,
+          status: "absent",
+          isLate: false,
+          remarks: `Auto-marked absent: No login recorded 1hr post shift end (${shift} shift)`,
+        });
+      } else if (existing.status !== "absent") {
+        existing.status = "absent";
+        existing.remarks = existing.remarks
+          ? `${existing.remarks} | Auto-marked absent`
+          : `Auto-marked absent: No login recorded 1hr post shift end (${shift} shift)`;
+        await existing.save();
+      }
+      markedAbsentCount++;
     }
 
     return NextResponse.json({
@@ -115,7 +143,9 @@ export async function GET(req: NextRequest) {
       date: startOfDay.toISOString().slice(0, 10),
       totalShiftEmployees: users.length,
       markedAbsentCount,
-      message: `Successfully processed ${shift} shift attendance. Marked ${markedAbsentCount} employees absent.`,
+      markedHolidayCount,
+      markedWeeklyOffCount,
+      message: `Processed ${shift} shift attendance. Marked ${markedAbsentCount} absent, ${markedHolidayCount} holidays, ${markedWeeklyOffCount} weekly offs.`,
     });
   } catch (error: any) {
     console.error("Cron mark-absent error:", error);

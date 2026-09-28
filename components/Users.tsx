@@ -22,9 +22,11 @@ interface UserData {
   _id: string;
   name: string;
   email: string;
-  role: "admin" | "hr" | "team-lead" | "survey-tester" | "user";
+  role: "admin" | "hr" | "team-lead" | "survey-tester";
   phoneNumber?: string;
   workingShift?: "day" | "night";
+  employeeId?: string;
+  isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -41,7 +43,6 @@ const roleLabels: Record<UserData["role"], string> = {
   hr: "HR",
   "team-lead": "Team Lead",
   "survey-tester": "Survey Tester",
-  user: "User",
 };
 
 const roleColors: Record<UserData["role"], string> = {
@@ -49,7 +50,6 @@ const roleColors: Record<UserData["role"], string> = {
   hr: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   "team-lead": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
   "survey-tester": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  user: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
 };
 
 const shiftLabels: Record<"day" | "night", string> = {
@@ -108,6 +108,48 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+
+  const downloadUsersExcel = async () => {
+  try {
+    const response = await fetch("/api/auth/users/export");
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+
+      throw new Error(
+        error?.message || "Failed to download users"
+      );
+    }
+
+    const blob = await response.blob();
+
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download = `Users_Role_Wise_${new Date()
+      .toISOString()
+      .slice(0, 10)}.xlsx`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Download users error:", error);
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Failed to download users"
+    );
+  }
+};
   // Filtered & paginated users
   const filteredUsers = users.filter((u) => {
     // Search filter
@@ -142,8 +184,10 @@ export default function AdminUsersPage() {
       email: "",
       phoneNumber: "",
       password: "",
-      role: "user",
+      role: "survey-tester",
       workingShift: "day",
+      employeeId: "",
+      isActive: true,
     });
     setIsAddModalOpen(true);
   };
@@ -156,6 +200,8 @@ export default function AdminUsersPage() {
       role: user.role,
       phoneNumber: user.phoneNumber || "",
       workingShift: user.workingShift || "day",
+      employeeId: user.employeeId || "",
+      isActive: user.isActive !== undefined ? user.isActive : true,
     });
     setIsEditModalOpen(true);
   };
@@ -302,6 +348,30 @@ export default function AdminUsersPage() {
           </select>
         </div>
 
+        <button
+  type="button"
+  onClick={downloadUsersExcel}
+  className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+
+  Download Excel
+</button>
+
         {/* Shift Filter */}
         <div className="relative">
           <select
@@ -323,6 +393,8 @@ export default function AdminUsersPage() {
           Add User
         </button>
       </div>
+
+      
 
       {/* Table */}
       {loading ? (
@@ -356,6 +428,9 @@ export default function AdminUsersPage() {
                   Email
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Emp ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Phone
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -363,6 +438,9 @@ export default function AdminUsersPage() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Shift
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Status
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
@@ -388,6 +466,9 @@ export default function AdminUsersPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
                     {user.email}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300 font-mono text-sm">
+                    {user.employeeId || "—"}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
                     {user.phoneNumber || "—"}
                   </td>
@@ -401,6 +482,11 @@ export default function AdminUsersPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                       {user.workingShift ? shiftLabels[user.workingShift] : "—"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${user.isActive !== false ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"}`}>
+                      {user.isActive !== false ? "Active" : "Inactive"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -459,7 +545,7 @@ export default function AdminUsersPage() {
       )}
 
       {/* ---------- Add Modal ---------- */}
-      {isAddModalOpen && (
+      {/* {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full shadow-xl p-6 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
@@ -498,6 +584,18 @@ export default function AdminUsersPage() {
                   value={formData.email || ""}
                   onChange={handleFormChange}
                   required
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Employee ID
+                </label>
+                <input
+                  type="text"
+                  name="employeeId"
+                  value={formData.employeeId || ""}
+                  onChange={handleFormChange}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 />
               </div>
@@ -561,6 +659,20 @@ export default function AdminUsersPage() {
                   <option value="night">Night Shift</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Status
+                </label>
+                <select
+                  name="isActive"
+                  value={formData.isActive === false ? "false" : "true"}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.value === "true" }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                >
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -590,7 +702,213 @@ export default function AdminUsersPage() {
             </form>
           </div>
         </div>
-      )}
+      )} */}
+
+      {isAddModalOpen && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-opacity">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full shadow-2xl p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
+      
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+          <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+            <Plus className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          Add New User
+        </h2>
+        <button
+          onClick={() => setIsAddModalOpen(false)}
+          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <form onSubmit={handleAddSubmit} className="space-y-5">
+        {/* Full Name */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Full Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name || ""}
+            onChange={handleFormChange}
+            required
+            placeholder="John Doe"
+            className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
+          />
+        </div>
+
+        {/* Email */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email || ""}
+            onChange={handleFormChange}
+            required
+            placeholder="john@example.com"
+            className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
+          />
+        </div>
+
+        {/* Employee ID */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Employee ID
+          </label>
+          <input
+            type="text"
+            name="employeeId"
+            value={formData.employeeId || ""}
+            onChange={handleFormChange}
+            placeholder="EMP-001"
+            className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
+          />
+        </div>
+
+        {/* Password */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Password <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="password"
+            name="password"
+            value={formData.password || ""}
+            onChange={handleFormChange}
+            required
+            minLength={8}
+            placeholder="••••••••"
+            className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-1">
+            <span className="w-1 h-1 rounded-full bg-gray-400"></span>
+            Must be at least 8 characters
+          </p>
+        </div>
+
+        {/* Phone Number */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Phone Number
+          </label>
+          <input
+            type="text"
+            name="phoneNumber"
+            value={formData.phoneNumber || ""}
+            onChange={handleFormChange}
+            placeholder="+1 (555) 000-0000"
+            className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
+          />
+        </div>
+
+        {/* --- IMPROVED SECTION: Role and Working Shift in One Row --- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Role
+            </label>
+            <div className="relative">
+              <select
+                name="role"
+                value={formData.role || "survey-tester"}
+                onChange={handleFormChange}
+                className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm appearance-none cursor-pointer"
+              >
+                {Object.entries(roleLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              {/* Custom Chevron for better styling */}
+              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path></svg>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Working Shift
+            </label>
+            <div className="relative">
+              <select
+                name="workingShift"
+                value={formData.workingShift || "day"}
+                onChange={handleFormChange}
+                className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm appearance-none cursor-pointer"
+              >
+                <option value="day">Day Shift</option>
+                <option value="night">Night Shift</option>
+              </select>
+              {/* Custom Chevron */}
+              <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* ------------------------------------------------------- */}
+
+        {/* Status */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Status
+          </label>
+          <div className="relative">
+            <select
+              name="isActive"
+              value={formData.isActive === false ? "false" : "true"}
+              onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.value === "true" }))}
+              className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm appearance-none cursor-pointer"
+            >
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-700 mt-2">
+          <button
+            type="button"
+            onClick={() => setIsAddModalOpen(false)}
+            className="px-5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2 font-medium transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                Add User
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
 
       {/* ---------- Edit Modal ---------- */}
       {isEditModalOpen && selectedUser && (
@@ -637,6 +955,18 @@ export default function AdminUsersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Employee ID
+                </label>
+                <input
+                  type="text"
+                  name="employeeId"
+                  value={formData.employeeId || ""}
+                  onChange={handleFormChange}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Phone Number
                 </label>
                 <input
@@ -676,6 +1006,20 @@ export default function AdminUsersPage() {
                 >
                   <option value="day">Day Shift</option>
                   <option value="night">Night Shift</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Status
+                </label>
+                <select
+                  name="isActive"
+                  value={formData.isActive === false ? "false" : "true"}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.value === "true" }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                >
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
                 </select>
               </div>
               <div className="flex justify-end gap-3 pt-2">

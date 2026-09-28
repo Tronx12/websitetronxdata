@@ -92,7 +92,55 @@ const [showExportOptions, setShowExportOptions] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [categoryCounts, setCategoryCounts] = useState({
+  B2B: 0,
+  B2H: 0,
+  B2C: 0,
+});
 
+const fetchCategoryCounts = useCallback(async () => {
+  try {
+    const categories = ["B2B", "B2H", "B2C"] as const;
+
+    const results = await Promise.all(
+      categories.map(async (category) => {
+        const params = new URLSearchParams({
+          page: "1",
+          limit: "1",
+          sortBy: "createdAt",
+          sortOrder: "desc",
+          createdBy: userId,
+          category,
+        });
+
+        if (search.trim()) {
+          params.set("search", search.trim());
+        }
+
+        const res = await fetch(`/api/survey?${params.toString()}`);
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch ${category} count`);
+        }
+
+        const json = await res.json();
+
+        return {
+          category,
+          count: json.success ? json.pagination?.total || 0 : 0,
+        };
+      })
+    );
+
+    setCategoryCounts({
+      B2B: results.find((r) => r.category === "B2B")?.count || 0,
+      B2H: results.find((r) => r.category === "B2H")?.count || 0,
+      B2C: results.find((r) => r.category === "B2C")?.count || 0,
+    });
+  } catch (error) {
+    console.error("Failed to fetch category counts:", error);
+  }
+}, [userId, search]);
 
 const fetchData = useCallback(async () => {
   try {
@@ -151,9 +199,14 @@ const fetchData = useCallback(async () => {
 
 
 
+  // useEffect(() => {
+  //   fetchData();
+  // }, [fetchData]);
+
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  fetchData();
+  fetchCategoryCounts();
+}, [fetchData, fetchCategoryCounts]);
 
   // Quick record-count preview so the user can see "this will create N rows"
   // before hitting save.
@@ -697,7 +750,7 @@ const handleExport = async () => {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto">
-          {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => (
+          {/* {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => {
@@ -712,7 +765,39 @@ const handleExport = async () => {
             >
               {tab}
             </button>
-          ))}
+          ))} */}
+          {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => {
+  const count =
+    tab === "ALL"
+      ? total
+      : categoryCounts[tab];
+
+  return (
+    <button
+      key={tab}
+      onClick={() => {
+        setActiveTab(tab);
+        setPage(1);
+      }}
+      className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+        activeTab === tab
+          ? "border-blue-600 text-blue-600"
+          : "border-transparent text-gray-500 hover:text-gray-700"
+      }`}
+    >
+      {tab}
+      <span
+        className={`ml-1.5 inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-semibold ${
+          activeTab === tab
+            ? "bg-blue-100 text-blue-700"
+            : "bg-gray-100 text-gray-600"
+        }`}
+      >
+        {count}
+      </span>
+    </button>
+  );
+})}
         </div>
 
         {/* Search + Sort */}

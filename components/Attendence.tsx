@@ -18,7 +18,7 @@ interface AttendenceRecord {
   logoutTime: string | null;
   lunchStart: string | null;
   lunchEnd: string | null;
-  status?: "present" | "absent" | "half-day" | "office-off";
+  status?: "present" | "absent" | "half-day" | "office-off" | "holiday" | "weekly-off" | "leave" | "worked-on-holiday" | "worked-on-weekly-off" | "comp-off";
   lunchDurationMinutes?: number;
   excessLunchMinutes?: number;
   remarks?: string;
@@ -374,19 +374,72 @@ export default function AttendencePage({ currentUserId }: Props) {
                         {format(new Date(r.date), "dd MMM yyyy")}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {r.status === "absent" ? (
-                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 uppercase">
-                            Absent
-                          </span>
-                        ) : r.status === "office-off" ? (
-                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 uppercase">
-                            Office Off
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 uppercase">
-                            Present
-                          </span>
-                        )}
+                        {(() => {
+                          const status = r.status || "present";
+                          switch (status) {
+                            case "absent":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 uppercase">
+                                  Absent
+                                </span>
+                              );
+                            case "half-day":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 uppercase">
+                                  Half Day
+                                </span>
+                              );
+                            case "holiday":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 uppercase">
+                                  Holiday
+                                </span>
+                              );
+                            case "weekly-off":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 uppercase">
+                                  Weekly Off
+                                </span>
+                              );
+                            case "office-off":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 uppercase">
+                                  Office Off
+                                </span>
+                              );
+                            case "worked-on-holiday":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 uppercase">
+                                  Worked on Holiday
+                                </span>
+                              );
+                            case "worked-on-weekly-off":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 uppercase">
+                                  Worked on Weekly Off
+                                </span>
+                              );
+                            case "comp-off":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-800 uppercase">
+                                  Comp Off
+                                </span>
+                              );
+                            case "leave":
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 uppercase">
+                                  Leave
+                                </span>
+                              );
+                            case "present":
+                            default:
+                              return (
+                                <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 uppercase">
+                                  Present
+                                </span>
+                              );
+                          }
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         {formatTime(r.loggingTime)}
