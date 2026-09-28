@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [needsVerify, setNeedsVerify] = useState(false);
-
+  const [accountPending, setAccountPending] = useState(false);
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
     setError("");
@@ -54,14 +54,28 @@ router.push(destination);
 
       // router.push(destination);
       router.refresh();
+    // } catch (err: any) {
+    //   if (err.code === "EMAIL_NOT_VERIFIED") {
+    //     setNeedsVerify(true);
+    //     setError("Please verify your email first.");
+    //   } else {
+    //     setError(err.message || "Invalid email or password");
+    //   }
+    // } 
     } catch (err: any) {
-      if (err.code === "EMAIL_NOT_VERIFIED") {
-        setNeedsVerify(true);
-        setError("Please verify your email first.");
-      } else {
-        setError(err.message || "Invalid email or password");
-      }
-    } finally {
+  if (err.code === "EMAIL_NOT_VERIFIED") {
+    setNeedsVerify(true);
+    setError("Please verify your email first.");
+  } else if (err.code === "ACCOUNT_NOT_ACTIVE") {
+    setAccountPending(true);
+    setError(
+      "Your account is waiting for admin approval. Please contact the administrator to verify and activate your account."
+    );
+  } else {
+    setError(err.message || "Invalid email or password");
+  }
+}
+    finally {
       setLoading(false);
     }
   };

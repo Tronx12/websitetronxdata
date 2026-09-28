@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       role: role || "survey-tester",
       workingShift: workingShift || "day",
-      isActive: isActive !== undefined ? isActive : true,
+      isActive: isActive !== undefined ? isActive : false,
       isEmailVerified: false,
       emailVerificationOtp: otp,
       emailVerificationOtpExpires: otpExpires,

@@ -49,11 +49,37 @@ async function api<T = any>(
 }
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
+  // login: (email: string, password: string) =>
+  //   api("/api/auth/login", {
+  //     method: "POST",
+  //     body: JSON.stringify({ email, password }),
+  //   }),
+  login: async (email: string, password: string) => {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
     }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.message || "Login failed"
+    );
+
+    error.code = data?.code;
+
+    throw error;
+  }
+
+  return data;
+},
 
   register: (payload: {
     name: string;
