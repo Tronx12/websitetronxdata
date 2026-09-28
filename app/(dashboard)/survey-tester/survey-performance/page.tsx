@@ -1033,6 +1033,15 @@ type DailyPerformance = {
   completed: number;
 };
 
+type TargetProgress = {
+  currentTarget: number;
+  remaining: number;
+  achievement: number;
+  currentTargetLabel: "First Target" | "Second Target";
+  firstTargetAchieved: boolean;
+  secondTargetAchieved: boolean;
+};
+
 type UserPerformance = {
   userId: string;
   name: string;
@@ -1574,6 +1583,8 @@ if (isTeamLead) {
 
         role: member.role || "survey-tester",
 
+        firstTarget: 0,
+        secondTarget: 0,
         target: 0,
 
         completed: 0,

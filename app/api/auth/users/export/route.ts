@@ -239,7 +239,8 @@ export async function GET(req: NextRequest) {
     // ==============================
     // SUMMARY SHEET
     // ==============================
-    const summary = workbook.addWorksheet("Summary", 0);
+    // const summary = workbook.addWorksheet("Summary", 0);
+    const summary = workbook.addWorksheet("Summary");
 
     summary.columns = [
       {
