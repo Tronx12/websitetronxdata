@@ -37,7 +37,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   // SURVEY TESTER
   // =========================================================
 
-   {
+  {
     label: "Attendance",
     path: "/survey-tester/attendence",
     icon: "CalendarCheck",
@@ -58,7 +58,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["survey-tester"],
   },
 
-     {
+  {
     label: "Survey Data Performance",
     path: "/survey-tester/survey-performance",
     icon: "ClipboardList",
@@ -71,14 +71,14 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "ClipboardList",
     roles: ["survey-tester"],
   },
-  
+
   {
     label: "OE Result Panel",
     path: "/survey-tester/oe/results",
     icon: "ClipboardList",
     roles: ["survey-tester"],
   },
-   {
+  {
     label: "OE Performance",
     path: "/survey-tester/oe/oe-performance",
     icon: "ClipboardList",
@@ -97,14 +97,14 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["team-lead"],
   },
 
-   {
+  {
     label: "Request Missing Attendance",
     path: "/team-lead/missing-attendence",
     icon: "CalendarPlus",
     roles: ["team-lead"],
   },
 
-  
+
 
   {
     label: "Manage Team Attendance",
@@ -112,7 +112,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "CalendarPlus",
     roles: ["team-lead"],
   },
-  
+
   {
     label: "Team Surveys Data",
     path: "/team-lead/survey-data",
@@ -120,14 +120,14 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["team-lead"],
   },
 
- 
+
   {
     label: "Team-Member Survey-Performance",
     path: "/team-lead/survey-performance",
     icon: "CalendarPlus",
     roles: ["team-lead"],
   },
-  
+
 
 
 
@@ -138,13 +138,13 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["team-lead"],
   },
 
-     {
+  {
     label: "OE Performance",
     path: "/team-lead/oe/oe-performance",
     icon: "ClipboardList",
     roles: ["team-lead"],
   },
-   {
+  {
     label: "OE SubmissionsDateWise",
     path: "/team-lead/oe/OESubmissionsByDate",
     icon: "ClipboardList",
@@ -168,7 +168,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "CalendarPlus",
     roles: ["hr"],
   },
-  
+
   {
     label: "Manage Attendance",
     path: "/hr/attendance",
@@ -176,21 +176,21 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["hr"],
   },
 
-    {
+  {
     label: "Manage Users",
     path: "/hr/users",
     icon: "UsersRound",
     roles: ["hr"],
   },
 
-   {
+  {
     label: "Manage Teams",
     path: "/hr/teams",
     icon: "Network",
     roles: ["hr"],
   },
 
- 
+
 
   {
     label: "Office Off Manage",
@@ -210,50 +210,50 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   // ADMIN
   // =========================================================
 
-   {
+  {
     label: "Manage Users",
     path: "/admin/users",
     icon: "UsersRound",
     roles: ["admin"],
   },
 
-    {
+  {
     label: "Manage Teams",
     path: "/admin/teams",
     icon: "Network",
     roles: ["admin"],
   },
 
-    {
+  {
     label: "Manage Attendance",
     path: "/admin/attendance",
     icon: "CalendarCog",
     roles: ["admin"],
   },
 
-     {
+  {
     label: "Manage Missing Attendance",
     path: "/admin/missing-attendence",
     icon: "CalendarPlus",
     roles: ["admin"],
   },
 
-    {
+  {
     label: " Add Survey-Target",
     path: "/admin/survey-target",
     icon: "CalendarPlus",
     roles: ["admin"],
   },
 
-    {
+  {
     label: "Manage Survey Data",
     path: "/admin/survey-data",
     icon: "Database",
     roles: ["admin"],
   },
 
-  
-   {
+
+  {
     label: "OE SubmissionsByDate",
     path: "/admin/oe/OESubmissionsByDate",
     icon: "ClipboardList",
@@ -267,13 +267,13 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   //   roles: ["admin"],
   // },
 
-   {
+  {
     label: "OE Submit Panel",
     path: "/admin/oe",
     icon: "ClipboardList",
     roles: ["admin"],
   },
-  
+
   {
     label: "OE Result Panel",
     path: "/admin/oe/results",
@@ -288,7 +288,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["admin"],
   },
 
- 
+
 
   {
     label: "Office Off Manage",
@@ -301,6 +301,13 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     label: "Audit Logs",
     path: "/admin/audit-logs",
     icon: "ScrollText",
+    roles: ["admin"],
+  },
+
+  {
+    label: "IP Whitelist",
+    path: "/admin/ip-whitelist",
+    icon: "Network",
     roles: ["admin"],
   },
 
@@ -317,13 +324,13 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   // ==============================================
   // -------------------------------------------------
 
-   {
+  {
     label: "My Profile",
     path: "/survey-tester/profile",
     icon: "UserCircle",
     roles: ["survey-tester"],
   },
-   {
+  {
     label: "My Profile",
     path: "/team-lead/profile",
     icon: "UserCircle",
