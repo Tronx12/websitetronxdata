@@ -4,15 +4,15 @@
 
 import { useEffect, useState } from "react";
 
-// const OFFICE_LAT = 28.6435;
-// const OFFICE_LNG = 77.1120;
-const OFFICE_LAT = Number(
-  process.env.OFFICE_LAT
-);
+const OFFICE_LAT = 28.6435;
+const OFFICE_LNG = 77.1120;
+// const OFFICE_LAT = Number(
+//   process.env.OFFICE_LAT
+// );
 
-const OFFICE_LNG = Number(
-  process.env.OFFICE_LNG
-);
+// const OFFICE_LNG = Number(
+//   process.env.OFFICE_LNG
+// );
 
 // Allowed distance from office in meters
 const OFFICE_RADIUS_METERS = 200;
