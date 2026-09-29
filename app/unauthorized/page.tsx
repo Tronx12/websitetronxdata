@@ -30,7 +30,7 @@ export default async function UnauthorizedPage() {
           403 Forbidden
         </span>
 
-        <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
+        <h3 className="text-2xl font-bold text-gray-900">Access Denied</h3>
 
         <p className="mt-3 text-sm text-gray-600 leading-relaxed">
           You do not have the required permissions to view this resource. If you believe this is an error, please contact your administrator.

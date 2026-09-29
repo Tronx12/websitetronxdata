@@ -24,9 +24,9 @@ export default async function TeamLeadOEPerformancePage() {
     return (
       <main className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-xl font-bold text-red-600">
+          <h3 className="text-xl font-bold text-red-600">
             Access Denied
-          </h1>
+          </h3>
 
           <p className="mt-2 text-sm text-slate-500">
             Only team leads can access team OE performance.
