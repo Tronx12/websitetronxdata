@@ -1120,9 +1120,9 @@ export default function IpWhitelistPage() {
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+              <h4 className="text-2xl font-bold tracking-tight text-gray-900">
                 IP Whitelist
-              </h1>
+              </h4>
               <p className="mt-1 text-sm text-gray-500">
                 Manage the office networks that are allowed to access attendance.
               </p>
@@ -1343,8 +1343,8 @@ export default function IpWhitelistPage() {
                         <div className="flex items-center gap-3">
                           <div
                             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${record.isActive
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-gray-100 text-gray-500"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-gray-100 text-gray-500"
                               }`}
                           >
                             {record.name.charAt(0).toUpperCase()}
@@ -1368,8 +1368,8 @@ export default function IpWhitelistPage() {
                           type="button"
                           onClick={() => toggleStatus(record)}
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset transition ${record.isActive
-                              ? "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
-                              : "bg-gray-100 text-gray-600 ring-gray-200 hover:bg-gray-200"
+                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+                            : "bg-gray-100 text-gray-600 ring-gray-200 hover:bg-gray-200"
                             }`}
                         >
                           <span
