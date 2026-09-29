@@ -9,6 +9,8 @@
 //         <div className="nav-actions"><a className="login-link" href="/login">Log in</a><a className="button button-small" href="/register">Get started <span aria-hidden="true">→</span></a></div>
 //       </nav>
 
+import LocationGuard from "@/components/LocationGuard"
+
 //       <section className="hero" id="top">
 //         <div className="hero-copy">
 //           <p className="eyebrow"><span className="eyebrow-line" /> CRM for teams in motion</p>
@@ -55,7 +57,9 @@
 // }
 
 export default function Home() {
+
   return (
+    <LocationGuard>
     <main className="site-shell bg-white">
       <nav className="nav-wrap" aria-label="Main navigation">
         <a className="brand" href="#top" aria-label="Tronx home">
@@ -110,5 +114,7 @@ export default function Home() {
 
       <section className="closing-cta" id="stories"><p className="eyebrow"><span className="eyebrow-line" /> Your next chapter starts here</p><h2>Work that feels<br /><em>in motion.</em></h2><a className="button button-light" href="/register">Build your workspace <span aria-hidden="true">-&gt;</span></a></section>
     </main>
+     </LocationGuard>
+     
   );
 }

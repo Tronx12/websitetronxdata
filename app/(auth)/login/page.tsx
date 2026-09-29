@@ -54,14 +54,7 @@ router.push(destination);
 
       // router.push(destination);
       router.refresh();
-    // } catch (err: any) {
-    //   if (err.code === "EMAIL_NOT_VERIFIED") {
-    //     setNeedsVerify(true);
-    //     setError("Please verify your email first.");
-    //   } else {
-    //     setError(err.message || "Invalid email or password");
-    //   }
-    // } 
+
     } catch (err: any) {
   if (err.code === "EMAIL_NOT_VERIFIED") {
     setNeedsVerify(true);
