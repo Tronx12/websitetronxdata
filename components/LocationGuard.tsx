@@ -4,18 +4,21 @@
 
 import { useEffect, useState } from "react";
 
-const OFFICE_LAT = 28.6435;
-const OFFICE_LNG = 77.1120;
-// const OFFICE_LAT = Number(
-//   process.env.OFFICE_LAT
-// );
+const OFFICE_LAT =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_OFFICE_LAT
+    ? Number(process.env.NEXT_PUBLIC_OFFICE_LAT)
+    : 28.6435;
 
-// const OFFICE_LNG = Number(
-//   process.env.OFFICE_LNG
-// );
+const OFFICE_LNG =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_OFFICE_LNG
+    ? Number(process.env.NEXT_PUBLIC_OFFICE_LNG)
+    : 77.1120;
 
 // Allowed distance from office in meters
-const OFFICE_RADIUS_METERS = 200;
+const OFFICE_RADIUS_METERS =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_OFFICE_RADIUS_METERS
+    ? Number(process.env.NEXT_PUBLIC_OFFICE_RADIUS_METERS)
+    : 200;
 
 type LocationStatus =
   | "checking"
@@ -174,8 +177,8 @@ export default function LocationGuard({
 
         timeout: 15000,
 
-        // Always get a fresh location
-        maximumAge: 0,
+        // Cache recent location within 30 seconds
+        maximumAge: 30000,
       }
     );
   };

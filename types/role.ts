@@ -2,6 +2,29 @@
 
 export type UserRole = "survey-tester" | "team-lead" | "hr" | "admin";
 
+export const ROLE_REDIRECT: Record<UserRole, string> = {
+  admin: "/admin/survey-data",
+  hr: "/hr/survey-data",
+  "team-lead": "/team-lead/survey-data",
+  "survey-tester": "/survey-tester/survey-data",
+};
+
+export function isRouteAllowedForRole(pathname: string, role: UserRole): boolean {
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return role === "admin";
+  }
+  if (pathname === "/hr" || pathname.startsWith("/hr/")) {
+    return role === "hr" || role === "admin";
+  }
+  if (pathname === "/team-lead" || pathname.startsWith("/team-lead/")) {
+    return role === "team-lead" || role === "admin";
+  }
+  if (pathname === "/survey-tester" || pathname.startsWith("/survey-tester/")) {
+    return role === "survey-tester" || role === "admin";
+  }
+  return true;
+}
+
 export interface SidebarItem {
   label: string;
   path: string;

@@ -8,13 +8,7 @@ import AuthShell from "@/components/auth/AuthShell";
 import FormField from "@/components/auth/FormField";
 import AuthButton from "@/components/auth/AuthButton";
 import { authApi } from "@/lib/auth-client";
-
-const ROLE_REDIRECT: Record<string, string> = {
-  admin: "/admin/survey-data",
-  hr: "/hr/survey-data",
-  "team-lead": "/team-lead/survey-data",
-  "survey-tester": "/survey-tester/survey-data",
-};
+import { ROLE_REDIRECT, UserRole } from "@/types/role";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,8 +36,8 @@ export default function LoginPage() {
 console.log("LOGIN RESPONSE:", res.data);
 console.log("ROLE FROM API:", res.data?.role);
 
-const role = res.data?.role;
-const destination = ROLE_REDIRECT[role] ?? "/survey-tester";
+const role = res.data?.role as UserRole;
+const destination = ROLE_REDIRECT[role] ?? "/survey-tester/survey-data";
 
 console.log("ROLE:", role);
 console.log("DESTINATION:", destination);
