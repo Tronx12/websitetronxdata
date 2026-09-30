@@ -60,6 +60,14 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   },
 
   {
+    label: "Manage leave",
+    path: "/survey-tester/leave-management/",
+    icon: "FileSpreadsheet",
+    roles: ["survey-tester"],
+  },
+
+
+  {
     label: "Surveys Data",
     path: "/survey-tester/survey-data",
     icon: "FileSpreadsheet",
@@ -109,6 +117,19 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     label: "Request Missing Attendance",
     path: "/team-lead/missing-attendence",
     icon: "CalendarPlus",
+    roles: ["team-lead"],
+  },
+
+  {
+    label: "Manage leave",
+    path: "/team-lead/leave-management/",
+    icon: "FileSpreadsheet",
+    roles: ["team-lead"],
+  },
+   {
+    label: "Manage leave Approval",
+    path: "/team-lead/leave-management/approvals",
+    icon: "FileSpreadsheet",
     roles: ["team-lead"],
   },
 
@@ -177,6 +198,26 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     roles: ["senior-teamlead"],
   },
 
+   {
+    label: "Request Missing Attendance",
+    path: "/senior-teamlead/missing-attendence",
+    icon: "CalendarPlus",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "Manage leave",
+    path: "/senior-teamlead/leave-management/",
+    icon: "FileSpreadsheet",
+    roles: ["senior-teamlead"],
+  },
+   {
+    label: "Manage leave Approval",
+    path: "/senior-teamlead/leave-management/approvals",
+    icon: "FileSpreadsheet",
+    roles: ["senior-teamlead"],
+  },
+
   {
     label: "Team Surveys Data",
     path: "/senior-teamlead/survey-data",
@@ -241,6 +282,19 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     label: "Manage Team Attendance",
     path: "/data-quality-analyst/attendance",
     icon: "CalendarCog",
+    roles: ["data-quality-analyst"],
+  },
+
+   {
+    label: "Request Missing Attendance",
+    path: "/team-lead/missing-attendence",
+    icon: "CalendarPlus",
+    roles: ["data-quality-analyst"],
+  },
+  {
+    label: "Manage leave",
+    path: "/data-quality-analyst/leave-management/",
+    icon: "FileSpreadsheet",
     roles: ["data-quality-analyst"],
   },
 
@@ -319,6 +373,19 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   },
 
   {
+    label: "Manage leave",
+    path: "/hr/leave-management/",
+    icon: "FileSpreadsheet",
+    roles: ["hr"],
+  },
+   {
+    label: "Manage leave Approval",
+    path: "/hr/leave-management/approvals",
+    icon: "FileSpreadsheet",
+    roles: ["hr"],
+  },
+
+  {
     label: "Manage Users",
     path: "/hr/users",
     icon: "UsersRound",
@@ -363,6 +430,19 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     label: "Manage Teams",
     path: "/admin/teams",
     icon: "Network",
+    roles: ["admin"],
+  },
+
+  {
+    label: "Manage leave",
+    path: "/admin/leave-management/",
+    icon: "FileSpreadsheet",
+    roles: ["admin"],
+  },
+   {
+    label: "Manage leave Approval",
+    path: "/admin/leave-management/approvals",
+    icon: "FileSpreadsheet",
     roles: ["admin"],
   },
 
