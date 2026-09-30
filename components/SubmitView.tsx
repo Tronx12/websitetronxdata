@@ -47,7 +47,7 @@
 // function Score({label,value}:{label:string,value:number}){return <div className="rounded-lg bg-white p-3 text-center shadow-sm"><div className="text-[10px] font-bold uppercase text-slate-400">{label}</div><div className={`text-2xl font-bold ${value>=65?"text-success":value>=50?"text-orange-600":"text-danger"}`}>{value}/100</div></div>}
 
 
-use client";
+"use client";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, ImagePlus, Lightbulb, Loader2, Search, Send, Sparkles, X } from "lucide-react";
 import { api } from "@/lib/api";
