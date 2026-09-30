@@ -1022,7 +1022,7 @@ export default function SubmitView({
   return (
     <div className="mx-auto w-full max-w-3xl">
       {/* HEADER */}
-      <div className="rounded-t-2xl bg-brand px-5 py-5 text-center text-white">
+      <div className="rounded-t-2xl bg-black px-5 py-5 text-center text-white">
         <h3 className="text-xl font-bold">
           📋 Submit Open-End Response
         </h3>

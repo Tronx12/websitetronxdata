@@ -1,6 +1,15 @@
+
+
+
 // import { cookies } from "next/headers";
+
 // import { UserRole } from "@/types/role";
-// import { verifyAccessToken, verifyRefreshToken } from "./auth";
+
+// import {
+//   verifyAccessToken,
+//   verifyRefreshToken,
+// } from "./auth";
+
 // import { connectDB } from "@/config/db";
 // import Auth from "@/models/Auth";
 
@@ -11,40 +20,73 @@
 //   name?: string;
 // } | null> {
 //   const cookieStore = await cookies();
-//   const accessToken = cookieStore.get("access_token")?.value;
-//   const refreshToken = cookieStore.get("refresh_token")?.value;
 
-//   // 1. Try access token first — the common, fast path
+//   const accessToken =
+//     cookieStore.get("access_token")?.value;
+
+//   const refreshToken =
+//     cookieStore.get("refresh_token")?.value;
+
+//   // =====================================================
+//   // ACCESS TOKEN
+//   // =====================================================
+
 //   if (accessToken) {
 //     try {
-//       const payload = verifyAccessToken(accessToken);
+//       const payload =
+//         verifyAccessToken(accessToken);
+
 //       if (payload.type === "access") {
+//         await connectDB();
+
+//         const user = await Auth.findById(
+//           payload.userId
+//         )
+//           .select("_id name email role")
+//           .lean();
+
+//         if (!user) {
+//           return null;
+//         }
+
 //         return {
-//           userId: payload.userId,
-//           role: payload.role as UserRole,
-//           email: payload.email,
+//           userId: user._id.toString(),
+//           role: user.role as UserRole,
+//           email: user.email,
+//           name: user.name,
 //         };
 //       }
 //     } catch {
-//       // Expired or invalid — fall through to refresh
+//       // Access token invalid/expired.
+//       // Continue to refresh token.
 //     }
 //   }
 
-//   // 2. Fall back to refresh token — look up the real user, never guess the role
+//   // =====================================================
+//   // REFRESH TOKEN
+//   // =====================================================
+
 //   if (refreshToken) {
 //     try {
-//       const payload = verifyRefreshToken(refreshToken);
-//       if (payload.type !== "refresh") return null;
+//       const payload =
+//         verifyRefreshToken(refreshToken);
+
+//       if (payload.type !== "refresh") {
+//         return null;
+//       }
 
 //       await connectDB();
-//       const user = await Auth.findById(payload.userId);
-//       if (!user) return null;
 
-//       // This only *reads* the user for the current render — it doesn't
-//       // rotate the access_token cookie, since cookies() can be read-only
-//       // here (e.g. called from a Server Component like a layout).
-//       // Actual cookie rotation happens in /api/auth/refresh, which is a
-//       // Route Handler and is allowed to set cookies.
+//       const user = await Auth.findById(
+//         payload.userId
+//       )
+//         .select("_id name email role")
+//         .lean();
+
+//       if (!user) {
+//         return null;
+//       }
+
 //       return {
 //         userId: user._id.toString(),
 //         role: user.role as UserRole,
@@ -58,7 +100,6 @@
 
 //   return null;
 // }
-
 
 import { cookies } from "next/headers";
 
@@ -80,6 +121,9 @@ export async function getCurrentUser(): Promise<{
 } | null> {
   const cookieStore = await cookies();
 
+  // IMPORTANT:
+  // These cookie names must exactly match the cookies
+  // created by the login API.
   const accessToken =
     cookieStore.get("access_token")?.value;
 
@@ -92,19 +136,25 @@ export async function getCurrentUser(): Promise<{
 
   if (accessToken) {
     try {
-      const payload =
-        verifyAccessToken(accessToken);
+      const payload = verifyAccessToken(accessToken);
 
       if (payload.type === "access") {
         await connectDB();
 
-        const user = await Auth.findById(
-          payload.userId
-        )
-          .select("_id name email role")
+        // IMPORTANT:
+        // Use the userId from the JWT only to identify the user.
+        // Always read the CURRENT role from MongoDB.
+        const user = await Auth.findById(payload.userId)
+          .select("_id name email role isActive")
           .lean();
 
         if (!user) {
+          return null;
+        }
+
+        // If admin deactivates the account, immediately
+        // treat the session as unauthorized.
+        if (user.isActive !== true) {
           return null;
         }
 
@@ -117,7 +167,7 @@ export async function getCurrentUser(): Promise<{
       }
     } catch {
       // Access token invalid/expired.
-      // Continue to refresh token.
+      // Continue with refresh token.
     }
   }
 
@@ -127,8 +177,7 @@ export async function getCurrentUser(): Promise<{
 
   if (refreshToken) {
     try {
-      const payload =
-        verifyRefreshToken(refreshToken);
+      const payload = verifyRefreshToken(refreshToken);
 
       if (payload.type !== "refresh") {
         return null;
@@ -136,13 +185,19 @@ export async function getCurrentUser(): Promise<{
 
       await connectDB();
 
-      const user = await Auth.findById(
-        payload.userId
-      )
-        .select("_id name email role")
+      // IMPORTANT:
+      // Read the CURRENT role from MongoDB here too.
+      // Never use a stale role from an old access token.
+      const user = await Auth.findById(payload.userId)
+        .select("_id name email role isActive")
         .lean();
 
       if (!user) {
+        return null;
+      }
+
+      // Account must still be active.
+      if (user.isActive !== true) {
         return null;
       }
 

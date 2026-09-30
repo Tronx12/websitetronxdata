@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Upload,
   Download,
@@ -10,11 +10,11 @@ import {
   FileSpreadsheet,
   Pencil,
   Trash2,
-  ArrowLeft,
   Users,
   User,
   X,
   Save,
+  RefreshCw,
 } from "lucide-react";
 import { SUGGESTED_FIELDS, SurveyCategory } from "@/lib/survey-fields";
 
@@ -33,7 +33,7 @@ interface SurveyItem {
   data: Record<string, string>;
   createdAt: string;
   updatedAt: string;
-  createdBy?: string;
+  createdBy?: any; // id string, or populated { _id, name, email }
 }
 
 interface TeamMemberSummary {
@@ -74,6 +74,12 @@ const CATEGORY_BADGE_CLASS: Record<SurveyCategory, string> = {
   B2C: "bg-emerald-100 text-emerald-800",
 };
 
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "member";
+
 interface SurveyPageTeamLeadProps {
   currentUserId: string;
   currentUserName?: string;
@@ -82,17 +88,12 @@ interface SurveyPageTeamLeadProps {
 /**
  * Team Lead survey page.
  *
- * Unlike the Admin view (which browses ALL testers and does not submit its
- * own survey data), a Team Lead:
- *   1. Submits/pastes their OWN survey data (MY_DATA tab), and
- *   2. Can view the survey data submitted by the members of THEIR OWN team
- *      only (TEAM_DATA tab) — not every tester in the system.
+ *  - "My Survey Data": the lead submits and browses their OWN records.
+ *  - "My Team's Survey Data": shows ALL team members' records straight away.
+ *    A member dropdown narrows it to one person.
  *
- * The "team member" restriction is enforced by passing the current team
- * lead's id as `teamLeadId` to /api/survey/team-members. The backend is
- * expected to resolve that to "users whose manager/teamLeadId === this id"
- * (or however your reporting-line relationship is modeled) rather than
- * returning every tester, the way /api/survey/testers does for Admin.
+ * Download Excel always follows what is on screen: whose data (mine / whole
+ * team / one member), the category tab, the search text and the selected day.
  */
 export default function SurveyPageTeamLead({
   currentUserId,
@@ -112,122 +113,227 @@ export default function SurveyPageTeamLead({
     type: "success" | "error";
     text: string;
   } | null>(null);
-
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [categoryCounts, setCategoryCounts] = useState({
-  B2B: 0,
-  B2H: 0,
-  B2C: 0,
-});
+    B2B: 0,
+    B2H: 0,
+    B2C: 0,
+  });
 
+
+  // Team
   const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
   const [teamLoading, setTeamLoading] = useState(false);
-  const [teamSearch, setTeamSearch] = useState("");
+  // null = whole team
   const [selectedMember, setSelectedMember] = useState<TeamMemberSummary | null>(null);
 
   const [editingItem, setEditingItem] = useState<SurveyItem | null>(null);
   const [editForm, setEditForm] = useState<Partial<SurveyItem>>({});
   const [editSaving, setEditSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /* ==================================================
+     SEARCH
+  ================================================== */
+  // useEffect(() => {
+  //   const value = searchInput.trim();
+
+  //   // Do not request the API for every keystroke.
+  //   const timer = window.setTimeout(() => {
+  //     setSearchLoading(value !== search);
+
+  //     setSearch((current) => {
+  //       if (current === value) {
+  //         setSearchLoading(false);
+  //         return current;
+  //       }
+
+  //       setPage(1);
+  //       return value;
+  //     });
+  //   }, 350);
+
+  //   return () => window.clearTimeout(timer);
+  // }, [searchInput, search]);
+
+  // Keep the visible input in sync when the active screen changes.
+  /* ==================================================
+   SEARCH (debounced)
+================================================== */
+  useEffect(() => {
+    const value = searchInput.trim();
+
+    // Already applied: nothing to wait for.
+    if (value === search) {
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSearch(value);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput, search]);
+
+  // useEffect(() => {
+  //   setSearchInput(search);
+  // }, [mainTab]);
 
 
+  // Ignore responses from outdated requests (fast tab / member switching).
+  const dataRequestId = useRef(0);
+
+  const memberNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    teamMembers.forEach((m) => map.set(String(m._id), m.name));
+    return map;
+  }, [teamMembers]);
+
+  const teamTotalRecords = useMemo(
+    () => teamMembers.reduce((sum, m) => sum + (m.totalRecords || 0), 0),
+    [teamMembers]
+  );
+
+  /**
+   * One place that decides WHOSE data every request (records, counts, days,
+   * export) is about, so the screen and the Excel file can never disagree.
+   *
+   *  My Survey Data            -> createdBy = me
+   *  Team, one member picked   -> createdBy = that member
+   *  Team, nobody picked       -> scope = team  (server resolves the team)
+   */
+  const applyScope = useCallback(
+    (params: URLSearchParams) => {
+      if (mainTab === "MY_DATA") {
+        params.set("createdBy", String(currentUserId));
+        return;
+      }
+
+      if (selectedMember?._id) {
+        params.set("createdBy", String(selectedMember._id));
+        return;
+      }
+
+      params.set("scope", "team");
+    },
+    [mainTab, selectedMember, currentUserId]
+  );
+
+  // ---------- Category counts ----------
   const fetchCategoryCounts = useCallback(async () => {
-  try {
-    const categories = ["B2B", "B2H", "B2C"] as const;
+    try {
+      const categories = ["B2B", "B2H", "B2C"] as const;
 
-    const results = await Promise.all(
-      categories.map(async (category) => {
-        const params = new URLSearchParams({
-          page: "1",
-          limit: "1",
-          sortBy: "createdAt",
-          sortOrder: "desc",
-          category,
-        });
+      const results = await Promise.all(
+        categories.map(async (category) => {
+          const params = new URLSearchParams();
+          params.set("page", "1");
+          params.set("limit", "1");
+          params.set("sortBy", "createdAt");
+          params.set("sortOrder", "desc");
+          params.set("category", category);
 
-        // My own survey data
-        if (mainTab === "MY_DATA") {
-          params.set("createdBy", currentUserId);
-        }
+          applyScope(params);
 
-        // Selected team member's survey data
-        if (mainTab === "TEAM_DATA" && selectedMember) {
-          params.set("createdBy", selectedMember._id);
-        }
+          const cleanSearch = search.trim();
+          if (cleanSearch) {
+            params.set("search", cleanSearch);
+          }
 
-        // Keep search consistent with displayed records
-        if (search.trim()) {
-          params.set("search", search.trim());
-        }
+          const res = await fetch(`/api/survey?${params.toString()}`, {
+            method: "GET",
+            cache: "no-store",
+          });
 
-        const res = await fetch(`/api/survey?${params.toString()}`);
+          if (!res.ok) {
+            throw new Error(`Failed to fetch ${category} count`);
+          }
 
-        if (!res.ok) {
-          throw new Error(`Failed to fetch ${category} count`);
-        }
+          const json = await res.json();
 
-        const json = await res.json();
+          return {
+            category,
+            count: json.success ? Number(json.pagination?.total) || 0 : 0,
+          };
+        })
+      );
 
-        return {
-          category,
-          count: json.success ? json.pagination?.total || 0 : 0,
-        };
-      })
-    );
-
-    setCategoryCounts({
-      B2B: results.find((r) => r.category === "B2B")?.count || 0,
-      B2H: results.find((r) => r.category === "B2H")?.count || 0,
-      B2C: results.find((r) => r.category === "B2C")?.count || 0,
-    });
-  } catch (error) {
-    console.error("Failed to fetch category counts:", error);
-  }
-}, [
-  mainTab,
-  currentUserId,
-  selectedMember,
-  search,
-]);
+      setCategoryCounts({
+        B2B: results.find((r) => r.category === "B2B")?.count || 0,
+        B2H: results.find((r) => r.category === "B2H")?.count || 0,
+        B2C: results.find((r) => r.category === "B2C")?.count || 0,
+      });
+    } catch (error) {
+      console.error("Failed to fetch category counts:", error);
+    }
+  }, [applyScope, search]);
 
   // ---------- Fetch records ----------
   const fetchData = useCallback(async () => {
+    const requestId = ++dataRequestId.current;
+
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: "20",
-        sortBy,
-        sortOrder,
-      });
-      if (activeTab !== "ALL") params.set("category", activeTab);
-      if (search.trim()) params.set("search", search.trim());
 
-      if (mainTab === "MY_DATA") {
-        params.set("createdBy", currentUserId);
-      } else if (mainTab === "TEAM_DATA" && selectedMember) {
-        params.set("createdBy", selectedMember._id);
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", "20");
+      params.set("sortBy", sortBy);
+      params.set("sortOrder", sortOrder);
+
+      applyScope(params);
+
+      if (activeTab !== "ALL") {
+        params.set("category", activeTab);
       }
 
-      const res = await fetch(`/api/survey?${params}`);
+      const cleanSearch = search.trim();
+      if (cleanSearch) {
+        params.set("search", cleanSearch);
+      }
+
+      const res = await fetch(`/api/survey?${params.toString()}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+
       const json = await res.json();
 
-      if (json.success) {
-        setItems(json.data);
-        setTotalPages(json.pagination.totalPages);
-        setTotal(json.pagination.total);
+      if (requestId !== dataRequestId.current) return;
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Failed to fetch survey data");
       }
+
+      const pagination = json.pagination || {};
+
+      setItems(Array.isArray(json.data) ? json.data : []);
+      setTotal(Number(pagination.total) || 0);
+      setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
     } catch (err) {
-      console.error(err);
+      if (requestId !== dataRequestId.current) return;
+
+      console.error("Survey fetch error:", err);
+      setItems([]);
+      setTotalPages(1);
+      setTotal(0);
     } finally {
-      setLoading(false);
+      if (requestId === dataRequestId.current) {
+        setLoading(false);
+        setSearchLoading(false);
+      }
     }
-  }, [activeTab, page, sortBy, sortOrder, search, mainTab, currentUserId, selectedMember]);
+  }, [applyScope, activeTab, page, sortBy, sortOrder, search]);
 
   // ---------- Fetch team members (scoped to this team lead only) ----------
   const fetchTeamMembers = useCallback(async () => {
@@ -236,7 +342,6 @@ export default function SurveyPageTeamLead({
       const params = new URLSearchParams({
         teamLeadId: currentUserId, // restrict results to members reporting to this team lead
       });
-      if (teamSearch.trim()) params.set("search", teamSearch.trim());
 
       const res = await fetch(`/api/survey/team-members?${params}`);
       const json = await res.json();
@@ -249,34 +354,24 @@ export default function SurveyPageTeamLead({
     } finally {
       setTeamLoading(false);
     }
-  }, [teamSearch, currentUserId]);
+  }, [currentUserId]);
 
-  // useEffect(() => {
-  //   if (mainTab === "MY_DATA" || (mainTab === "TEAM_DATA" && selectedMember)) {
-  //     fetchData();
-  //   }
-  // }, [fetchData, mainTab, selectedMember]);
-
-  useEffect(() => {
-  if (
-    mainTab === "MY_DATA" ||
-    (mainTab === "TEAM_DATA" && selectedMember)
-  ) {
+  const refreshAll = () => {
     fetchData();
     fetchCategoryCounts();
-  }
-}, [
-  fetchData,
-  fetchCategoryCounts,
-  mainTab,
-  selectedMember,
-]);
+    if (mainTab === "TEAM_DATA") fetchTeamMembers();
+  };
 
   useEffect(() => {
-    if (mainTab === "TEAM_DATA" && !selectedMember) {
+    fetchData();
+    fetchCategoryCounts();
+  }, [fetchData, fetchCategoryCounts]);
+
+  useEffect(() => {
+    if (mainTab === "TEAM_DATA") {
       fetchTeamMembers();
     }
-  }, [mainTab, selectedMember, fetchTeamMembers]);
+  }, [mainTab, fetchTeamMembers]);
 
   const blockPreviewCount = useMemo(() => {
     if (!paste.trim()) return 0;
@@ -304,7 +399,6 @@ export default function SurveyPageTeamLead({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paste,
-          // createdBy: currentUserId,
         }),
       });
 
@@ -313,14 +407,11 @@ export default function SurveyPageTeamLead({
       if (json.success) {
         setMessage({
           type: "success",
-          text: `${json.message}${
-            json.errors?.length ? ` (${json.errors.length} block(s) skipped)` : ""
-          }`,
+          text: `${json.message}${json.errors?.length ? ` (${json.errors.length} block(s) skipped)` : ""
+            }`,
         });
         setPaste("");
-        setMainTab("MY_DATA");
-        setSelectedMember(null);
-        fetchData();
+        refreshAll();
       } else {
         setMessage({ type: "error", text: json.message || "Save failed" });
       }
@@ -333,30 +424,83 @@ export default function SurveyPageTeamLead({
       setSaving(false);
     }
   };
+  const searchPending = searchInput.trim() !== search;
+  // ---------- Export (follows the current selection) ----------
+  const exportScopeLabel =
+    mainTab === "MY_DATA"
+      ? "My data"
+      : selectedMember
+        ? selectedMember.name
+        : "All team members";
 
-  // ---------- Export ----------
+  const exportLabel = [
+    exportScopeLabel,
+    activeTab === "ALL" ? "All categories" : activeTab,
+    search.trim() ? `Search: "${search.trim()}"` : "All matching records",
+  ].join(" • ");
+
   // const handleExport = async () => {
   //   try {
-  //     setExporting(true);
-  //     const params = new URLSearchParams();
-  //     if (activeTab !== "ALL") params.set("category", activeTab);
-  //     if (mainTab === "MY_DATA") {
-  //       params.set("createdBy", currentUserId);
-  //     } else if (selectedMember) {
-  //       params.set("createdBy", selectedMember._id);
+  //     if (searchPending) {
+  //       alert("Search is still updating. Please wait a moment and try again.");
+  //       return;
+  //     }
+  //     if (total <= 0) {
+  //       alert("No records available for the current filters.");
+  //       return;
   //     }
 
-  //     const res = await fetch(`/api/survey/export?${params}`);
-  //     if (!res.ok) throw new Error("Export failed");
+  //     setExporting(true);
+
+  //     const params = new URLSearchParams();
+  //     applyScope(params);
+
+  //     if (activeTab !== "ALL") {
+  //       params.set("category", activeTab);
+  //     }
+
+  //     const cleanSearch = search.trim();
+  //     if (cleanSearch) {
+  //       params.set("search", cleanSearch);
+  //     }
+
+  //     // Export all matching records, not only the current page.
+  //     params.set("range", "all");
+
+  //     const res = await fetch(`/api/survey/export?${params.toString()}`, {
+  //       method: "GET",
+  //       cache: "no-store",
+  //     });
+
+  //     if (!res.ok) {
+  //       const errorText = await res.text();
+  //       console.error("Survey export error:", errorText);
+  //       throw new Error("Export failed");
+  //     }
 
   //     const blob = await res.blob();
   //     const url = window.URL.createObjectURL(blob);
   //     const a = document.createElement("a");
+
+  //     const scopeSlug =
+  //       mainTab === "MY_DATA"
+  //         ? "mine"
+  //         : selectedMember
+  //           ? slug(selectedMember.name)
+  //           : "team";
+
+  //     const searchSlug = cleanSearch ? `-${slug(cleanSearch).slice(0, 50)}` : "";
+
   //     a.href = url;
-  //     a.download = `survey-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
+  //     a.download = `survey-${scopeSlug}-${activeTab.toLowerCase()}${searchSlug}-all.xlsx`;
+
+  //     document.body.appendChild(a);
   //     a.click();
+  //     a.remove();
+
   //     window.URL.revokeObjectURL(url);
-  //   } catch (err) {
+  //   } catch (error) {
+  //     console.error(error);
   //     alert("Failed to download Excel");
   //   } finally {
   //     setExporting(false);
@@ -365,95 +509,134 @@ export default function SurveyPageTeamLead({
 
   const handleExport = async () => {
   try {
+    const cleanSearch = search.trim();
+
+    if (searchPending) {
+      alert("Search is still updating. Please wait a moment.");
+      return;
+    }
+
+    if (total <= 0) {
+      alert(
+        cleanSearch
+          ? `No records found for search: "${cleanSearch}"`
+          : "No records available for the current filters."
+      );
+      return;
+    }
+
     setExporting(true);
 
-    const params =
-      new URLSearchParams();
+    const params = new URLSearchParams();
 
-    if (
-      activeTab !== "ALL"
-    ) {
-      params.set(
-        "category",
-        activeTab
-      );
+    // IMPORTANT:
+    // Use exactly the same scope currently displayed on screen.
+    applyScope(params);
+
+    // Current category filter
+    if (activeTab !== "ALL") {
+      params.set("category", activeTab);
+    }
+
+    // Current search filter
+    if (cleanSearch) {
+      params.set("search", cleanSearch);
     }
 
     /*
-     * DO NOT send createdBy.
+     * IMPORTANT:
+     * Do NOT send page or limit.
      *
-     * Backend automatically gets:
-     * logged-in Team Lead
-     * +
-     * all members of his team
+     * The export API must download ALL records
+     * matching the current search/filter.
      */
-    const res =
-      await fetch(
-        `/api/survey/export?${params.toString()}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
+    params.set("range", "all");
+
+    console.log(
+      "EXPORT FILTER:",
+      Object.fromEntries(params.entries())
+    );
+
+    const res = await fetch(
+      `/api/survey/export?${params.toString()}`,
+      {
+        method: "GET",
+        cache: "no-store",
+      }
+    );
 
     if (!res.ok) {
-      const errorText =
-        await res.text();
+      const errorText = await res.text();
 
       console.error(
-        "Team Lead export error:",
+        "Survey export failed:",
+        res.status,
         errorText
       );
 
       throw new Error(
-        "Export failed"
+        `Export failed (${res.status})`
       );
     }
 
-    const blob =
-      await res.blob();
+    const blob = await res.blob();
 
-    const url =
-      window.URL.createObjectURL(
-        blob
-      );
+    if (!blob.size) {
+      throw new Error("Downloaded Excel file is empty.");
+    }
 
-    const a =
-      document.createElement(
-        "a"
-      );
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+
+    const scopeSlug =
+      mainTab === "MY_DATA"
+        ? "mine"
+        : selectedMember
+          ? slug(selectedMember.name)
+          : "team";
+
+    const searchSlug = cleanSearch
+      ? `-${slug(cleanSearch).slice(0, 50)}`
+      : "";
+
+    const categorySlug =
+      activeTab === "ALL"
+        ? "all"
+        : activeTab.toLowerCase();
 
     a.href = url;
 
     a.download =
-      `survey-team-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
+      `survey-${scopeSlug}-${categorySlug}` +
+      `${searchSlug}-full-data.xlsx`;
 
-    document.body.appendChild(
-      a
-    );
-
+    document.body.appendChild(a);
     a.click();
-
     a.remove();
 
-    window.URL.revokeObjectURL(
-      url
+    window.URL.revokeObjectURL(url);
+
+    console.log(
+      `Excel downloaded successfully. ` +
+      `Expected matching records: ${total}`
     );
 
   } catch (error) {
     console.error(
+      "Excel download error:",
       error
     );
 
     alert(
-      "Failed to download Excel"
+      error instanceof Error
+        ? error.message
+        : "Failed to download Excel"
     );
-
   } finally {
     setExporting(false);
   }
 };
-
   const handleWorkReport = async (range: "weekly" | "monthly") => {
     try {
       setReportLoading(range);
@@ -516,7 +699,7 @@ export default function SurveyPageTeamLead({
 
       if (json.success) {
         setEditingItem(null);
-        fetchData();
+        refreshAll();
         setMessage({ type: "success", text: "Record updated successfully" });
       } else {
         setMessage({ type: "error", text: json.message || "Update failed" });
@@ -543,10 +726,7 @@ export default function SurveyPageTeamLead({
       const json = await res.json();
 
       if (json.success) {
-        fetchData();
-        if (mainTab === "TEAM_DATA" && !selectedMember) {
-          fetchTeamMembers();
-        }
+        refreshAll();
         setMessage({ type: "success", text: "Record deleted successfully" });
       } else {
         setMessage({ type: "error", text: json.message || "Delete failed" });
@@ -579,11 +759,50 @@ export default function SurveyPageTeamLead({
     });
   };
 
+  // Who submitted this record. Show it for every record.
+  const getSubmitterInfo = (
+    item: SurveyItem
+  ): { name: string; email?: string } => {
+    const raw = item.createdBy;
+
+    if (raw && typeof raw === "object") {
+      const id = String(raw._id || "");
+      return {
+        name:
+          raw.name ||
+          raw.fullName ||
+          raw.username ||
+          memberNameById.get(id) ||
+          (id === String(currentUserId) ? currentUserName : "") ||
+          "Unknown user",
+        email: raw.email || undefined,
+      };
+    }
+
+    const id = String(raw || "");
+
+    if (id === String(currentUserId)) {
+      return { name: currentUserName || "Me" };
+    }
+
+    const member = teamMembers.find((m) => String(m._id) === id);
+
+    if (member) {
+      return {
+        name: member.name || member.email || "Unknown user",
+        email: member.email || undefined,
+      };
+    }
+
+    return { name: id ? `User ${id.slice(-6)}` : "Unknown user" };
+  };
+
   // ---------- Record card ----------
   const renderRecordCard = (item: SurveyItem) => {
     const hasHeader = item.accountType || item.projectNo || item.description;
     const hasMeta =
       item.pid || item.supplierId || item.country || item.ip || item.status;
+    const submitter = getSubmitterInfo(item);
 
     return (
       <div key={item._id} className="px-4 py-4 hover:bg-gray-50">
@@ -593,6 +812,18 @@ export default function SurveyPageTeamLead({
               className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${CATEGORY_BADGE_CLASS[item.category]}`}
             >
               {item.category}
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100"
+              title={submitter.email || "Submitted by user"}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>{submitter.name}</span>
+              {submitter.email && (
+                <span className="font-normal text-indigo-500">
+                  • {submitter.email}
+                </span>
+              )}
             </span>
             {hasHeader && (
               <span className="text-sm font-medium text-gray-800">
@@ -605,7 +836,17 @@ export default function SurveyPageTeamLead({
 
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 whitespace-nowrap">
-              {new Date(item.createdAt).toLocaleDateString()}
+              {new Date(item.createdAt).toLocaleDateString("en-GB", {
+                weekday: "short",
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+              {", "}
+              {new Date(item.createdAt).toLocaleTimeString("en-GB", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
 
             <button
@@ -630,7 +871,7 @@ export default function SurveyPageTeamLead({
           </div>
         </div>
 
-        {Object.keys(item.data).length > 0 && (
+        {Object.keys(item.data || {}).length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2">
             {Object.entries(item.data).map(([k, v]) => (
               <span key={k} className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
@@ -685,43 +926,59 @@ export default function SurveyPageTeamLead({
             Welcome, {currentUserName}. Manage your own survey data and your team&apos;s data • Edit & Delete enabled
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => handleWorkReport("weekly")}
-            disabled={reportLoading !== null}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
-          >
-            {reportLoading === "weekly" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="w-4 h-4" />
-            )}
-            Weekly Work Report
-          </button>
-          <button
-            onClick={() => handleWorkReport("monthly")}
-            disabled={reportLoading !== null}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
-          >
-            {reportLoading === "monthly" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="w-4 h-4" />
-            )}
-            Monthly Work Report
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={exporting || total === 0}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
-          >
-            {exporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            Download Excel
-          </button>
+        <div className="flex flex-col items-start sm:items-end gap-1">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => handleWorkReport("weekly")}
+              disabled={reportLoading !== null}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
+            >
+              {reportLoading === "weekly" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Weekly Work Report
+            </button>
+            <button
+              onClick={() => handleWorkReport("monthly")}
+              disabled={reportLoading !== null}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
+            >
+              {reportLoading === "monthly" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Monthly Work Report
+            </button>
+            {/* <button
+              onClick={handleExport}
+              disabled={exporting || total === 0}
+              title={`Exports: ${exportLabel}`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+            > */}
+            <button
+              onClick={handleExport}
+              disabled={exporting || total === 0 || searchPending || loading}
+              title={
+                searchPending
+                  ? "Search is still updating..."
+                  : `Exports: ${exportLabel}`
+              }
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Download Excel
+            </button>
+          </div>
+          <p className="text-xs text-gray-500">
+            Excel will contain: <span className="font-medium">{exportLabel}</span>
+          </p>
         </div>
       </div>
 
@@ -733,12 +990,13 @@ export default function SurveyPageTeamLead({
             setSelectedMember(null);
             setPage(1);
             setActiveTab("ALL");
+            // setSearchInput(search);
+            // setSearch(search);
           }}
-          className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-            mainTab === "MY_DATA"
+          className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${mainTab === "MY_DATA"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
+            }`}
         >
           <User className="w-4 h-4" />
           My Survey Data
@@ -749,12 +1007,13 @@ export default function SurveyPageTeamLead({
             setSelectedMember(null);
             setPage(1);
             setActiveTab("ALL");
+            setSearchInput(search);
+            setSearch(search);
           }}
-          className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-            mainTab === "TEAM_DATA"
+          className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${mainTab === "TEAM_DATA"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
+            }`}
         >
           <Users className="w-4 h-4" />
           My Team&apos;s Survey Data
@@ -809,11 +1068,10 @@ export default function SurveyPageTeamLead({
 
           {message && (
             <div
-              className={`mt-4 p-3 rounded-lg text-sm ${
-                message.type === "success"
+              className={`mt-4 p-3 rounded-lg text-sm ${message.type === "success"
                   ? "bg-green-50 text-green-800"
                   : "bg-red-50 text-red-800"
-              }`}
+                }`}
             >
               {message.text}
             </div>
@@ -841,238 +1099,254 @@ export default function SurveyPageTeamLead({
 
       {/* Content */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Team Member List (scoped to this team lead's team only) */}
-        {mainTab === "TEAM_DATA" && !selectedMember && (
-          <>
-            <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search team member by name or email..."
-                  value={teamSearch}
-                  onChange={(e) => setTeamSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <button
-                onClick={fetchTeamMembers}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm"
-              >
-                Refresh
-              </button>
-            </div>
+        {/* Team: member filter (all team data is already showing) */}
+        {mainTab === "TEAM_DATA" && (
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
+            <label
+              htmlFor="team-member-filter"
+              className="text-sm font-medium text-gray-700"
+            >
+              Team member
+            </label>
 
-            {teamLoading ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              </div>
-            ) : teamMembers.length === 0 ? (
-              <div className="text-center py-16 text-gray-500">
-                No team members with submitted survey data found.
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {teamMembers.map((member) => (
-                  <button
-                    key={member._id}
-                    onClick={() => {
-                      setSelectedMember(member);
-                      setPage(1);
-                      setActiveTab("ALL");
-                      setSearch("");
-                    }}
-                    className="w-full text-left px-4 py-4 hover:bg-blue-50 transition-colors flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-semibold text-sm shrink-0">
-                        {(member.name || "T").charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 truncate">
-                          {member.name || "Unknown Member"}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {member.email || "No email"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-lg font-bold text-blue-600">
-                        {member.totalRecords}
-                      </p>
-                      <p className="text-xs text-gray-400">records</p>
-                      {member.lastSubmitted && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Last: {new Date(member.lastSubmitted).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
+            <select
+              id="team-member-filter"
+              value={selectedMember?._id || ""}
+              onChange={(e) => {
+                const member =
+                  teamMembers.find(
+                    (m) => String(m._id) === String(e.target.value)
+                  ) || null;
+
+                setSelectedMember(member);
+                setPage(1);
+              }}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white min-w-[220px]"
+            >
+              <option value="">
+                All team members ({teamTotalRecords})
+              </option>
+              {teamMembers.map((member) => (
+                <option key={member._id} value={member._id}>
+                  {member.name || member.email || "Unknown"} (
+                  {member.totalRecords})
+                </option>
+              ))}
+            </select>
+
+            {selectedMember && (
+              <button
+                onClick={() => {
+                  setSelectedMember(null);
+                  setPage(1);
+                }}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Show all team
+              </button>
             )}
-          </>
+
+            <button
+              onClick={fetchTeamMembers}
+              disabled={teamLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-gray-300 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${teamLoading ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+
+            <span className="text-sm text-gray-600 sm:ml-auto">
+              Viewing{" "}
+              <strong>
+                {selectedMember ? selectedMember.name : "all team members"}
+              </strong>
+              {selectedMember?.email && (
+                <span className="ml-1 text-gray-400">
+                  ({selectedMember.email})
+                </span>
+              )}
+            </span>
+          </div>
         )}
 
-        {/* Records (My Data or selected team member) */}
-        {(mainTab === "MY_DATA" || (mainTab === "TEAM_DATA" && selectedMember)) && (
-          <>
-            {mainTab === "TEAM_DATA" && selectedMember && (
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    setSelectedMember(null);
-                    setPage(1);
-                  }}
-                  className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to my team
-                </button>
-                <span className="text-sm text-gray-600">
-                  Viewing data of <strong>{selectedMember.name}</strong> (
-                  {selectedMember.totalRecords} total records)
-                </span>
-              </div>
-            )}
+        {/* Category tabs */}
+        <div className="flex border-b border-gray-200 overflow-x-auto">
+          {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => {
+            const count = tab === "ALL" ? total : categoryCounts[tab];
 
-            {/* Category tabs */}
-            {/* <div className="flex border-b border-gray-200 overflow-x-auto">
-              {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => {
-                    setActiveTab(tab);
-                    setPage(1);
-                  }}
-                  className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                    activeTab === tab
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700"
+            return (
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+                  setPage(1);
+                }}
+                className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
                   }`}
+              >
+                <span>{tab}</span>
+
+                <span
+                  className={`ml-1.5 inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-semibold ${activeTab === tab
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-600"
+                    }`}
                 >
-                  {tab}
-                </button>
-              ))}
-            </div> */}
-            {/* Category tabs */}
-<div className="flex border-b border-gray-200 overflow-x-auto">
-  {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => {
-    const count =
-      tab === "ALL"
-        ? total
-        : categoryCounts[tab];
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-    return (
-      <button
-        key={tab}
-        onClick={() => {
-          setActiveTab(tab);
-          setPage(1);
-        }}
-        className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-          activeTab === tab
-            ? "border-blue-600 text-blue-600"
-            : "border-transparent text-gray-500 hover:text-gray-700"
-        }`}
-      >
-        <span>{tab}</span>
+        {/* Search + Sort */}
+        <div className="p-4 flex flex-col sm:flex-row gap-3 border-b border-gray-100">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
 
-        <span
-          className={`ml-1.5 inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-semibold ${
-            activeTab === tab
-              ? "bg-blue-100 text-blue-700"
-              : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          {count}
-        </span>
-      </button>
-    );
-  })}
-</div>
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearchInput("");
+                  setSearch("");
+                  setPage(1);
+                  setSearchLoading(false);
+                }
+              }}
+              placeholder="Search user name, email, PID, project, supplier, country, IP, status, TNX, parent, child, respondent or survey fields..."
+              className="w-full pl-10 pr-20 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              aria-label="Search survey data"
+            />
 
-            {/* Search + Sort */}
-            <div className="p-4 flex flex-col sm:flex-row gap-3 border-b border-gray-100">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search PID, project no, supplier ID, country, raw text..."
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {searchLoading && (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+              )}
+
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput("");
+                    setSearch("");
                     setPage(1);
+                    setSearchLoading(false);
                   }}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                  title="Clear search"
+                  aria-label="Clear search"
                 >
-                  <option value="createdAt">Created Date</option>
-                  <option value="updatedAt">Updated Date</option>
-                  <option value="category">Category</option>
-                </select>
-                <select
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="desc">Newest first</option>
-                  <option value="asc">Oldest first</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Records */}
-            <div>
-              {loading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                </div>
-              ) : items.length === 0 ? (
-                <div className="text-center py-16 text-gray-500">
-                  No records found.
-                  {mainTab === "MY_DATA" && " Paste some data above."}
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {items.map(renderRecordCard)}
-                </div>
+                  <X className="w-4 h-4" />
+                </button>
               )}
             </div>
+          </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                <p className="text-sm text-gray-500">
-                  Page {page} of {totalPages} ({total} records)
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    disabled={page === 1}
-                    onClick={() => setPage((p) => p - 1)}
-                    className="px-3 py-1 border rounded disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    disabled={page === totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                    className="px-3 py-1 border rounded disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+          <div className="flex gap-2">
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setPage(1);
+              }}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="createdAt">Created Date</option>
+              <option value="updatedAt">Updated Date</option>
+              <option value="category">Category</option>
+            </select>
+
+            <select
+              value={sortOrder}
+              onChange={(e) => {
+                setSortOrder(e.target.value as "asc" | "desc");
+                setPage(1);
+              }}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="desc">Newest first</option>
+              <option value="asc">Oldest first</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Search fields hint */}
+        <div className="px-4 pb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <span className="font-medium text-gray-600">Search:</span>
+          {[
+            "User name",
+            "Email",
+            "IP address",
+            "Location",
+            "PID",
+            "Project",
+            "Supplier ID",
+            "Status",
+            "Survey fields",
+          ].map((label) => (
+            <span
+              key={label}
+              className="px-2 py-1 rounded-full bg-gray-50 border border-gray-200"
+            >
+              {label}
+            </span>
+          ))}
+          {search && (
+            <span className="ml-auto text-blue-600 font-medium">
+              Searching: "{search}"
+            </span>
+          )}
+        </div>
+
+
+        {/* Records */}
+        <div>
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              No records found.
+              {mainTab === "MY_DATA" && " Paste some data above."}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {items.map(renderRecordCard)}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+            <p className="text-sm text-gray-500">
+              Page {page} of {totalPages} ({total} records)
+            </p>
+            <div className="flex gap-2">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="px-3 py-1 border rounded disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="px-3 py-1 border rounded disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

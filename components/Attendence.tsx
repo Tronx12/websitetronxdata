@@ -116,56 +116,97 @@ export default function AttendencePage({ currentUserId }: Props) {
   };
 
   // ── Mark Attendance Actions ──
-  const handleAction = async (
-    action: "login" | "logout" | "lunchStart" | "lunchEnd"
-  ) => {
-    setMarking(true);
+  // const handleAction = async (
+  //   action: "login" | "logout" | "lunchStart" | "lunchEnd"
+  // ) => {
+  //   setMarking(true);
 
-    try {
-      let body: any = {
-        userId: currentUserId,
-        action,
-      };
+  //   try {
+  //     let body: any = {
+  //       userId: currentUserId,
+  //       action,
+  //     };
 
-      // Only for login → get location
-      if (action === "login") {
-        try {
-          const location = await getCurrentLocation();
-          body.latitude = location.latitude;
-          body.longitude = location.longitude;
-        } catch (locError: any) {
-          alert(locError.message || "Failed to get location");
-          setMarking(false);
-          return;
-        }
-      }
+  //     // Only for login → get location
+  //     if (action === "login") {
+  //       try {
+  //         const location = await getCurrentLocation();
+  //         body.latitude = location.latitude;
+  //         body.longitude = location.longitude;
+  //       } catch (locError: any) {
+  //         alert(locError.message || "Failed to get location");
+  //         setMarking(false);
+  //         return;
+  //       }
+  //     }
 
-      const res = await fetch("/api/attendence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+  //     const res = await fetch("/api/attendence", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(body),
+  //     });
 
-      const data = await res.json();
+  //     const data = await res.json();
 
-      if (!res.ok) {
-        alert(data.error || "Action failed");
-        return;
-      }
+  //     if (!res.ok) {
+  //       alert(data.error || "Action failed");
+  //       return;
+  //     }
 
-      if (data.remarks) {
-        alert(`${action} successful: ${data.remarks}`);
-      } else {
-        alert(`${action} successful`);
-      }
-      fetchRecords();
-    } catch (err) {
-      console.error(err);
-      alert("Something went wrong");
-    } finally {
-      setMarking(false);
+  //     if (data.remarks) {
+  //       alert(`${action} successful: ${data.remarks}`);
+  //     } else {
+  //       alert(`${action} successful`);
+  //     }
+  //     fetchRecords();
+  //   } catch (err) {
+  //     console.error(err);
+  //     alert("Something went wrong");
+  //   } finally {
+  //     setMarking(false);
+  //   }
+  // };
+  // ── Mark Attendance Actions ──
+const handleAction = async (
+  action: "login" | "logout" | "lunchStart" | "lunchEnd"
+) => {
+  setMarking(true);
+
+  try {
+    const body = {
+      userId: currentUserId,
+      action,
+    };
+
+    const res = await fetch("/api/attendence", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "Action failed");
+      return;
     }
-  };
+
+    if (data.remarks) {
+      alert(`${action} successful: ${data.remarks}`);
+    } else {
+      alert(`${action} successful`);
+    }
+
+    fetchRecords();
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong");
+  } finally {
+    setMarking(false);
+  }
+};
 
   // ── Download Excel ──
   const downloadExcel = () => {
@@ -258,10 +299,12 @@ export default function AttendencePage({ currentUserId }: Props) {
               End Lunch
             </button>
           </div>
-
           <p className="text-sm text-gray-500 mt-3">
+  Note: Attendance access is restricted to authorized office network/IP addresses.
+</p>
+          {/* <p className="text-sm text-gray-500 mt-3">
             Note: Login requires location access. Please allow location permission when prompted.
-          </p>
+          </p> */}
         </div>
 
         {/* Filters + Download */}
@@ -486,4 +529,4 @@ export default function AttendencePage({ currentUserId }: Props) {
       </div>
     </div>
   );
-}
+}
