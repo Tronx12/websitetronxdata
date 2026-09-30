@@ -45,7 +45,7 @@ const authSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["survey-tester", "team-lead", "hr", "admin"],
+      enum: ["survey-tester", "team-lead", "senior-teamlead", "data-quality-analyst", "hr", "admin"],
       default: "survey-tester",
     },
 

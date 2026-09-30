@@ -337,7 +337,7 @@ function AccessDenied() {
           {/* Refresh */}
           <a
             href="/"
-            className="mt-6 block w-full rounded-lg bg-black px-5 py-3 text-sm font-medium text-white transition hover:bg-gray-800"
+            className="mt-6 block w-full rounded-lg bg-red-400 px-5 py-3 text-sm font-medium text-white transition hover:bg-green-300"
           >
             Check Network Again
           </a>

@@ -26,11 +26,25 @@ export default function TeamsPageClient({ currentUser }: Props) {
   const fetchTeams = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/teams?search=${search}`);
+
+      const res = await fetch(
+        `/api/teams?search=${encodeURIComponent(search)}`,
+        {
+          cache: "no-store",
+        }
+      );
+
       const data = await res.json();
-      if (data.success) setTeams(data.data);
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to load teams");
+      }
+
+      setTeams(Array.isArray(data.data) ? data.data : []);
     } catch (err) {
-      toast.error("Failed to load teams");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load teams"
+      );
     } finally {
       setLoading(false);
     }
@@ -54,16 +68,76 @@ export default function TeamsPageClient({ currentUser }: Props) {
     if (!confirm("Are you sure you want to delete this team?")) return;
 
     try {
-      const res = await fetch(`/api/teams/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/teams/${id}`, {
+        method: "DELETE",
+      });
+
       const data = await res.json();
-      if (data.success) {
-        toast.success("Team deleted");
-        fetchTeams();
-      } else {
-        toast.error(data.message);
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Delete failed");
       }
-    } catch {
-      toast.error("Delete failed");
+
+      toast.success("Team deleted");
+      await fetchTeams();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
+  };
+
+  const handleStatusChange = async (id: string, isActive: boolean) => {
+    // Keep the old value so we can restore it if the API fails.
+    const previousTeam = teams.find((team) => team._id === id);
+
+    // Optimistic UI update.
+    setTeams((currentTeams) =>
+      currentTeams.map((team) =>
+        team._id === id ? { ...team, isActive } : team
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/teams/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          isActive,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to update team status");
+      }
+
+      // Use the database response when available.
+      if (data.data) {
+        setTeams((currentTeams) =>
+          currentTeams.map((team) =>
+            team._id === id ? { ...team, ...data.data } : team
+          )
+        );
+      }
+
+      toast.success(`Team ${isActive ? "activated" : "deactivated"}`);
+    } catch (err) {
+      // Restore previous UI value when database update fails.
+      if (previousTeam) {
+        setTeams((currentTeams) =>
+          currentTeams.map((team) =>
+            team._id === id ? previousTeam : team
+          )
+        );
+      }
+
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update team status"
+      );
     }
   };
 
@@ -102,6 +176,7 @@ export default function TeamsPageClient({ currentUser }: Props) {
         loading={loading}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onStatusChange={handleStatusChange}
       />
 
       <TeamFormModal

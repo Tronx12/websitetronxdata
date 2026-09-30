@@ -16,6 +16,8 @@ export const config = {
     "/admin/:path*",
     "/hr/:path*",
     "/team-lead/:path*",
+    "/senior-teamlead/:path*",
+    "/data-quality-analyst/:path*",
     "/survey-tester/:path*",
 
     // Protected API routes (everything except /api/auth/*)
@@ -61,12 +63,14 @@ async function verifyToken(token: string) {
 // Role → allowed path prefixes
 // ─────────────────────────────────────────────────────────
 
-type UserRole = "survey-tester" | "team-lead" | "hr" | "admin";
+type UserRole = "survey-tester" | "team-lead" | "senior-teamlead" | "data-quality-analyst" | "hr" | "admin";
 
 const ROLE_REDIRECT: Record<UserRole, string> = {
   admin: "/admin/survey-data",
   hr: "/hr/survey-data",
   "team-lead": "/team-lead/survey-data",
+  "senior-teamlead": "/senior-teamlead/survey-data",
+  "data-quality-analyst": "/data-quality-analyst/survey-data",
   "survey-tester": "/survey-tester/survey-data",
 };
 
@@ -83,6 +87,10 @@ function isRouteAllowedForRole(pathname: string, role: UserRole): boolean {
   if (pathname.startsWith("/hr")) return role === "hr";
 
   if (pathname.startsWith("/team-lead")) return role === "team-lead";
+
+  if (pathname.startsWith("/senior-teamlead")) return role === "senior-teamlead";
+
+  if (pathname.startsWith("/data-quality-analyst")) return role === "data-quality-analyst";
 
   if (pathname.startsWith("/survey-tester")) return role === "survey-tester";
 

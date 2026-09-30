@@ -1,11 +1,13 @@
 
 
-export type UserRole = "survey-tester" | "team-lead" | "hr" | "admin";
+export type UserRole = "survey-tester" | "team-lead" | "senior-teamlead" | "data-quality-analyst" | "hr" | "admin";
 
 export const ROLE_REDIRECT: Record<UserRole, string> = {
   admin: "/admin/survey-data",
   hr: "/hr/survey-data",
   "team-lead": "/team-lead/survey-data",
+  "senior-teamlead": "/senior-teamlead/survey-data",
+  "data-quality-analyst": "/data-quality-analyst/survey-data",
   "survey-tester": "/survey-tester/survey-data",
 };
 
@@ -18,6 +20,12 @@ export function isRouteAllowedForRole(pathname: string, role: UserRole): boolean
   }
   if (pathname === "/team-lead" || pathname.startsWith("/team-lead/")) {
     return role === "team-lead" || role === "admin";
+  }
+  if (pathname === "/senior-teamlead" || pathname.startsWith("/senior-teamlead/")) {
+    return role === "senior-teamlead" || role === "admin";
+  }
+  if (pathname === "/data-quality-analyst" || pathname.startsWith("/data-quality-analyst/")) {
+    return role === "data-quality-analyst" || role === "admin";
   }
   if (pathname === "/survey-tester" || pathname.startsWith("/survey-tester/")) {
     return role === "survey-tester" || role === "admin";
@@ -149,6 +157,140 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     path: "/team-lead/oe/OESubmissionsByDate",
     icon: "ClipboardList",
     roles: ["team-lead"],
+  },
+
+  // =========================================================
+  // SENIOR TEAM LEAD
+  // =========================================================
+
+  {
+    label: "Attendance",
+    path: "/senior-teamlead/attendence",
+    icon: "CalendarCheck",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "Manage Team Attendance",
+    path: "/senior-teamlead/attendance",
+    icon: "CalendarCog",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "Team Surveys Data",
+    path: "/senior-teamlead/survey-data",
+    icon: "Users",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "Survey Target",
+    path: "/senior-teamlead/survey-target",
+    icon: "CalendarPlus",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "Manage Teams",
+    path: "/senior-teamlead/teams",
+    icon: "Network",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "OE DQA Panel",
+    path: "/senior-teamlead/oe/dqa",
+    icon: "BadgeCheck",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "OE Performance",
+    path: "/senior-teamlead/oe/oe-performance",
+    icon: "ClipboardList",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "IP Whitelist",
+    path: "/senior-teamlead/ip-whitelist",
+    icon: "Network",
+    roles: ["senior-teamlead"],
+  },
+
+  {
+    label: "My Profile",
+    path: "/senior-teamlead/profile",
+    icon: "UserCircle",
+    roles: ["senior-teamlead"],
+  },
+
+  // =========================================================
+  // DATA QUALITY ANALYST
+  // =========================================================
+
+  {
+    label: "Attendance",
+    path: "/data-quality-analyst/attendence",
+    icon: "CalendarCheck",
+    roles: ["data-quality-analyst"],
+  },
+
+  {
+    label: "Manage Team Attendance",
+    path: "/data-quality-analyst/attendance",
+    icon: "CalendarCog",
+    roles: ["data-quality-analyst"],
+  },
+
+  {
+    label: "Team Surveys Data",
+    path: "/data-quality-analyst/survey-data",
+    icon: "Users",
+    roles: ["data-quality-analyst"],
+  },
+
+  {
+    label: "Survey Target",
+    path: "/data-quality-analyst/survey-target",
+    icon: "CalendarPlus",
+    roles: ["data-quality-analyst"],
+  },
+
+  {
+    label: "Manage Teams",
+    path: "/data-quality-analyst/teams",
+    icon: "Network",
+    roles: ["data-quality-analyst"],
+  },
+
+  {
+    label: "OE DQA Panel",
+    path: "/data-quality-analyst/oe",
+    icon: "BadgeCheck",
+    roles: ["data-quality-analyst"],
+  },
+
+  {
+    label: "OE Performance",
+    path: "/data-quality-analyst/oe/oe-performance",
+    icon: "ClipboardList",
+    roles: ["data-quality-analyst"],
+  },
+
+  {
+    label: "IP Whitelist",
+    path: "/data-quality-analyst/ip-whitelist",
+    icon: "Network",
+    roles: ["data-quality-analyst"],
+  },
+
+  {
+    label: "My Profile",
+    path: "/data-quality-analyst/profile",
+    icon: "UserCircle",
+    roles: ["data-quality-analyst"],
   },
 
   // =========================================================

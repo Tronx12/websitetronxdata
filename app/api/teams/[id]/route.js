@@ -424,4 +424,141 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+}
+
+/* =========================================================
+   PATCH UPDATE TEAM STATUS
+========================================================= */
+
+export async function PATCH(req, { params }) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    console.log("===== PATCH TEAM STATUS USER =====");
+    console.log(currentUser);
+
+    // Authentication
+    if (!currentUser?.userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unauthorized",
+        },
+        { status: 401 }
+      );
+    }
+
+    // Authorization
+    if (!["admin", "hr","senior-teamlead"].includes(currentUser.role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Forbidden",
+        },
+        { status: 403 }
+      );
+    }
+
+    const { id } = await params;
+
+    if (!id) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Team ID is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    const body = await req.json();
+
+    const { isActive } = body;
+
+    // Validate status
+    if (typeof isActive !== "boolean") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "isActive must be a boolean",
+        },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+
+    const team = await Team.findById(id);
+
+    if (!team) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Team not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Update only status
+    team.isActive = isActive;
+
+    await team.save();
+
+    // Audit log
+    await createAuditLog({
+      userId: currentUser.userId,
+      action: "UPDATE",
+      module: "Team",
+      description: `Team '${team.name}' ${
+        isActive ? "activated" : "deactivated"
+      }`,
+      entityType: "Team",
+      entityId: id,
+      metadata: {
+        name: team.name,
+        isActive,
+      },
+    });
+
+    // Return updated team
+    const updated = await Team.findById(team._id)
+      .populate(
+        "teamLead",
+        "name email role phoneNumber"
+      )
+      .populate(
+        "members",
+        "name email role phoneNumber workingShift"
+      )
+      .populate(
+        "createdBy",
+        "name email"
+      )
+      .lean();
+
+    return NextResponse.json({
+      success: true,
+      message: `Team ${
+        isActive ? "activated" : "deactivated"
+      } successfully`,
+      data: updated,
+    });
+  } catch (error) {
+    console.error(
+      "PATCH /api/teams/[id] ERROR:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update team status",
+      },
+      { status: 500 }
+    );
+  }
+}
