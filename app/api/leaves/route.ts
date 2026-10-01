@@ -28,83 +28,6 @@ import {
    Do NOT accept userId from query parameters.
 ========================================================= */
 
-// export async function GET(request: NextRequest) {
-//   try {
-//     const currentUser = await getCurrentUser();
-
-//     if (!currentUser) {
-//       return NextResponse.json(
-//         {
-//           success: false,
-//           message: "Unauthorized",
-//         },
-//         { status: 401 }
-//       );
-//     }
-
-//     await connectDB();
-
-//     const { searchParams } = new URL(request.url);
-
-//     const status = searchParams.get("status");
-
-//     const filter: {
-//       employeeId: mongoose.Types.ObjectId;
-//       status?: string;
-//     } = {
-//       employeeId: new mongoose.Types.ObjectId(
-//         currentUser.userId
-//       ),
-//     };
-
-//     /*
-//      * Optional status filter.
-//      *
-//      * Example:
-//      * /api/leaves?status=APPROVED
-//      */
-
-//     if (status) {
-//       filter.status = status;
-//     }
-
-//     const records = await Leave.find(filter)
-//       .populate(
-//         "employeeId",
-//         "name email role teamId"
-//       )
-//       .populate(
-//         "teamId",
-//         "name code"
-//       )
-//       .populate(
-//         "approvalHistory.approverId",
-//         "name email role"
-//       )
-//       .sort({
-//         createdAt: -1,
-//       })
-//       .lean();
-
-//     return NextResponse.json({
-//       success: true,
-//       data: records,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "GET /api/leaves error:",
-//       error
-//     );
-
-//     return NextResponse.json(
-//       {
-//         success: false,
-//         message: "Internal server error",
-//       },
-//       { status: 500 }
-//     );
-//   }
-// }
 
 
 export async function GET(
@@ -695,12 +618,23 @@ export async function POST(
        * More than 3 absences means no paid leave.
        */
 
-      if (!summary.eligible) {
+      if (summary.remaining <= 0) {
+        if (!summary.eligible && summary.carriedForward <= 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                "Paid leave is unavailable because you have more than 3 absent days this month and no carried-forward leaves.",
+              paidLeaveSummary: summary,
+            },
+            { status: 400 }
+          );
+        }
+
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Paid leave is unavailable because you have more than 3 absent days this month.",
+            message: "You have no paid leave days remaining.",
             paidLeaveSummary: summary,
           },
           { status: 400 }
@@ -708,17 +642,13 @@ export async function POST(
       }
 
       /*
-       * Employee gets only the remaining entitlement.
+       * Employee can apply up to their remaining total (including carried-forward).
        */
-
-      if (
-        totalDays >
-        summary.remaining
-      ) {
+      if (totalDays > summary.remaining) {
         return NextResponse.json(
           {
             success: false,
-            message: `You have only ${summary.remaining} paid leave day(s) remaining this month.`,
+            message: `You have only ${summary.remaining} paid leave day(s) available (including carried-forward leaves). You requested ${totalDays} day(s).`,
             paidLeaveSummary: summary,
           },
           { status: 400 }

@@ -242,8 +242,19 @@ const LeaveSchema = new Schema(
  */
 LeaveSchema.index({
   employeeId: 1,
+  status: 1,
   startDate: 1,
   endDate: 1,
+});
+
+LeaveSchema.index({
+  employeeId: 1,
+  createdAt: -1,
+});
+
+LeaveSchema.index({
+  status: 1,
+  createdAt: -1,
 });
 
 /**

@@ -1,9 +1,11 @@
-
 // app/page.tsx
 
 import { headers } from "next/headers";
+import Link from "next/link";
 import { connectDB } from "@/config/db";
 import IpWhitelist from "@/models/IpWhitelist";
+import { getCurrentUser } from "@/lib/getuser";
+import { ROLE_REDIRECT } from "@/types/role";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,6 @@ export const dynamic = "force-dynamic";
  */
 function isLocalIp(ip: string): boolean {
   const normalized = ip.trim().toLowerCase();
-
   return (
     normalized === "127.0.0.1" ||
     normalized === "::1" ||
@@ -22,163 +23,53 @@ function isLocalIp(ip: string): boolean {
 
 /**
  * Get public IP for LOCAL DEVELOPMENT only.
- *
- * When running:
- *
- *   http://localhost:3000
- *
- * Next.js may see:
- *
- *   127.0.0.1
- *   ::1
- *
- * instead of your public IP.
- *
- * This fallback gets the public IP of the
- * same machine running the Next.js server.
  */
 async function getDevelopmentPublicIp(): Promise<string> {
   try {
-    const response = await fetch(
-      "https://api.ipify.org",
-      {
-        cache: "no-store",
-      }
-    );
+    const response = await fetch("https://api.ipify.org", {
+      cache: "no-store",
+    });
 
     if (!response.ok) {
-      console.error(
-        "Unable to get development public IP"
-      );
-
       return "";
     }
 
-    const ip = (await response.text()).trim();
-
-    console.log(
-      "DEVELOPMENT PUBLIC IP:",
-      ip
-    );
-
-    return ip;
-  } catch (error) {
-    console.error(
-      "DEVELOPMENT PUBLIC IP ERROR:",
-      error
-    );
-
+    return (await response.text()).trim();
+  } catch {
     return "";
   }
 }
 
 /**
  * Get visitor/client IP.
- *
- * Production:
- *   x-forwarded-for
- *   x-real-ip
- *
- * Development:
- *   localhost -> public IP lookup
  */
 async function getClientIp(): Promise<string> {
   const requestHeaders = await headers();
 
-  /*
-   * x-forwarded-for
-   */
-  const forwardedFor =
-    requestHeaders.get("x-forwarded-for");
-
+  const forwardedFor = requestHeaders.get("x-forwarded-for");
   if (forwardedFor) {
-    const firstIp = forwardedFor
-      .split(",")[0]
-      .trim();
-
+    const firstIp = forwardedFor.split(",")[0].trim();
     if (firstIp) {
-      console.log(
-        "X-FORWARDED-FOR:",
-        firstIp
-      );
-
-      /*
-       * Local development.
-       */
-      if (
-        process.env.NODE_ENV !== "production" &&
-        isLocalIp(firstIp)
-      ) {
-        console.log(
-          "LOCALHOST DETECTED"
-        );
-
-        console.log(
-          "Getting public IP..."
-        );
-
+      if (process.env.NODE_ENV !== "production" && isLocalIp(firstIp)) {
         return await getDevelopmentPublicIp();
       }
-
       return firstIp;
     }
   }
 
-  /*
-   * x-real-ip
-   */
-  const realIp =
-    requestHeaders.get("x-real-ip");
-
+  const realIp = requestHeaders.get("x-real-ip");
   if (realIp) {
     const ip = realIp.trim();
-
-    console.log(
-      "X-REAL-IP:",
-      ip
-    );
-
-    /*
-     * Local development.
-     */
-    if (
-      process.env.NODE_ENV !== "production" &&
-      isLocalIp(ip)
-    ) {
-      console.log(
-        "LOCALHOST DETECTED"
-      );
-
-      console.log(
-        "Getting public IP..."
-      );
-
+    if (process.env.NODE_ENV !== "production" && isLocalIp(ip)) {
       return await getDevelopmentPublicIp();
     }
-
     return ip;
   }
 
-  /*
-   * No proxy headers.
-   *
-   * This commonly happens with localhost.
-   */
   if (process.env.NODE_ENV !== "production") {
-    console.log(
-      "NO CLIENT IP HEADER FOUND"
-    );
-
-    console.log(
-      "Getting development public IP..."
-    );
-
     return await getDevelopmentPublicIp();
   }
 
-  /*
-   * Production fail closed.
-   */
   return "";
 }
 
@@ -187,166 +78,73 @@ async function getClientIp(): Promise<string> {
  */
 async function isIpAllowed(): Promise<boolean> {
   try {
-    const clientIp =
-      await getClientIp();
+    const clientIp = await getClientIp();
 
-    console.log("");
-    console.log(
-      "========================================"
-    );
-    console.log(
-      "       TRONX IP WHITELIST CHECK"
-    );
-    console.log(
-      "========================================"
-    );
-
-    console.log(
-      "Environment:",
-      process.env.NODE_ENV
-    );
-
-    console.log(
-      "Client Public IP:",
-      clientIp
-    );
-
-    /*
-     * No IP = deny.
-     */
     if (!clientIp) {
-      console.log(
-        "RESULT: DENIED"
-      );
-
-      console.log(
-        "Reason: IP NOT FOUND"
-      );
-
-      console.log(
-        "========================================"
-      );
-
       return false;
     }
 
-    /*
-     * Connect MongoDB.
-     */
     await connectDB();
 
-    /*
-     * Find active whitelist record.
-     */
-    const whitelistRecord =
-      await IpWhitelist.findOne({
-        ipAddress: clientIp,
-        isActive: true,
-      }).lean();
+    const whitelistRecord = await IpWhitelist.findOne({
+      ipAddress: clientIp,
+      isActive: true,
+    }).lean();
 
-    const allowed =
-      Boolean(whitelistRecord);
-
-    console.log(
-      "MongoDB IP:",
-      whitelistRecord?.ipAddress ||
-        "NOT FOUND"
-    );
-
-    console.log(
-      "Network:",
-      whitelistRecord?.name ||
-        "NOT FOUND"
-    );
-
-    console.log(
-      "Active:",
-      whitelistRecord?.isActive ??
-        false
-    );
-
-    console.log(
-      "RESULT:",
-      allowed
-        ? "✅ ALLOWED"
-        : "❌ DENIED"
-    );
-
-    console.log(
-      "========================================"
-    );
-
-    return allowed;
+    return Boolean(whitelistRecord);
   } catch (error) {
-    console.error(
-      "HOME IP WHITELIST ERROR:",
-      error
-    );
-
-    /*
-     * Security:
-     * If the whitelist check fails,
-     * access is denied.
-     */
+    console.error("HOME IP WHITELIST ERROR:", error);
     return false;
   }
 }
 
 /**
- * Access denied screen.
- *
- * This is a Server Component.
- * Therefore NO onClick/window usage here.
+ * Access Restricted screen (when on unauthorized network).
  */
 function AccessDenied() {
   return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+    <main className="min-h-screen bg-[#0B1528] flex items-center justify-center p-6 text-white">
       <div className="w-full max-w-md">
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-
-          {/* Icon */}
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
-            <span className="text-3xl font-bold text-red-600">
-              !
-            </span>
+        <div className="rounded-2xl border border-gray-800 bg-[#111C38] p-8 text-center shadow-2xl">
+          {/* Tronx Brand */}
+          <div className="flex justify-center mb-6">
+            <img src="/2.svg" alt="Tronx" className="h-10 w-auto" />
           </div>
 
-          {/* Heading */}
-          <h3 className="text-2xl font-bold text-gray-900">
+          {/* Icon */}
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20">
+            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+
+          <h3 className="text-2xl font-bold text-white">
             Access Restricted
           </h3>
 
-          {/* Description */}
-          <p className="mt-4 text-gray-600">
-            Your current network is not authorized
-            to access the Tronx application.
+          <p className="mt-3 text-sm text-gray-400 leading-relaxed">
+            Your current network is not recognized as an authorized office network for Tronx CRM.
           </p>
 
-          {/* Network information */}
-          <div className="mt-6 rounded-xl bg-gray-50 p-4">
-            <p className="text-sm font-medium text-gray-700">
-              Office network required
-            </p>
-
-            <p className="mt-2 text-sm text-gray-500">
-              Please connect to an authorized
-              office Wi-Fi/network and try again.
+          <div className="mt-6 rounded-xl bg-[#0B1528] border border-gray-800 p-4 text-left">
+            <div className="flex items-center gap-2 text-xs font-semibold text-amber-400">
+              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+              Office Network Required
+            </div>
+            <p className="mt-1.5 text-xs text-gray-400">
+              Please connect to an authorized office Wi-Fi or company VPN and retry.
             </p>
           </div>
 
-          {/* Refresh */}
           <a
             href="/"
-            className="mt-6 block w-full rounded-lg bg-red-400 px-5 py-3 text-sm font-medium text-white transition hover:bg-green-300"
+            className="mt-6 block w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 shadow-lg shadow-blue-600/25"
           >
             Check Network Again
           </a>
 
-          {/* Help */}
-          <p className="mt-5 text-xs text-gray-400">
-            If you are connected to an office
-            network and still see this message,
-            please contact your administrator.
+          <p className="mt-5 text-xs text-gray-500">
+            If you believe this is an error, please contact your System Administrator.
           </p>
         </div>
       </div>
@@ -355,574 +153,355 @@ function AccessDenied() {
 }
 
 /**
- * Home Page
+ * Main Tronx CRM Home Page
  */
 export default async function Home() {
-  /*
-   * IMPORTANT:
-   *
-   * IP is checked BEFORE the homepage
-   * is rendered.
-   */
-  const ipAllowed =
-    await isIpAllowed();
+  const ipAllowed = await isIpAllowed();
 
-  /*
-   * Unauthorized IP.
-   */
   if (!ipAllowed) {
     return <AccessDenied />;
   }
 
-  /*
-   * Authorized IP.
-   */
+  // Check if user is currently logged in
+  const currentUser = await getCurrentUser();
+  const dashboardLink = currentUser ? (ROLE_REDIRECT[currentUser.role] ?? "/login") : "/login";
+
   return (
-    <main className="site-shell bg-white">
+    <div className="min-h-screen bg-[#0B1528] text-white flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+      {/* =========================================================
+          TOP NAVIGATION BAR
+      ========================================================= */}
+      <header className="sticky top-0 z-50 border-b border-gray-800/80 bg-[#0B1528]/85 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3">
+            <img src="/2.svg" alt="Tronx" className="h-10 w-auto" />
+          </Link>
 
-      {/* =========================
-          NAVIGATION
-      ========================= */}
-      <nav
-        className="nav-wrap"
-        aria-label="Main navigation"
-      >
-        <a
-          className="brand"
-          href="#top"
-          aria-label="Tronx home"
-        >
-          <img
-            src="/2.svg"
-            alt="Tronx"
-            className="h-14 w-48"
-          />
-        </a>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+            <a href="#features" className="hover:text-white transition">Features</a>
+            <a href="#modules" className="hover:text-white transition">Modules</a>
+            <a href="#hierarchy" className="hover:text-white transition">Approval Flow</a>
+            <a href="#security" className="hover:text-white transition">Security</a>
+          </nav>
 
-        <div className="nav-links">
-          <a href="#product">
-            Product
-          </a>
-
-          <a href="#workflow">
-            Workflow
-          </a>
-
-          <a href="#stories">
-            Stories
-          </a>
-        </div>
-
-        <div className="nav-actions">
-          <a
-            className="login-link"
-            href="/login"
-          >
-            Log in
-          </a>
-
-          <a
-            className="button button-small"
-            href="/register"
-          >
-            Get started{" "}
-            <span aria-hidden="true">
-              →
-            </span>
-          </a>
-        </div>
-      </nav>
-
-      {/* =========================
-          HERO
-      ========================= */}
-      <section
-        className="hero"
-        id="top"
-      >
-        <div className="hero-copy">
-
-          <p className="eyebrow">
-            <span className="eyebrow-line" />
-            CRM for teams in motion
-          </p>
-
-          <h4>
-            Make every
-            <br />
-            <em>connection</em> count.
-          </h4>
-
-          <p className="hero-description">
-            Tronx brings your people, pipeline,
-            and next best action into one clear
-            view, so your team can spend less time
-            updating tools and more time moving
-            work forward.
-          </p>
-
-          <div className="hero-actions">
-            <a
-              className="button"
-              href="/login"
-            >
-              Start for free{" "}
-              <span aria-hidden="true">
-                -&gt;
-              </span>
-            </a>
-
-            <a
-              className="text-link"
-              href="#product"
-            >
-              Explore the platform{" "}
-              <span aria-hidden="true">
-                ↗
-              </span>
-            </a>
-          </div>
-
-          <div className="proof-row">
-            <div className="avatar-stack">
-              <span>AM</span>
-              <span>JK</span>
-              <span>RS</span>
-              <span>+</span>
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              Office Network Verified
             </div>
 
-            <p>
-              Trusted by 2,000+ growing teams
-            </p>
-          </div>
-        </div>
-
-        {/* =========================
-            HERO VISUAL
-        ========================= */}
-        <div
-          className="hero-visual"
-          aria-label="Tronx workspace preview"
-        >
-          <div className="visual-glow" />
-
-          <div className="dashboard-card">
-
-            <div className="dash-topbar">
-              <a
-                className="brand"
-                href="#top"
-                aria-label="Tronx home"
+            {currentUser ? (
+              <Link
+                href={dashboardLink}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-500"
               >
-                <img
-                  src="/2.svg"
-                  alt="Tronx"
-                  className="h-10 w-32"
-                />
+                Go to Dashboard
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-500"
+              >
+                Employee Login
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </Link>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* =========================================================
+          HERO SECTION
+      ========================================================= */}
+      <section className="relative overflow-hidden pt-12 pb-20 md:pt-20 md:pb-32">
+        {/* Glow background accent */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold text-blue-400 mb-6">
+              <span>🚀</span> Workforce & Operations Intelligence
+            </div>
+
+            <h4 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight">
+              Workforce, Attendance & Leave Management Platform
+            </h4>
+
+            <p className="mt-6 text-lg sm:text-xl text-gray-300 leading-relaxed">
+              Tronx unifies attendance logging, leave carry-forward tracking, survey data pipelines, and hierarchical approvals into one seamless operational workspace.
+            </p>
+
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+              <Link
+                href={dashboardLink}
+                className="rounded-xl bg-blue-600 px-8 py-3.5 text-base font-bold text-white shadow-xl shadow-blue-600/30 transition hover:bg-blue-500 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {currentUser ? "Open Your Dashboard →" : "Sign In to Tronx Portal →"}
+              </Link>
+
+              <a
+                href="#modules"
+                className="rounded-xl border border-gray-700 bg-[#111C38] px-6 py-3.5 text-base font-semibold text-gray-200 transition hover:bg-gray-800 hover:text-white"
+              >
+                Explore Modules ▾
               </a>
-
-              <div className="dash-top-actions">
-                <span className="search-pill">
-                  Search anything <b>/</b>
-                </span>
-
-                <span className="notification-dot" />
-              </div>
-            </div>
-
-            <div className="dash-body">
-
-              <aside className="dash-sidebar">
-                <span className="side-icon active">
-                  ⌂
-                </span>
-
-                <span className="side-icon">
-                  ▦
-                </span>
-
-                <span className="side-icon">
-                  ◎
-                </span>
-
-                <span className="side-icon">
-                  ◒
-                </span>
-
-                <span className="side-icon">
-                  ⚙
-                </span>
-              </aside>
-
-              <div className="dash-content">
-
-                <div className="dash-heading">
-                  <div>
-                    <span className="dash-kicker">
-                      Tuesday, October 08
-                    </span>
-
-                    <h2>
-                      Good morning, Amina
-                    </h2>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="add-button"
-                  >
-                    + Add new
-                  </button>
-                </div>
-
-                {/* Metrics */}
-                <div className="metric-grid">
-
-                  <div className="metric">
-                    <span>
-                      Open pipeline
-                    </span>
-
-                    <strong>
-                      $248.6k
-                    </strong>
-
-                    <small className="positive">
-                      ↑ 18.4%
-                    </small>
-                  </div>
-
-                  <div className="metric">
-                    <span>
-                      Won this month
-                    </span>
-
-                    <strong>
-                      $72.4k
-                    </strong>
-
-                    <small className="positive">
-                      ↑ 12.8%
-                    </small>
-                  </div>
-
-                  <div className="metric">
-                    <span>
-                      Active deals
-                    </span>
-
-                    <strong>
-                      42
-                    </strong>
-
-                    <small className="muted">
-                      8 closing soon
-                    </small>
-                  </div>
-
-                </div>
-
-                {/* Lower dashboard */}
-                <div className="dash-lower">
-
-                  <div className="chart-panel">
-
-                    <div className="panel-title">
-                      <strong>
-                        Pipeline velocity
-                      </strong>
-
-                      <span>
-                        Last 30 days ˅
-                      </span>
-                    </div>
-
-                    <div className="chart">
-                      <i className="chart-line" />
-
-                      <div className="chart-labels">
-                        <span>
-                          Sep 08
-                        </span>
-
-                        <span>
-                          Sep 22
-                        </span>
-
-                        <span>
-                          Oct 08
-                        </span>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Activity */}
-                  <div className="activity-panel">
-
-                    <div className="panel-title">
-                      <strong>
-                        Next up
-                      </strong>
-
-                      <span>
-                        View all
-                      </span>
-                    </div>
-
-                    <div className="activity-item">
-
-                      <span className="activity-avatar coral">
-                        JL
-                      </span>
-
-                      <p>
-                        Follow up with{" "}
-                        <b>
-                          Jules Lee
-                        </b>
-
-                        <small>
-                          Today, 10:30 AM
-                        </small>
-                      </p>
-
-                      <span className="activity-arrow">
-                        →
-                      </span>
-                    </div>
-
-                    <div className="activity-item">
-
-                      <span className="activity-avatar blue">
-                        RK
-                      </span>
-
-                      <p>
-                        Proposal review{" "}
-                        <b>
-                          Ravi Kumar
-                        </b>
-
-                        <small>
-                          Today, 2:00 PM
-                        </small>
-                      </p>
-
-                      <span className="activity-arrow">
-                        →
-                      </span>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Floating note */}
-          <div className="floating-note">
+          {/* =========================================================
+              LIVE DASHBOARD PREVIEW CARD
+          ========================================================= */}
+          <div className="mt-16 rounded-2xl border border-gray-800 bg-[#111C38] p-4 sm:p-6 shadow-2xl shadow-black/60 max-w-5xl mx-auto">
+            {/* Window header */}
+            <div className="flex items-center justify-between border-b border-gray-800 pb-4 mb-6">
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-red-500/80" />
+                <span className="h-3 w-3 rounded-full bg-yellow-500/80" />
+                <span className="h-3 w-3 rounded-full bg-green-500/80" />
+                <span className="ml-3 text-xs font-mono text-gray-400">tronx-crm.internal/dashboard</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                ● Live Operations
+              </div>
+            </div>
 
-            <span className="checkmark">
-              ✓
-            </span>
+            {/* Dashboard Sample Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
+              {/* Card 1 */}
+              <div className="rounded-xl border border-gray-800 bg-[#0B1528] p-4">
+                <div className="text-xs text-gray-400 font-medium">Leave Carry-Forward</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-400">3 Available</div>
+                <div className="mt-1 text-[11px] text-gray-400">2 Carried Over + 1 This Month</div>
+              </div>
 
-            <p>
-              <b>
-                Deal moved forward
-              </b>
+              {/* Card 2 */}
+              <div className="rounded-xl border border-gray-800 bg-[#0B1528] p-4">
+                <div className="text-xs text-gray-400 font-medium">Today&apos;s Attendance</div>
+                <div className="mt-2 text-2xl font-bold text-blue-400">Present</div>
+                <div className="mt-1 text-[11px] text-gray-400">Shift: Day (09:30 - 18:30)</div>
+              </div>
 
-              <small>
-                Acme Inc. · $24,000
-              </small>
-            </p>
+              {/* Card 3 */}
+              <div className="rounded-xl border border-gray-800 bg-[#0B1528] p-4">
+                <div className="text-xs text-gray-400 font-medium">Pending Approvals</div>
+                <div className="mt-2 text-2xl font-bold text-amber-400">2 Requests</div>
+                <div className="mt-1 text-[11px] text-gray-400">Assigned for your review</div>
+              </div>
+
+              {/* Card 4 */}
+              <div className="rounded-xl border border-gray-800 bg-[#0B1528] p-4">
+                <div className="text-xs text-gray-400 font-medium">Network Security</div>
+                <div className="mt-2 text-2xl font-bold text-indigo-400">Protected</div>
+                <div className="mt-1 text-[11px] text-gray-400">IP Whitelist Active</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* =========================
-          LOGO STRIP
-      ========================= */}
-      <section
-        className="logo-strip"
-        id="product"
-      >
-        <span>
-          Teams building what&apos;s next with
-          Tronx
-        </span>
+      {/* =========================================================
+          KEY MODULES SECTION
+      ========================================================= */}
+      <section id="modules" className="py-20 border-t border-gray-800/80 bg-[#080F1E]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Enterprise Modules Built for Velocity
+            </h2>
+            <p className="mt-4 text-sm sm:text-base text-gray-400">
+              Designed to optimize workforce operations, accountability, and real-time team synchronization.
+            </p>
+          </div>
 
-        <div className="logo-list">
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Module 1 */}
+            <div className="rounded-2xl border border-gray-800 bg-[#111C38] p-6 shadow-sm hover:border-blue-500/50 transition">
+              <div className="h-12 w-12 rounded-xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-5">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white">Smart Leave & Carry-Forward</h3>
+              <p className="mt-2 text-sm text-gray-400 leading-relaxed">
+                Automated monthly paid leave entitlement (1 leave/month if ≤3 absences) with automatic carry-forward accumulation, multi-granularity analytics, and status filters.
+              </p>
+            </div>
 
-          <b>
-            northstar
-          </b>
+            {/* Module 2 */}
+            <div className="rounded-2xl border border-gray-800 bg-[#111C38] p-6 shadow-sm hover:border-emerald-500/50 transition">
+              <div className="h-12 w-12 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-5">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white">Attendance & Shift Engine</h3>
+              <p className="mt-2 text-sm text-gray-400 leading-relaxed">
+                Precision check-in/out, automated absent-marking crons 1 hour after shift close, late arrival calculation, lunch timers, and missing attendance resolution workflows.
+              </p>
+            </div>
 
-          <b className="serif-logo">
-            arc
-            <span>°</span>
-          </b>
+            {/* Module 3 */}
+            <div className="rounded-2xl border border-gray-800 bg-[#111C38] p-6 shadow-sm hover:border-indigo-500/50 transition">
+              <div className="h-12 w-12 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-5">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white">Office IP Security & Geofence</h3>
+              <p className="mt-2 text-sm text-gray-400 leading-relaxed">
+                Secure access restricted to whitelisted office networks. Prevents unauthorized off-site access while maintaining an immutable audit log of administrative actions.
+              </p>
+            </div>
 
-          <b>
-            lattice
-            <span className="logo-plus">
-              +
-            </span>
-          </b>
+            {/* Module 4 */}
+            <div className="rounded-2xl border border-gray-800 bg-[#111C38] p-6 shadow-sm hover:border-amber-500/50 transition">
+              <div className="h-12 w-12 rounded-xl bg-amber-600/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-5">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white">Team & Roster Management</h3>
+              <p className="mt-2 text-sm text-gray-400 leading-relaxed">
+                Manage team compositions, assign Team Leads, configure weekly-off schedules, and oversee cross-departmental operations effortlessly.
+              </p>
+            </div>
 
-          <b className="wide-logo">
-            KINSHIP
-          </b>
+            {/* Module 5 */}
+            <div className="rounded-2xl border border-gray-800 bg-[#111C38] p-6 shadow-sm hover:border-cyan-500/50 transition">
+              <div className="h-12 w-12 rounded-xl bg-cyan-600/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-5">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white">Survey Data & QA Pipelines</h3>
+              <p className="mt-2 text-sm text-gray-400 leading-relaxed">
+                Track daily survey quotas, monitor tester deliverables, review quality scores, and inspect detailed submission data in real-time.
+              </p>
+            </div>
 
-          <b>
-            Layer
-            <span className="layer-dot">
-              ●
-            </span>
-          </b>
-
+            {/* Module 6 */}
+            <div className="rounded-2xl border border-gray-800 bg-[#111C38] p-6 shadow-sm hover:border-purple-500/50 transition">
+              <div className="h-12 w-12 rounded-xl bg-purple-600/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-5">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white">Automated Work Reports</h3>
+              <p className="mt-2 text-sm text-gray-400 leading-relaxed">
+                Scheduled weekly and monthly work summary reports delivered to management for high-level visibility across all shifts and teams.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* =========================
-          FEATURES
-      ========================= */}
-      <section
-        className="feature-band"
-        id="workflow"
-      >
-
-        <div>
-
-          <p className="eyebrow">
-            <span className="eyebrow-line" />
-            One workspace, zero guesswork
-          </p>
-
-          <h2>
-            Clarity is a
-            <br />
-            <em>
-              growth strategy.
-            </em>
-          </h2>
-
-        </div>
-
-        <p className="feature-intro">
-          The best teams do not work harder
-          to stay aligned. They build a system
-          that makes alignment the default.
-        </p>
-
-        <div className="feature-grid">
-
-          <article>
-            <span className="feature-number">
-              01
-            </span>
-
-            <h3>
-              See the signal
-            </h3>
-
-            <p>
-              Know what matters now with a
-              living view of every relationship
-              and opportunity.
+      {/* =========================================================
+          APPROVAL HIERARCHY SECTION
+      ========================================================= */}
+      <section id="hierarchy" className="py-20 border-t border-gray-800/80 bg-[#0B1528]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Hierarchical Approval Framework
+            </h2>
+            <p className="mt-4 text-sm sm:text-base text-gray-400">
+              Clear delegation matrix ensuring swift reviews without procedural bottlenecks.
             </p>
+          </div>
 
-            <a href="/login">
-              Explore insights{" "}
-              <span>
-                ↗
-              </span>
-            </a>
-          </article>
+          <div className="mt-12 max-w-4xl mx-auto space-y-3">
+            <div className="rounded-xl border border-gray-800 bg-[#111C38] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 text-xs font-bold">
+                  Survey Tester
+                </span>
+                <span className="text-sm font-medium text-gray-300">Leave Approvers</span>
+              </div>
+              <div className="text-xs sm:text-sm text-gray-400">
+                Team Lead (Same Team) · Senior Team Lead · HR · Admin
+              </div>
+            </div>
 
-          <article>
-            <span className="feature-number">
-              02
-            </span>
+            <div className="rounded-xl border border-gray-800 bg-[#111C38] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2.5 py-1 text-xs font-bold">
+                  Team Lead
+                </span>
+                <span className="text-sm font-medium text-gray-300">Leave Approvers</span>
+              </div>
+              <div className="text-xs sm:text-sm text-gray-400">
+                Senior Team Lead · HR · Admin
+              </div>
+            </div>
 
-            <h3>
-              Move as one
-            </h3>
+            <div className="rounded-xl border border-gray-800 bg-[#111C38] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2.5 py-1 text-xs font-bold">
+                  Data Quality Analyst
+                </span>
+                <span className="text-sm font-medium text-gray-300">Leave Approvers</span>
+              </div>
+              <div className="text-xs sm:text-sm text-gray-400">
+                Senior Team Lead · HR · Admin
+              </div>
+            </div>
 
-            <p>
-              Give every teammate the context
-              they need to make the next move
-              confidently.
-            </p>
+            <div className="rounded-xl border border-gray-800 bg-[#111C38] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 text-xs font-bold">
+                  Senior Team Lead
+                </span>
+                <span className="text-sm font-medium text-gray-300">Leave Approvers</span>
+              </div>
+              <div className="text-xs sm:text-sm text-gray-400">
+                HR · Admin
+              </div>
+            </div>
 
-            <a href="/register">
-              Explore workflows{" "}
-              <span>
-                ↗
-              </span>
-            </a>
-          </article>
-
-          <article>
-            <span className="feature-number">
-              03
-            </span>
-
-            <h3>
-              Grow on purpose
-            </h3>
-
-            <p>
-              Turn your team&apos;s best habits
-              into repeatable momentum that
-              compounds over time.
-            </p>
-
-            <a href="/register">
-              Explore analytics{" "}
-              <span>
-                ↗
-              </span>
-            </a>
-          </article>
-
+            <div className="rounded-xl border border-gray-800 bg-[#111C38] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 text-xs font-bold">
+                  HR
+                </span>
+                <span className="text-sm font-medium text-gray-300">Leave Approvers</span>
+              </div>
+              <div className="text-xs sm:text-sm text-gray-400">
+                Admin
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* =========================
-          CLOSING CTA
-      ========================= */}
-      <section
-        className="closing-cta"
-        id="stories"
-      >
+      {/* =========================================================
+          CALL TO ACTION & FOOTER
+      ========================================================= */}
+      <footer className="mt-auto border-t border-gray-800 bg-[#080F1E] pt-12 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <img src="/2.svg" alt="Tronx" className="h-8 w-auto" />
+              <span className="text-xs text-gray-500">| Enterprise CRM & Workforce Suite</span>
+            </div>
 
-        <p className="eyebrow">
-          <span className="eyebrow-line" />
-          Your next chapter starts here
-        </p>
+            <div className="flex items-center gap-6 text-xs text-gray-400">
+              <Link href="/login" className="hover:text-white transition">Sign In</Link>
+              <a href="#features" className="hover:text-white transition">Documentation</a>
+              <span className="text-gray-600">·</span>
+              <span className="text-emerald-400">● System Operational</span>
+            </div>
+          </div>
 
-        <h2>
-          Work that feels
-          <br />
-          <em>
-            in motion.
-          </em>
-        </h2>
-
-        <a
-          className="button button-light"
-          href="/register"
-        >
-          Build your workspace{" "}
-          <span aria-hidden="true">
-            -&gt;
-          </span>
-        </a>
-
-      </section>
-
-    </main>
+          <div className="mt-8 border-t border-gray-800/60 pt-6 text-center text-xs text-gray-500">
+            &copy; {new Date().getFullYear()} Tronx CRM. All rights reserved. Authorized employee access only.
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }
-

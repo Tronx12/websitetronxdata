@@ -369,7 +369,19 @@ const AttendanceSchema =
   );
 
 AttendanceSchema.index({
-  loginLocation: "2dsphere",
+  userId: 1,
+  status: 1,
+  date: 1,
+});
+
+AttendanceSchema.index({
+  userId: 1,
+  date: -1,
+});
+
+AttendanceSchema.index({
+  status: 1,
+  date: -1,
 });
 
 /*
