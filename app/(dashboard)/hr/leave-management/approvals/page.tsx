@@ -13,7 +13,6 @@ type Leave = {
   totalDays: number;
   reason: string;
   status: string;
-  currentApprovalLevel: string;
 };
 
 export default function LeaveApprovalsPage() {
@@ -22,6 +21,10 @@ export default function LeaveApprovalsPage() {
   const [error, setError] = useState("");
   const [processingId, setProcessingId] =
     useState<string | null>(null);
+
+  /* =========================================================
+     LOAD PENDING LEAVES
+  ========================================================= */
 
   async function load() {
     try {
@@ -73,6 +76,10 @@ export default function LeaveApprovalsPage() {
     load();
   }, []);
 
+  /* =========================================================
+     APPROVE / REJECT
+  ========================================================= */
+
   async function action(
     id: string,
     type: "approve" | "reject"
@@ -97,8 +104,10 @@ export default function LeaveApprovalsPage() {
       /*
        * IMPORTANT:
        *
-       * Do NOT send approverId.
-       * Do NOT send x-user-id.
+       * Do NOT send:
+       * - approverId
+       * - userId
+       * - x-user-id
        *
        * Backend identifies the authenticated
        * approver using getCurrentUser().
@@ -131,6 +140,12 @@ export default function LeaveApprovalsPage() {
         );
       }
 
+      /*
+       * Reload the pending list.
+       *
+       * After approval/rejection the request
+       * should disappear automatically.
+       */
       await load();
     } catch (error) {
       console.error(
@@ -148,6 +163,10 @@ export default function LeaveApprovalsPage() {
     }
   }
 
+  /* =========================================================
+     LOADING
+  ========================================================= */
+
   if (loading) {
     return (
       <div className="p-6">
@@ -157,6 +176,10 @@ export default function LeaveApprovalsPage() {
       </div>
     );
   }
+
+  /* =========================================================
+     PAGE
+  ========================================================= */
 
   return (
     <div className="space-y-6 p-6">
@@ -168,8 +191,8 @@ export default function LeaveApprovalsPage() {
         </h4>
 
         <p className="mt-1 text-sm text-gray-500">
-          Review and process leave requests assigned
-          to you.
+          Review and process leave requests you
+          are authorized to approve.
         </p>
       </div>
 
@@ -191,7 +214,7 @@ export default function LeaveApprovalsPage() {
           return (
             <div
               key={leave._id}
-              className="rounded-xl border bg-white p-5"
+              className="rounded-xl border bg-white p-5 shadow-sm"
             >
               {/* EMPLOYEE */}
 
@@ -279,15 +302,14 @@ export default function LeaveApprovalsPage() {
                 </div>
               </div>
 
-              {/* CURRENT APPROVAL */}
+              {/* APPROVAL INFORMATION */}
 
               <div className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
                 <strong>
-                  Current Approval:
+                  Approval:
                 </strong>{" "}
-                {formatApprovalLevel(
-                  leave.currentApprovalLevel
-                )}
+                Any authorized approver can approve
+                this request.
               </div>
 
               {/* REASON */}
@@ -336,6 +358,8 @@ export default function LeaveApprovalsPage() {
           );
         })}
 
+        {/* EMPTY */}
+
         {!leaves.length && (
           <div className="rounded-xl border bg-white p-10 text-center text-gray-500">
             No pending leave approvals.
@@ -382,16 +406,6 @@ function formatStatus(value: string) {
         word.slice(1)
     )
     .join(" ");
-}
-
-function formatApprovalLevel(
-  value?: string | null
-) {
-  if (!value) {
-    return "Completed";
-  }
-
-  return formatStatus(value);
 }
 
 function formatRole(value: string) {

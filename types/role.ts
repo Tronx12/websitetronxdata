@@ -287,7 +287,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
 
    {
     label: "Request Missing Attendance",
-    path: "/team-lead/missing-attendence",
+    path: "/data-quality-analyst/missing-attendence",
     icon: "CalendarPlus",
     roles: ["data-quality-analyst"],
   },
@@ -321,7 +321,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
 
   {
     label: "OE DQA Panel",
-    path: "/data-quality-analyst/oe",
+    path: "/data-quality-analyst/oe/dqa",
     icon: "BadgeCheck",
     roles: ["data-quality-analyst"],
   },

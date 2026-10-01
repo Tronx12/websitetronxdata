@@ -167,16 +167,112 @@ export default function AttendencePage({ currentUserId }: Props) {
   //   }
   // };
   // ── Mark Attendance Actions ──
+// const handleAction = async (
+//   action: "login" | "logout" | "lunchStart" | "lunchEnd"
+// ) => {
+//   setMarking(true);
+
+//   try {
+//     const body = {
+//       userId: currentUserId,
+//       action,
+//     };
+
+//     const res = await fetch("/api/attendence", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify(body),
+//     });
+
+//     const data = await res.json();
+
+//     if (!res.ok) {
+//       alert(data.error || "Action failed");
+//       return;
+//     }
+
+//     if (data.remarks) {
+//       alert(`${action} successful: ${data.remarks}`);
+//     } else {
+//       alert(`${action} successful`);
+//     }
+
+//     fetchRecords();
+//   } catch (err) {
+//     console.error(err);
+//     alert("Something went wrong");
+//   } finally {
+//     setMarking(false);
+//   }
+// };
+
+// ── Mark Attendance Actions ──
 const handleAction = async (
   action: "login" | "logout" | "lunchStart" | "lunchEnd"
 ) => {
   setMarking(true);
 
   try {
-    const body = {
+    // =====================================================
+    // Find active attendance record
+    //
+    // Important for night shift:
+    //
+    // 30 Sep 11:25 PM -> Login
+    // 01 Oct 06:00 AM -> Logout
+    //
+    // We need to send:
+    // date = 30 Sep
+    // =====================================================
+
+    let attendanceDate: string | undefined;
+
+    if (
+      action === "logout" ||
+      action === "lunchStart" ||
+      action === "lunchEnd"
+    ) {
+      const activeRecord = records.find(
+        (record) =>
+          record.loggingTime &&
+          !record.logoutTime
+      );
+
+      if (activeRecord) {
+        attendanceDate = activeRecord.date;
+      }
+    }
+
+    // =====================================================
+    // Request body
+    // =====================================================
+
+    const body: {
+      userId: string;
+      action: string;
+      date?: string;
+    } = {
       userId: currentUserId,
       action,
     };
+
+    // Send attendance date for logout/lunch actions
+    // when an active record exists.
+    if (attendanceDate) {
+      body.date = attendanceDate;
+    }
+
+    console.log("Attendance action:", {
+      action,
+      attendanceDate,
+      body,
+    });
+
+    // =====================================================
+    // API REQUEST
+    // =====================================================
 
     const res = await fetch("/api/attendence", {
       method: "POST",
@@ -188,21 +284,46 @@ const handleAction = async (
 
     const data = await res.json();
 
+    // =====================================================
+    // ERROR
+    // =====================================================
+
     if (!res.ok) {
-      alert(data.error || "Action failed");
+      alert(
+        data.error ||
+          "Attendance action failed"
+      );
+
       return;
     }
 
+    // =====================================================
+    // SUCCESS
+    // =====================================================
+
     if (data.remarks) {
-      alert(`${action} successful: ${data.remarks}`);
+      alert(
+        `${action} successful: ${data.remarks}`
+      );
     } else {
-      alert(`${action} successful`);
+      alert(
+        `${action} successful`
+      );
     }
 
-    fetchRecords();
+    // Refresh attendance table
+    await fetchRecords();
+
   } catch (err) {
-    console.error(err);
-    alert("Something went wrong");
+    console.error(
+      "Attendance action error:",
+      err
+    );
+
+    alert(
+      "Something went wrong while marking attendance"
+    );
+
   } finally {
     setMarking(false);
   }

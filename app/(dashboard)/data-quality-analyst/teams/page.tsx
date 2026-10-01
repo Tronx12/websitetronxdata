@@ -6,7 +6,7 @@ export default async function TeamsPage() {
   const user = await getCurrentUser();
 
   // Only admin & hr can manage teams
-  if (!user || !["admin", "hr","senior-teamlead"].includes(user.role)) {
+  if (!user || !["admin", "hr","senior-teamlead","data-quality-analyst"].includes(user.role)) {
     redirect("/unauthorized"); // or "/login"
   }
 

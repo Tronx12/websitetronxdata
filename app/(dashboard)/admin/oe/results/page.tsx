@@ -60,26 +60,47 @@ export default async function OEResultsPage() {
   // =====================================================
   // RESULTS
   // =====================================================
-
   return (
-    <main className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="mx-auto w-full max-w-7xl">
+  <main className="min-h-screen bg-slate-50 p-4 md:p-6">
+    <div className="mx-auto w-full max-w-3xl">
 
-        <div className="mb-5">
-          <h4 className="text-2xl font-bold text-slate-800">
-            My Results
-          </h4>
+      <div className="mb-5 flex justify-center flex-col">
+        <h4 className="text-2xl font-bold text-slate-800">
+          My Results
+        </h4>
 
-          <p className="mt-1 text-sm text-slate-500">
-            View your submitted OE responses and their current status.
-          </p>
-        </div>
-
-        <ResultsView
-          memberName={user.name}
-        />
-
+        <p className="mt-1 text-sm text-slate-500">
+          View your submitted OE responses and their current status.
+        </p>
       </div>
-    </main>
-  );
+
+      <ResultsView
+        memberName={user.name}
+      />
+
+    </div>
+  </main>
+);
+
+  // return (
+  //   <main className="min-h-screen bg-slate-50 p-4 md:p-6">
+  //     <div className="mx-auto w-full max-w-7xl">
+
+  //       <div className="mb-5">
+  //         <h4 className="text-2xl font-bold text-slate-800">
+  //           My Results
+  //         </h4>
+
+  //         <p className="mt-1 text-sm text-slate-500">
+  //           View your submitted OE responses and their current status.
+  //         </p>
+  //       </div>
+
+  //       <ResultsView
+  //         memberName={user.name}
+  //       />
+
+  //     </div>
+  //   </main>
+  // );
 }

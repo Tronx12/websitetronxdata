@@ -1,4 +1,4 @@
-// import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import Leave from "@/models/Leave";
@@ -83,6 +83,10 @@ export async function GET(
       );
     }
 
+    /*
+     * Account must be active.
+     */
+
     if (user.isActive !== true) {
       return NextResponse.json(
         {
@@ -112,7 +116,8 @@ export async function GET(
         .populate(
           "approvalHistory.approverId",
           "name email role"
-        );
+        )
+        .lean();
 
     if (!leave) {
       return NextResponse.json(
@@ -126,29 +131,18 @@ export async function GET(
 
     /*
      * =====================================================
-     * ACCESS CONTROL
-     *
-     * Employee:
-     *   Can view only their own leave.
-     *
-     * Team Lead:
-     *   Can view their team's leave.
-     *
-     * Senior Team Lead:
-     *   Can view pending leave at their level
-     *   and requests that have progressed through
-     *   the workflow.
-     *
-     * HR:
-     *   Can view leave requests.
-     *
-     * Admin:
-     *   Can view leave requests.
+     * NORMALIZE CURRENT USER ROLE
      * =====================================================
      */
 
     const role =
       normalizeRole(user.role);
+
+    /*
+     * =====================================================
+     * GET EMPLOYEE ID
+     * =====================================================
+     */
 
     const employeeId =
       leave.employeeId &&
@@ -157,7 +151,15 @@ export async function GET(
         ? String(
             (leave.employeeId as any)._id
           )
-        : String(leave.employeeId);
+        : String(
+            leave.employeeId
+          );
+
+    /*
+     * =====================================================
+     * GET LEAVE TEAM ID
+     * =====================================================
+     */
 
     const leaveTeamId =
       leave.teamId &&
@@ -166,7 +168,15 @@ export async function GET(
         ? String(
             (leave.teamId as any)._id
           )
-        : String(leave.teamId || "");
+        : String(
+            leave.teamId || ""
+          );
+
+    /*
+     * =====================================================
+     * CURRENT USER ID
+     * =====================================================
+     */
 
     const currentUserId =
       String(currentUser.userId);
@@ -175,16 +185,27 @@ export async function GET(
      * =====================================================
      * EMPLOYEE ACCESS
      * =====================================================
+     *
+     * Normal employees can only view their own
+     * leave requests.
+     *
+     * Approval roles have broader access.
      */
 
-    if (
-      role !== "team-lead" &&
-      role !== "senior-teamlead" &&
-      role !== "hr" &&
-      role !== "admin"
-    ) {
+    const approvalRoles = [
+      "team-lead",
+      "senior-teamlead",
+      "hr",
+      "admin",
+    ];
+
+    const isApprovalRole =
+      approvalRoles.includes(role);
+
+    if (!isApprovalRole) {
       if (
-        employeeId !== currentUserId
+        employeeId !==
+        currentUserId
       ) {
         return NextResponse.json(
           {
@@ -200,13 +221,37 @@ export async function GET(
     /*
      * =====================================================
      * TEAM LEAD ACCESS
-     *
-     * Team Lead can only view requests
-     * belonging to their assigned team.
      * =====================================================
+     *
+     * Team Lead can view:
+     *
+     * 1. Their own leave
+     * 2. Leave requests belonging to their team
+     *
+     * This matches the Team Lead approval scope.
      */
 
-    if (role === "team-lead") {
+    if (
+      role === "team-lead"
+    ) {
+      /*
+       * Own leave is always allowed.
+       */
+
+      if (
+        employeeId ===
+        currentUserId
+      ) {
+        return NextResponse.json({
+          success: true,
+          data: leave,
+        });
+      }
+
+      /*
+       * Team Lead must have a team.
+       */
+
       if (!user.teamId) {
         return NextResponse.json(
           {
@@ -218,35 +263,49 @@ export async function GET(
         );
       }
 
+      /*
+       * Leave must belong to a team.
+       */
+
+      if (!leaveTeamId) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "This leave request is not assigned to a team.",
+          },
+          { status: 403 }
+        );
+      }
+
+      /*
+       * Team must match.
+       */
+
       if (
-        !leaveTeamId ||
         leaveTeamId !==
-          String(user.teamId)
+        String(user.teamId)
       ) {
-        /*
-         * Allow Team Lead to view their own leave,
-         * if they have submitted one.
-         */
-        if (
-          employeeId !==
-          currentUserId
-        ) {
-          return NextResponse.json(
-            {
-              success: false,
-              message:
-                "You can view leave requests only for your assigned team.",
-            },
-            { status: 403 }
-          );
-        }
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "You can view leave requests only for your assigned team.",
+          },
+          { status: 403 }
+        );
       }
     }
 
     /*
      * =====================================================
-     * RESPONSE
+     * SENIOR TEAM LEAD / HR / ADMIN
      * =====================================================
+     *
+     * These roles can view leave requests.
+     *
+     * Their actual approval permission is checked
+     * separately by the approve endpoint.
      */
 
     return NextResponse.json({
@@ -259,11 +318,25 @@ export async function GET(
       error
     );
 
+    if (error instanceof Error) {
+      console.error(
+        "ERROR MESSAGE:",
+        error.message
+      );
+
+      console.error(
+        "ERROR STACK:",
+        error.stack
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
         message:
-          "Internal server error",
+          error instanceof Error
+            ? error.message
+            : "Internal server error",
       },
       { status: 500 }
     );

@@ -540,11 +540,313 @@ export async function GET(request: NextRequest) {
 
 // ────────────────────────────────────────────────
 // POST /api/attendence
+// export async function POST(request: NextRequest) {
+//   try {
+//     await connectDB();
+
+//     const body = await request.json();
+//     const {
+//       userId,
+//       action,
+//       date,
+//       updatedBy,
+//       ...rest
+//     } = body;
+
+//     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+//       return NextResponse.json(
+//         { error: "Valid userId is required" },
+//         { status: 400 }
+//       );
+//     }
+
+//     // Normalize to start of day
+//     const targetDate = date ? new Date(date) : new Date();
+//     targetDate.setHours(0, 0, 0, 0);
+
+//     let record = await Attendance.findOne({
+//       userId: new mongoose.Types.ObjectId(userId),
+//       date: targetDate,
+//     });
+//     const now = new Date();
+
+//     // ── Action based flow (login / logout / lunch) ──
+//     if (action) {
+//       // Fetch user to get workingShift
+//       const user = await Auth.findById(userId).select("workingShift name");
+//       if (!user) {
+//         return NextResponse.json({ error: "User not found" }, { status: 404 });
+//       }
+
+//       const shift = (user.workingShift as "day" | "night") || "day";
+
+//       if (!record) {
+//         record = new Attendance({
+//           userId: new mongoose.Types.ObjectId(userId),
+//           date: targetDate,
+//           shiftDate: targetDate,
+//           updatedBy: updatedBy ? new mongoose.Types.ObjectId(updatedBy) : null,
+//         });
+//       }
+
+//       switch (action) {
+//         // ────────────── LOGIN ──────────────
+//         case "login": {
+//           if (record.loggingTime) {
+//             return NextResponse.json(
+//               { error: "Already logged in for this date" },
+//               { status: 400 }
+//             );
+//           }
+
+//           // Validate shift login window
+//           const loginValidation = validateLoginShift(now, shift);
+//           if (!loginValidation.allowed) {
+//             return NextResponse.json(
+//               { error: loginValidation.message },
+//               { status: 400 }
+//             );
+//           }
+
+//           // ── CONNECT OFFICE OFF & RULES RESOLUTION ──
+//           const dayResolution = await resolveAttendanceDay({
+//             userId,
+//             date: targetDate,
+//           });
+
+//           if (dayResolution.holiday) {
+//             record.status = "worked-on-holiday";
+//             record.holiday = true;
+//             record.holidayId = dayResolution.holidayId
+//               ? new mongoose.Types.ObjectId(dayResolution.holidayId)
+//               : null;
+//           } else if (dayResolution.weeklyOff) {
+//             record.status = "worked-on-weekly-off";
+//             record.weeklyOff = true;
+//           } else {
+//             record.status = "present";
+//             record.holiday = false;
+//             record.weeklyOff = false;
+//           }
+
+//           if (dayResolution.resolvedShiftId) {
+//             record.shiftId = new mongoose.Types.ObjectId(dayResolution.resolvedShiftId);
+//           }
+
+//           record.shiftDate = targetDate;
+//           record.loggingTime = now;
+
+//           record.isLate = !!loginValidation.isLate;
+//           record.lateByMinutes = loginValidation.lateByMinutes || 0;
+//           if (loginValidation.message) {
+//             record.remarks = loginValidation.message;
+//           }
+
+//           break;
+//         }
+
+//         // ────────────── LOGOUT ──────────────
+//         case "logout": {
+//           if (!record.loggingTime) {
+//             return NextResponse.json(
+//               {
+//                 error:
+//                   "You have not logged in today. Please contact your Team Lead.",
+//               },
+//               { status: 400 }
+//             );
+//           }
+//           if (record.logoutTime) {
+//             return NextResponse.json(
+//               { error: "Already logged out" },
+//               { status: 400 }
+//             );
+//           }
+
+//           // Validate shift logout window
+//           const logoutValidation = validateLogoutShift(now, shift);
+//           if (!logoutValidation.allowed) {
+//             return NextResponse.json(
+//               { error: logoutValidation.message },
+//               { status: 400 }
+//             );
+//           }
+
+//           record.logoutTime = now;
+//           break;
+//         }
+
+//         // ────────────── LUNCH START ──────────────
+//         case "lunchStart": {
+//           if (!record.loggingTime) {
+//             return NextResponse.json(
+//               {
+//                 error:
+//                   "You have not logged in today. Please contact your Team Lead.",
+//               },
+//               { status: 400 }
+//             );
+//           }
+//           if (record.lunchStart) {
+//             return NextResponse.json(
+//               { error: "Lunch already started" },
+//               { status: 400 }
+//             );
+//           }
+//           record.lunchStart = now;
+//           break;
+//         }
+
+//         // ────────────── LUNCH END ──────────────
+//         case "lunchEnd": {
+//           if (!record.loggingTime) {
+//             return NextResponse.json(
+//               {
+//                 error:
+//                   "You have not logged in today. Please contact your Team Lead.",
+//               },
+//               { status: 400 }
+//             );
+//           }
+//           if (!record.lunchStart) {
+//             return NextResponse.json(
+//               { error: "Lunch not started yet" },
+//               { status: 400 }
+//             );
+//           }
+//           if (record.lunchEnd) {
+//             return NextResponse.json(
+//               { error: "Lunch already ended" },
+//               { status: 400 }
+//             );
+//           }
+
+//           // Validate lunch duration (30 to 35 min)
+//           const lunchValidation = validateLunchEnd(record.lunchStart, now);
+//           if (!lunchValidation.allowed) {
+//             return NextResponse.json(
+//               { error: lunchValidation.message },
+//               { status: 400 }
+//             );
+//           }
+
+//           record.lunchEnd = now;
+//           record.lunchDurationMinutes = lunchValidation.lunchDurationMinutes || 0;
+//           record.excessLunchMinutes = lunchValidation.excessLunchMinutes || 0;
+//           if (lunchValidation.message) {
+//             record.remarks = record.remarks
+//               ? `${record.remarks} | ${lunchValidation.message}`
+//               : lunchValidation.message;
+//           }
+//           break;
+//         }
+
+//         default:
+//           return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+//       }
+
+//       if (updatedBy) {
+//         record.updatedBy = new mongoose.Types.ObjectId(updatedBy);
+//       }
+//       await record.save();
+
+//       // AUDIT LOG
+//       const auditAction =
+//         action === "login" ? "LOGIN" : action === "logout" ? "LOGOUT" : "UPDATE";
+//       await createAuditLog({
+//         userId,
+//         action: auditAction,
+//         module: "Attendance",
+//         description: `Marked attendance action: ${action} for ${user.name || "user"}`,
+//         entityType: "Attendance",
+//         entityId: String(record._id),
+//         metadata: { action, date: targetDate, status: record.status },
+//       });
+
+//       // Return populated record
+//       const populated = await Attendance.findById(record._id)
+//         .populate("userId", "name email workingShift role")
+//         .populate("updatedBy", "name email")
+//         .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
+//         .populate("holidayId", "title type scope isPaid");
+
+//       return NextResponse.json(populated);
+//     }
+
+//     // ── Manual create / update (admin / TL / HR) ──
+//     const userObjectId = new mongoose.Types.ObjectId(userId);
+//     const updatedByObjectId = updatedBy ? new mongoose.Types.ObjectId(updatedBy) : null;
+
+//     if (record) {
+//       Object.assign(record, rest);
+//       if (rest.status === "holiday" || rest.status === "office-off") {
+//         record.holiday = true;
+//       } else if (rest.status === "weekly-off") {
+//         record.weeklyOff = true;
+//       }
+//       if (updatedByObjectId) record.updatedBy = updatedByObjectId;
+//       await record.save();
+
+//       await createAuditLog({
+//         userId: updatedBy || userId,
+//         action: "UPDATE",
+//         module: "Attendance",
+//         description: `Updated attendance record for user ${userId}`,
+//         entityType: "Attendance",
+//         entityId: String(record._id),
+//         metadata: rest,
+//       });
+
+//       const populated = await Attendance.findById(record._id)
+//         .populate("userId", "name email workingShift role")
+//         .populate("updatedBy", "name email")
+//         .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
+//         .populate("holidayId", "title type scope isPaid");
+
+//       return NextResponse.json(populated);
+//     }
+
+//     const newRecord = await Attendance.create({
+//       userId: userObjectId,
+//       date: targetDate,
+//       shiftDate: targetDate,
+//       updatedBy: updatedByObjectId,
+//       holiday: rest.status === "holiday" || rest.status === "office-off",
+//       weeklyOff: rest.status === "weekly-off",
+//       ...rest,
+//     });
+
+//     await createAuditLog({
+//       userId: updatedBy || userId,
+//       action: "CREATE",
+//       module: "Attendance",
+//       description: `Created attendance record for user ${userId}`,
+//       entityType: "Attendance",
+//       entityId: String(newRecord._id),
+//       metadata: rest,
+//     });
+
+//     const populated = await Attendance.findById(newRecord._id)
+//       .populate("userId", "name email workingShift role")
+//       .populate("updatedBy", "name email")
+//       .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
+//       .populate("holidayId", "title type scope isPaid");
+
+//     return NextResponse.json(populated, { status: 201 });
+//   } catch (error) {
+//     console.error("POST /api/attendence error:", error);
+//     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+//   }
+// }
+
+// ────────────────────────────────────────────────
+// POST /api/attendence
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
     const body = await request.json();
+
     const {
       userId,
       action,
@@ -553,6 +855,10 @@ export async function POST(request: NextRequest) {
       ...rest
     } = body;
 
+    // =====================================================
+    // VALIDATE USER ID
+    // =====================================================
+
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return NextResponse.json(
         { error: "Valid userId is required" },
@@ -560,94 +866,288 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize to start of day
-    const targetDate = date ? new Date(date) : new Date();
+    // =====================================================
+    // CURRENT TIME
+    // =====================================================
+
+    const now = new Date();
+
+    // =====================================================
+    // GET USER + SHIFT
+    // =====================================================
+
+    const user = await Auth.findById(userId).select(
+      "workingShift name"
+    );
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    const shift =
+      (user.workingShift as "day" | "night") || "day";
+
+    // =====================================================
+    // RESOLVE TARGET ATTENDANCE DATE
+    //
+    // Day shift:
+    //   Login/Logout same calendar date.
+    //
+    // Night shift:
+    //   Login: 30 Sep
+    //   Logout: 01 Oct
+    //
+    //   Logout must find the 30 Sep record.
+    // =====================================================
+
+    let targetDate = date
+      ? new Date(date)
+      : new Date();
+
     targetDate.setHours(0, 0, 0, 0);
+
+    // =====================================================
+    // FIND ATTENDANCE RECORD
+    // =====================================================
 
     let record = await Attendance.findOne({
       userId: new mongoose.Types.ObjectId(userId),
       date: targetDate,
     });
-    const now = new Date();
 
-    // ── Action based flow (login / logout / lunch) ──
-    if (action) {
-      // Fetch user to get workingShift
-      const user = await Auth.findById(userId).select("workingShift name");
-      if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
-      }
+    // =====================================================
+    // NIGHT SHIFT CROSS-MIDNIGHT FIX
+    //
+    // Example:
+    //
+    // 30 Sep 11:25 PM -> Login
+    // 01 Oct 06:00 AM -> Logout
+    //
+    // On 01 Oct, first search 01 Oct.
+    // If no usable record exists, search 30 Sep.
+    // =====================================================
 
-      const shift = (user.workingShift as "day" | "night") || "day";
+    if (
+      shift === "night" &&
+      action &&
+      action !== "login"
+    ) {
+      const previousDate = new Date(targetDate);
 
+      previousDate.setDate(
+        previousDate.getDate() - 1
+      );
+
+      previousDate.setHours(0, 0, 0, 0);
+
+      // If today's record doesn't exist,
+      // look at previous attendance day.
       if (!record) {
-        record = new Attendance({
+        record = await Attendance.findOne({
           userId: new mongoose.Types.ObjectId(userId),
-          date: targetDate,
-          shiftDate: targetDate,
-          updatedBy: updatedBy ? new mongoose.Types.ObjectId(updatedBy) : null,
+          date: previousDate,
         });
+
+        if (record) {
+          targetDate = previousDate;
+        }
       }
 
-      switch (action) {
-        // ────────────── LOGIN ──────────────
-        case "login": {
-          if (record.loggingTime) {
-            return NextResponse.json(
-              { error: "Already logged in for this date" },
-              { status: 400 }
-            );
-          }
-
-          // Validate shift login window
-          const loginValidation = validateLoginShift(now, shift);
-          if (!loginValidation.allowed) {
-            return NextResponse.json(
-              { error: loginValidation.message },
-              { status: 400 }
-            );
-          }
-
-          // ── CONNECT OFFICE OFF & RULES RESOLUTION ──
-          const dayResolution = await resolveAttendanceDay({
-            userId,
-            date: targetDate,
+      // If today's record exists but doesn't contain
+      // a login, check previous night-shift record.
+      if (
+        record &&
+        !record.loggingTime
+      ) {
+        const previousRecord =
+          await Attendance.findOne({
+            userId: new mongoose.Types.ObjectId(userId),
+            date: previousDate,
           });
 
+        if (previousRecord?.loggingTime) {
+          record = previousRecord;
+          targetDate = previousDate;
+        }
+      }
+    }
+
+    // =====================================================
+    // ACTION BASED FLOW
+    // =====================================================
+
+    if (action) {
+      switch (action) {
+
+        // =================================================
+        // LOGIN
+        // =================================================
+
+        case "login": {
+
+          // -----------------------------------------------
+          // Don't allow duplicate login
+          // -----------------------------------------------
+
+          if (record?.loggingTime) {
+            return NextResponse.json(
+              {
+                error:
+                  "Already logged in for this date",
+              },
+              { status: 400 }
+            );
+          }
+
+          // -----------------------------------------------
+          // Validate login shift window
+          // -----------------------------------------------
+
+          const loginValidation =
+            validateLoginShift(
+              now,
+              shift
+            );
+
+          if (!loginValidation.allowed) {
+            return NextResponse.json(
+              {
+                error:
+                  loginValidation.message,
+              },
+              { status: 400 }
+            );
+          }
+
+          // -----------------------------------------------
+          // Resolve holiday / weekly off / shift
+          // -----------------------------------------------
+
+          const dayResolution =
+            await resolveAttendanceDay({
+              userId,
+              date: targetDate,
+            });
+
+          // -----------------------------------------------
+          // Create record if it doesn't exist
+          // -----------------------------------------------
+
+          if (!record) {
+            record = new Attendance({
+              userId:
+                new mongoose.Types.ObjectId(
+                  userId
+                ),
+
+              date: targetDate,
+
+              shiftDate: targetDate,
+
+              updatedBy: updatedBy
+                ? new mongoose.Types.ObjectId(
+                    updatedBy
+                  )
+                : null,
+            });
+          }
+
+          // -----------------------------------------------
+          // Attendance status
+          // -----------------------------------------------
+
           if (dayResolution.holiday) {
-            record.status = "worked-on-holiday";
+
+            record.status =
+              "worked-on-holiday";
+
             record.holiday = true;
-            record.holidayId = dayResolution.holidayId
-              ? new mongoose.Types.ObjectId(dayResolution.holidayId)
-              : null;
-          } else if (dayResolution.weeklyOff) {
-            record.status = "worked-on-weekly-off";
+
+            record.holidayId =
+              dayResolution.holidayId
+                ? new mongoose.Types.ObjectId(
+                    dayResolution.holidayId
+                  )
+                : null;
+
+          } else if (
+            dayResolution.weeklyOff
+          ) {
+
+            record.status =
+              "worked-on-weekly-off";
+
             record.weeklyOff = true;
+
           } else {
+
             record.status = "present";
+
             record.holiday = false;
+
             record.weeklyOff = false;
           }
 
-          if (dayResolution.resolvedShiftId) {
-            record.shiftId = new mongoose.Types.ObjectId(dayResolution.resolvedShiftId);
+          // -----------------------------------------------
+          // Assign resolved shift
+          // -----------------------------------------------
+
+          if (
+            dayResolution.resolvedShiftId
+          ) {
+            record.shiftId =
+              new mongoose.Types.ObjectId(
+                dayResolution.resolvedShiftId
+              );
           }
 
-          record.shiftDate = targetDate;
-          record.loggingTime = now;
+          // -----------------------------------------------
+          // Store login
+          // -----------------------------------------------
 
-          record.isLate = !!loginValidation.isLate;
-          record.lateByMinutes = loginValidation.lateByMinutes || 0;
-          if (loginValidation.message) {
-            record.remarks = loginValidation.message;
+          record.shiftDate =
+            targetDate;
+
+          record.loggingTime =
+            now;
+
+          // -----------------------------------------------
+          // Late calculation
+          // -----------------------------------------------
+
+          record.isLate =
+            !!loginValidation.isLate;
+
+          record.lateByMinutes =
+            loginValidation.lateByMinutes ||
+            0;
+
+          if (
+            loginValidation.message
+          ) {
+            record.remarks =
+              loginValidation.message;
           }
 
           break;
         }
 
-        // ────────────── LOGOUT ──────────────
+        // =================================================
+        // LOGOUT
+        // =================================================
+
         case "logout": {
-          if (!record.loggingTime) {
+
+          // -----------------------------------------------
+          // IMPORTANT:
+          // For night shift, `record` may belong to
+          // yesterday because the shift crosses midnight.
+          // -----------------------------------------------
+
+          if (!record?.loggingTime) {
             return NextResponse.json(
               {
                 error:
@@ -656,29 +1156,63 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
+
+          // -----------------------------------------------
+          // Already logged out
+          // -----------------------------------------------
+
           if (record.logoutTime) {
             return NextResponse.json(
-              { error: "Already logged out" },
+              {
+                error:
+                  "Already logged out",
+              },
               { status: 400 }
             );
           }
 
-          // Validate shift logout window
-          const logoutValidation = validateLogoutShift(now, shift);
+          // -----------------------------------------------
+          // Validate logout window
+          // -----------------------------------------------
+
+          const logoutValidation =
+            validateLogoutShift(
+              now,
+              shift
+            );
+
           if (!logoutValidation.allowed) {
             return NextResponse.json(
-              { error: logoutValidation.message },
+              {
+                error:
+                  logoutValidation.message,
+              },
               { status: 400 }
             );
           }
+
+          // -----------------------------------------------
+          // Store logout
+          //
+          // Example:
+          // loggingTime = 30 Sep 11:25 PM
+          // logoutTime  = 01 Oct 06:00 AM
+          //
+          // Both stay in the SAME Attendance document.
+          // -----------------------------------------------
 
           record.logoutTime = now;
+
           break;
         }
 
-        // ────────────── LUNCH START ──────────────
+        // =================================================
+        // LUNCH START
+        // =================================================
+
         case "lunchStart": {
-          if (!record.loggingTime) {
+
+          if (!record?.loggingTime) {
             return NextResponse.json(
               {
                 error:
@@ -687,19 +1221,29 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
+
           if (record.lunchStart) {
             return NextResponse.json(
-              { error: "Lunch already started" },
+              {
+                error:
+                  "Lunch already started",
+              },
               { status: 400 }
             );
           }
+
           record.lunchStart = now;
+
           break;
         }
 
-        // ────────────── LUNCH END ──────────────
+        // =================================================
+        // LUNCH END
+        // =================================================
+
         case "lunchEnd": {
-          if (!record.loggingTime) {
+
+          if (!record?.loggingTime) {
             return NextResponse.json(
               {
                 error:
@@ -708,133 +1252,345 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
+
           if (!record.lunchStart) {
             return NextResponse.json(
-              { error: "Lunch not started yet" },
-              { status: 400 }
-            );
-          }
-          if (record.lunchEnd) {
-            return NextResponse.json(
-              { error: "Lunch already ended" },
+              {
+                error:
+                  "Lunch not started yet",
+              },
               { status: 400 }
             );
           }
 
-          // Validate lunch duration (30 to 35 min)
-          const lunchValidation = validateLunchEnd(record.lunchStart, now);
+          if (record.lunchEnd) {
+            return NextResponse.json(
+              {
+                error:
+                  "Lunch already ended",
+              },
+              { status: 400 }
+            );
+          }
+
+          // -----------------------------------------------
+          // Validate lunch duration
+          // 30 - 35 minutes
+          // -----------------------------------------------
+
+          const lunchValidation =
+            validateLunchEnd(
+              record.lunchStart,
+              now
+            );
+
           if (!lunchValidation.allowed) {
             return NextResponse.json(
-              { error: lunchValidation.message },
+              {
+                error:
+                  lunchValidation.message,
+              },
               { status: 400 }
             );
           }
 
           record.lunchEnd = now;
-          record.lunchDurationMinutes = lunchValidation.lunchDurationMinutes || 0;
-          record.excessLunchMinutes = lunchValidation.excessLunchMinutes || 0;
-          if (lunchValidation.message) {
-            record.remarks = record.remarks
-              ? `${record.remarks} | ${lunchValidation.message}`
-              : lunchValidation.message;
+
+          record.lunchDurationMinutes =
+            lunchValidation.lunchDurationMinutes ||
+            0;
+
+          record.excessLunchMinutes =
+            lunchValidation.excessLunchMinutes ||
+            0;
+
+          if (
+            lunchValidation.message
+          ) {
+            record.remarks =
+              record.remarks
+                ? `${record.remarks} | ${lunchValidation.message}`
+                : lunchValidation.message;
           }
+
           break;
         }
 
+        // =================================================
+        // INVALID ACTION
+        // =================================================
+
         default:
-          return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+          return NextResponse.json(
+            {
+              error:
+                "Invalid action",
+            },
+            { status: 400 }
+          );
       }
+
+      // ===================================================
+      // UPDATED BY
+      // ===================================================
 
       if (updatedBy) {
-        record.updatedBy = new mongoose.Types.ObjectId(updatedBy);
+        record.updatedBy =
+          new mongoose.Types.ObjectId(
+            updatedBy
+          );
       }
+
+      // ===================================================
+      // SAVE
+      // ===================================================
+
       await record.save();
 
+      // ===================================================
       // AUDIT LOG
+      // ===================================================
+
       const auditAction =
-        action === "login" ? "LOGIN" : action === "logout" ? "LOGOUT" : "UPDATE";
+        action === "login"
+          ? "LOGIN"
+          : action === "logout"
+          ? "LOGOUT"
+          : "UPDATE";
+
       await createAuditLog({
         userId,
+
         action: auditAction,
+
         module: "Attendance",
-        description: `Marked attendance action: ${action} for ${user.name || "user"}`,
+
+        description:
+          `Marked attendance action: ${action} for ${
+            user.name || "user"
+          }`,
+
         entityType: "Attendance",
-        entityId: String(record._id),
-        metadata: { action, date: targetDate, status: record.status },
+
+        entityId: String(
+          record._id
+        ),
+
+        metadata: {
+          action,
+          date: targetDate,
+          status: record.status,
+        },
       });
 
-      // Return populated record
-      const populated = await Attendance.findById(record._id)
-        .populate("userId", "name email workingShift role")
-        .populate("updatedBy", "name email")
-        .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
-        .populate("holidayId", "title type scope isPaid");
+      // ===================================================
+      // RETURN POPULATED RECORD
+      // ===================================================
 
-      return NextResponse.json(populated);
+      const populated =
+        await Attendance.findById(
+          record._id
+        )
+          .populate(
+            "userId",
+            "name email workingShift role"
+          )
+          .populate(
+            "updatedBy",
+            "name email"
+          )
+          .populate(
+            "shiftId",
+            "name code startTime endTime crossesMidnight graceMinutes"
+          )
+          .populate(
+            "holidayId",
+            "title type scope isPaid"
+          );
+
+      return NextResponse.json(
+        populated
+      );
     }
 
-    // ── Manual create / update (admin / TL / HR) ──
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const updatedByObjectId = updatedBy ? new mongoose.Types.ObjectId(updatedBy) : null;
+    // =====================================================
+    // MANUAL CREATE / UPDATE
+    // Admin / TL / HR
+    // =====================================================
+
+    const userObjectId =
+      new mongoose.Types.ObjectId(
+        userId
+      );
+
+    const updatedByObjectId =
+      updatedBy
+        ? new mongoose.Types.ObjectId(
+            updatedBy
+          )
+        : null;
+
+    // =====================================================
+    // UPDATE EXISTING RECORD
+    // =====================================================
 
     if (record) {
-      Object.assign(record, rest);
-      if (rest.status === "holiday" || rest.status === "office-off") {
+
+      Object.assign(
+        record,
+        rest
+      );
+
+      if (
+        rest.status === "holiday" ||
+        rest.status === "office-off"
+      ) {
         record.holiday = true;
-      } else if (rest.status === "weekly-off") {
+
+      } else if (
+        rest.status === "weekly-off"
+      ) {
         record.weeklyOff = true;
       }
-      if (updatedByObjectId) record.updatedBy = updatedByObjectId;
+
+      if (updatedByObjectId) {
+        record.updatedBy =
+          updatedByObjectId;
+      }
+
       await record.save();
 
       await createAuditLog({
-        userId: updatedBy || userId,
+        userId:
+          updatedBy || userId,
+
         action: "UPDATE",
+
         module: "Attendance",
-        description: `Updated attendance record for user ${userId}`,
+
+        description:
+          `Updated attendance record for user ${userId}`,
+
         entityType: "Attendance",
-        entityId: String(record._id),
+
+        entityId:
+          String(record._id),
+
         metadata: rest,
       });
 
-      const populated = await Attendance.findById(record._id)
-        .populate("userId", "name email workingShift role")
-        .populate("updatedBy", "name email")
-        .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
-        .populate("holidayId", "title type scope isPaid");
+      const populated =
+        await Attendance.findById(
+          record._id
+        )
+          .populate(
+            "userId",
+            "name email workingShift role"
+          )
+          .populate(
+            "updatedBy",
+            "name email"
+          )
+          .populate(
+            "shiftId",
+            "name code startTime endTime crossesMidnight graceMinutes"
+          )
+          .populate(
+            "holidayId",
+            "title type scope isPaid"
+          );
 
-      return NextResponse.json(populated);
+      return NextResponse.json(
+        populated
+      );
     }
 
-    const newRecord = await Attendance.create({
-      userId: userObjectId,
-      date: targetDate,
-      shiftDate: targetDate,
-      updatedBy: updatedByObjectId,
-      holiday: rest.status === "holiday" || rest.status === "office-off",
-      weeklyOff: rest.status === "weekly-off",
-      ...rest,
-    });
+    // =====================================================
+    // CREATE MANUAL RECORD
+    // =====================================================
+
+    const newRecord =
+      await Attendance.create({
+        userId:
+          userObjectId,
+
+        date:
+          targetDate,
+
+        shiftDate:
+          targetDate,
+
+        updatedBy:
+          updatedByObjectId,
+
+        holiday:
+          rest.status === "holiday" ||
+          rest.status === "office-off",
+
+        weeklyOff:
+          rest.status === "weekly-off",
+
+        ...rest,
+      });
 
     await createAuditLog({
-      userId: updatedBy || userId,
+      userId:
+        updatedBy || userId,
+
       action: "CREATE",
+
       module: "Attendance",
-      description: `Created attendance record for user ${userId}`,
+
+      description:
+        `Created attendance record for user ${userId}`,
+
       entityType: "Attendance",
-      entityId: String(newRecord._id),
+
+      entityId:
+        String(newRecord._id),
+
       metadata: rest,
     });
 
-    const populated = await Attendance.findById(newRecord._id)
-      .populate("userId", "name email workingShift role")
-      .populate("updatedBy", "name email")
-      .populate("shiftId", "name code startTime endTime crossesMidnight graceMinutes")
-      .populate("holidayId", "title type scope isPaid");
+    const populated =
+      await Attendance.findById(
+        newRecord._id
+      )
+        .populate(
+          "userId",
+          "name email workingShift role"
+        )
+        .populate(
+          "updatedBy",
+          "name email"
+        )
+        .populate(
+          "shiftId",
+          "name code startTime endTime crossesMidnight graceMinutes"
+        )
+        .populate(
+          "holidayId",
+          "title type scope isPaid"
+        );
 
-    return NextResponse.json(populated, { status: 201 });
+    return NextResponse.json(
+      populated,
+      { status: 201 }
+    );
+
   } catch (error) {
-    console.error("POST /api/attendence error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+
+    console.error(
+      "POST /api/attendence error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "Internal server error",
+      },
+      { status: 500 }
+    );
   }
 }

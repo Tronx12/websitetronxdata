@@ -1,3 +1,6 @@
+
+
+
 // "use client";
 
 // import { useEffect, useMemo, useState } from "react";
@@ -11,6 +14,8 @@
 //   XCircle,
 //   AlertCircle,
 //   Image as ImageIcon,
+//   Send,
+//   Sparkles,
 // } from "lucide-react";
 // import { api } from "@/lib/api";
 
@@ -18,6 +23,12 @@
 //   id?: string;
 //   pid?: string;
 //   qNumber?: string;
+
+//   // Question fields — same fields supported by the DQA panel
+//   question?: string;
+//   questionText?: string;
+//   questionTitle?: string;
+//   actualQuestion?: string;
 
 //   originalOE?: string;
 //   approvedOE?: string;
@@ -61,6 +72,15 @@
 
 //   const [message, setMessage] = useState("");
 
+//   // Edit / resubmit
+//   const [editingId, setEditingId] = useState<string | null>(null);
+//   const [editText, setEditText] = useState("");
+//   const [savingEdit, setSavingEdit] = useState(false);
+
+//   // AI human-style suggestions
+//   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
+//   const [suggestionLoading, setSuggestionLoading] = useState<Record<string, boolean>>({});
+
 //   // =========================================================
 //   // LOAD RESULTS
 //   // =========================================================
@@ -95,13 +115,68 @@
 //         memberName: name,
 //       });
 
-//       const data = Array.isArray(response)
-//         ? response
-//         : response?.results ||
-//           response?.data ||
-//           [];
+//       // const data = Array.isArray(response)
+//       //   ? response
+//       //   : response?.results ||
+//       //     response?.data ||
+//       //     [];
 
-//       setResults(Array.isArray(data) ? data : []);
+//       // setResults(Array.isArray(data) ? data : []);
+//       const data = Array.isArray(response)
+//   ? response
+//   : response?.results ||
+//     response?.data ||
+//     [];
+
+// const normalizedResults: OERecord[] = (
+//   Array.isArray(data) ? data : []
+// ).map((item: any) => {
+//   const candidates = [
+//     item.questionText,
+//     item.question,
+//     item.actualQuestion,
+//     item.questionTitle,
+//   ];
+
+//   let questionText = "";
+
+//   for (const value of candidates) {
+//     const text = String(value ?? "").trim();
+
+//     if (
+//       text &&
+//       !/^Q\s*\d+[A-Z]?$/i.test(text)
+//     ) {
+//       questionText = text;
+//       break;
+//     }
+//   }
+
+//   // Legacy records where Column E contains
+//   // the complete question instead of Q1/Q2.
+//   if (
+//     !questionText &&
+//     item.qNumber &&
+//     !/^Q\s*\d+[A-Z]?$/i.test(
+//       String(item.qNumber).trim()
+//     )
+//   ) {
+//     questionText = String(item.qNumber).trim();
+//   }
+
+//   return {
+//     ...item,
+
+//     qNumber: String(item.qNumber || "").trim(),
+
+//     // Keep all aliases so the UI/DQA logic can use them
+//     questionText,
+//     question: questionText,
+//     actualQuestion: questionText,
+//   };
+// });
+
+// setResults(normalizedResults);
 //     } catch (error: any) {
 //       console.error("getMyResults error:", error);
 
@@ -157,9 +232,283 @@
 //   };
 
 //   // =========================================================
-//   // FILTER
+//   // QUESTION
 //   // =========================================================
 
+//   // Use the same question resolution logic as the DQA panel.
+//   // Priority:
+//   // 1. questionText
+//   // 2. question
+//   // 3. actualQuestion
+//   // 4. questionTitle
+//   //
+//   // Q1 / Q2 / Q3 etc. are ignored because they are
+//   // question numbers, not the actual question text.
+//   const getQuestionText = (item: OERecord) => {
+//     const candidates = [
+//       item.questionText,
+//       item.question,
+//       item.actualQuestion,
+//       item.questionTitle,
+//     ];
+
+//     for (const value of candidates) {
+//       const text = String(value ?? "").trim();
+
+//       if (text && !/^Q\s*\d+[A-Z]?$/i.test(text)) {
+//         return text;
+//       }
+//     }
+
+//     // Legacy submissions created before Column T was introduced.
+//     const legacyQuestions: Record<string, string> = {
+//       Q1: "What do you enjoy most about working?",
+//     };
+
+//     return legacyQuestions[String(item.qNumber || "").trim().toUpperCase()] || "";
+//   };
+
+//   // =========================================================
+//   // EDIT / RESUBMIT
+//   // =========================================================
+
+//   const startEdit = (item: OERecord) => {
+//     setEditingId(item.id || null);
+//     setEditText(item.originalOE || "");
+//     setMessage("");
+//   };
+
+//   const cancelEdit = () => {
+//     setEditingId(null);
+//     setEditText("");
+//   };
+
+//   const resubmit = async (item: OERecord) => {
+//     const oeId = String(item.id || "").trim();
+//     const newText = editText.trim();
+
+//     if (!oeId) {
+//       setMessage("OE ID is missing. Please refresh and try again.");
+//       return;
+//     }
+
+//     if (!newText) {
+//       setMessage("Please enter your revised OE response.");
+//       return;
+//     }
+
+//     try {
+//       setSavingEdit(true);
+//       setMessage("");
+
+//       await api("updateOE", {
+//         oeId,
+//         newText,
+//       });
+
+//       cancelEdit();
+//       await loadResults(true);
+//     } catch (error: any) {
+//       setMessage(error?.message || "Unable to resubmit the OE.");
+//     } finally {
+//       setSavingEdit(false);
+//     }
+//   };
+
+//   // =========================================================
+//   // AI SUGGESTIONS
+//   // =========================================================
+
+//   const getSuggestionKey = (item: OERecord, index: number) =>
+//     String(item.id || `${item.pid || "oe"}-${item.qNumber || "q"}-${index}`);
+
+//   // const loadSuggestions = async (item: OERecord, index: number) => {
+//   //   const key = getSuggestionKey(item, index);
+//   //   const question = getQuestionText(item);
+
+//   //   try {
+//   //     setSuggestionLoading((prev) => ({ ...prev, [key]: true }));
+//   //     setMessage("");
+
+//   //     const response = await api<any>("rewriteOEAsHuman", {
+//   //       oeResponse: item.originalOE || "",
+//   //       question,
+//   //       qText: question,
+//   //       qNumber: item.qNumber || "",
+//   //     });
+
+//   //     const list =
+//   //       response?.suggestions ||
+//   //       response?.data?.suggestions ||
+//   //       (Array.isArray(response) ? response : []);
+
+//   //     setSuggestions((prev) => ({
+//   //       ...prev,
+//   //       [key]: Array.isArray(list) ? list.filter(Boolean).slice(0, 5) : [],
+//   //     }));
+//   //   } catch (error: any) {
+//   //     setSuggestions((prev) => ({ ...prev, [key]: [] }));
+//   //     setMessage(error?.message || "Unable to generate AI suggestions.");
+//   //   } finally {
+//   //     setSuggestionLoading((prev) => ({ ...prev, [key]: false }));
+//   //   }
+//   // };
+
+//   // =========================================================
+//   // FILTER
+//   // =========================================================
+// const sleep = (ms: number) =>
+//   new Promise((resolve) => setTimeout(resolve, ms));
+
+// const loadSuggestions = async (
+//   item: OERecord,
+//   index: number
+// ) => {
+//   const key = getSuggestionKey(item, index);
+
+//   const oeResponse = String(
+//     item.originalOE || ""
+//   ).trim();
+
+//   const question = String(
+//     getQuestionText(item) || ""
+//   ).trim();
+
+//   const qNumber = String(
+//     item.qNumber || ""
+//   ).trim();
+
+//   if (!oeResponse) {
+//     setMessage("Original OE response is missing.");
+//     return;
+//   }
+
+//   if (!question) {
+//     setMessage("Question is missing.");
+//     return;
+//   }
+
+//   try {
+//     setSuggestionLoading((prev) => ({
+//       ...prev,
+//       [key]: true,
+//     }));
+
+//     setMessage("");
+
+//     let lastError: any = null;
+
+//     // Retry up to 3 times
+//     for (let attempt = 1; attempt <= 3; attempt++) {
+//       try {
+//         const requestId =
+//           `${Date.now()}-${Math.random()
+//             .toString(36)
+//             .slice(2)}`;
+
+//         console.log(
+//           `rewriteOEAsHuman attempt ${attempt}/3`,
+//           {
+//             requestId,
+//             key,
+//             oeResponse,
+//             question,
+//             qNumber,
+//           }
+//         );
+
+//         const response = await api<any>(
+//           "rewriteOEAsHuman",
+//           {
+//             oeResponse,
+//             question,
+//             qText: question,
+//             qNumber,
+//             requestId,
+//           }
+//         );
+
+//         console.log(
+//           "rewriteOEAsHuman response:",
+//           response
+//         );
+
+//         const list =
+//           response?.suggestions ||
+//           response?.data?.suggestions ||
+//           (Array.isArray(response)
+//             ? response
+//             : []);
+
+//         const finalSuggestions =
+//           Array.isArray(list)
+//             ? list
+//                 .map((value: any) =>
+//                   String(value || "").trim()
+//                 )
+//                 .filter(Boolean)
+//                 .slice(0, 5)
+//             : [];
+
+//         if (finalSuggestions.length > 0) {
+//           setSuggestions((prev) => ({
+//             ...prev,
+//             [key]: finalSuggestions,
+//           }));
+
+//           // SUCCESS
+//           setMessage("");
+
+//           return;
+//         }
+
+//         throw new Error(
+//           "AI returned no suggestions."
+//         );
+//       } catch (error: any) {
+//         lastError = error;
+
+//         console.warn(
+//           `rewriteOEAsHuman attempt ${attempt} failed:`,
+//           error
+//         );
+
+//         // Don't wait after the final attempt
+//         if (attempt < 3) {
+//           // Increasing delay:
+//           // 1st retry -> 2 sec
+//           // 2nd retry -> 4 sec
+//           await sleep(attempt * 2000);
+//         }
+//       }
+//     }
+
+//     throw lastError ||
+//       new Error(
+//         "Unable to generate AI suggestions."
+//       );
+//   } catch (error: any) {
+//     console.error(
+//       "rewriteOEAsHuman final error:",
+//       error
+//     );
+
+//     setSuggestions((prev) => ({
+//       ...prev,
+//       [key]: [],
+//     }));
+
+//     setMessage(
+//       error?.message ||
+//         "Unable to generate AI suggestions. Please try again."
+//     );
+//   } finally {
+//     setSuggestionLoading((prev) => ({
+//       ...prev,
+//       [key]: false,
+//     }));
+//   }
+// };
 //   const filteredResults = useMemo(() => {
 //     const query = search
 //       .trim()
@@ -184,6 +533,10 @@
 //         item.id,
 //         item.pid,
 //         item.qNumber,
+//         item.questionText,
+//         item.question,
+//         item.actualQuestion,
+//         item.questionTitle,
 //         item.originalOE,
 //         item.approvedOE,
 //         item.status,
@@ -544,6 +897,29 @@
 //                   {/* BODY */}
 //                   <div className="space-y-5 p-5">
 
+//                     {/* QUESTION — same logic as DQA */}
+//                     <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+//                       <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+//                         ❓ Question {item.qNumber ? `· ${item.qNumber}` : ""}
+//                       </div>
+
+//                       {getQuestionText(item) ? (
+//                         <div className="whitespace-pre-wrap text-sm font-semibold leading-relaxed text-slate-800">
+//                           {getQuestionText(item)}
+//                         </div>
+//                       ) : (
+//                         <div className="text-xs italic text-slate-500">
+//                           Question text is not available for this submission.
+//                           {item.qNumber
+//                             ? ` Question number: ${item.qNumber}`
+//                             : ""}
+//                           {item.imageUrl
+//                             ? " Use “View Attached Image” below."
+//                             : ""}
+//                         </div>
+//                       )}
+//                     </div>
+
 //                     {/* ORIGINAL */}
 //                     <div>
 //                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -574,6 +950,109 @@
 //                         <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-sm leading-6 text-slate-700">
 //                           {item.approvedOE}
 //                         </div>
+//                       </div>
+//                     )}
+
+//                     {/* EDIT / RESUBMIT */}
+//                     {status === "rejected" && (
+//                       <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+//                         {editingId === item.id ? (
+//                           <>
+//                             <div className="mb-2 text-xs font-bold uppercase tracking-wide text-red-700">
+//                               ✏️ Edit rejected response
+//                             </div>
+
+//                             <textarea
+//                               value={editText}
+//                               onChange={(e) => setEditText(e.target.value)}
+//                               className="min-h-32 w-full rounded-xl border border-red-200 bg-white p-3 text-sm leading-6 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+//                               placeholder="Rewrite your response..."
+//                             />
+
+//                             <div className="mt-2 flex flex-wrap gap-2">
+//                               <button
+//                                 type="button"
+//                                 onClick={() => resubmit(item)}
+//                                 disabled={savingEdit || !editText.trim()}
+//                                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+//                               >
+//                                 {savingEdit ? (
+//                                   <Loader2 className="h-4 w-4 animate-spin" />
+//                                 ) : (
+//                                   <Send className="h-4 w-4" />
+//                                 )}
+//                                 {savingEdit ? "Resubmitting..." : "Resubmit for DQA"}
+//                               </button>
+
+//                               <button
+//                                 type="button"
+//                                 onClick={cancelEdit}
+//                                 disabled={savingEdit}
+//                                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+//                               >
+//                                 Cancel
+//                               </button>
+//                             </div>
+//                           </>
+//                         ) : (
+//                           <button
+//                             type="button"
+//                             onClick={() => startEdit(item)}
+//                             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+//                           >
+//                             <Send className="h-4 w-4" />
+//                             Edit &amp; Resubmit
+//                           </button>
+//                         )}
+//                       </div>
+//                     )}
+
+//                     {/* AI SUGGESTIONS */}
+//                     {(status === "rejected" || status === "pending") && (
+//                       <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+//                         <button
+//                           type="button"
+//                           onClick={() => loadSuggestions(item, index)}
+//                           disabled={Boolean(suggestionLoading[getSuggestionKey(item, index)])}
+//                           className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+//                         >
+//                           {suggestionLoading[getSuggestionKey(item, index)] ? (
+//                             <>
+//                               <RefreshCw className="h-4 w-4 animate-spin" />
+//                               Generating suggestions...
+//                             </>
+//                           ) : (
+//                             <>
+//                               <Sparkles className="h-4 w-4" />
+//                               Generate 5 Better Suggestions
+//                             </>
+//                           )}
+//                         </button>
+
+//                         {(suggestions[getSuggestionKey(item, index)] || []).length > 0 && (
+//                           <div className="mt-3 space-y-2">
+//                             <div className="text-xs font-semibold text-purple-700">
+//                               💡 Click a suggestion to put it into the editor
+//                             </div>
+
+//                             {suggestions[getSuggestionKey(item, index)].map((suggestion, suggestionIndex) => (
+//                               <button
+//                                 key={`${suggestionIndex}-${suggestion}`}
+//                                 type="button"
+//                                 onClick={() => {
+//                                   setEditingId(item.id || null);
+//                                   setEditText(suggestion);
+//                                 }}
+//                                 className="block w-full rounded-lg border border-purple-100 bg-white p-3 text-left text-sm leading-6 text-slate-700 hover:border-purple-400 hover:bg-purple-50"
+//                               >
+//                                 <span className="mr-2 text-[10px] font-bold text-purple-500">
+//                                   #{suggestionIndex + 1}
+//                                 </span>
+//                                 {suggestion}
+//                               </button>
+//                             ))}
+//                           </div>
+//                         )}
 //                       </div>
 //                     )}
 
@@ -613,28 +1092,29 @@
 //                       </div>
 //                     )}
 
-//                     {/* APPROVED BY */}
-//                     {item.approvedBy && (
-//                       <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-xs text-slate-500">
-
-//                         <span>
-//                           Approved by:{" "}
-//                           <strong className="text-slate-700">
-//                             {item.approvedBy}
-//                           </strong>
-//                         </span>
-
-//                         {item.dqaViewedTime && (
-//                           <span>
-//                             DQA viewed:{" "}
-//                             <strong className="text-slate-700">
-//                               {formatDate(
-//                                 item.dqaViewedTime
-//                               )}
+//                     {/* DQA / REVIEW STATUS */}
+//                     {(item.approvedBy || item.dqaViewedTime) && (
+//                       <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4 text-xs">
+//                         {item.approvedBy && (
+//                           <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">
+//                             Approved/Rejected by:{" "}
+//                             <strong className="text-slate-800">
+//                               {item.approvedBy}
 //                             </strong>
 //                           </span>
 //                         )}
 
+//                         {item.dqaViewedTime ? (
+//                           <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 font-semibold text-blue-700">
+//                             👁️ DQA Seen · {formatDate(item.dqaViewedTime)}
+//                           </span>
+//                         ) : (
+//                           String(item.status || "").toUpperCase() === "PENDING" && (
+//                             <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 font-semibold text-amber-700">
+//                               ⏳ Not seen by DQA yet
+//                             </span>
+//                           )
+//                         )}
 //                       </div>
 //                     )}
 
@@ -756,6 +1236,8 @@
 //     </div>
 //   );
 // }
+
+
 
 
 "use client";
@@ -1403,7 +1885,7 @@ const loadSuggestions = async (
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-10">
+      <div className="mx-auto w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-10">
         <div className="flex flex-col items-center justify-center gap-3">
           <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
 
@@ -1420,7 +1902,7 @@ const loadSuggestions = async (
   // =========================================================
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full max-w-3xl space-y-5">
 
       {/* MEMBER */}
       {memberName && (

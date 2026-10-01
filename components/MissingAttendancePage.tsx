@@ -958,7 +958,7 @@ export default function MissingAttendancePage({
   // ============================================
   // ROLE CHECK
   // ============================================
-  const isReviewer = ["team-lead", "hr", "admin"].includes(currentUserRole);
+  const isReviewer = ["team-lead", "hr", "admin","senior-teamlead"].includes(currentUserRole);
   const isAdmin = currentUserRole === "admin";
 
   // ============================================

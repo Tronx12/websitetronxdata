@@ -1,95 +1,3 @@
-// import { NextRequest, NextResponse } from "next/server";
-// import mongoose from "mongoose";
-// import Leave from "@/models/Leave";
-// import { connectDB } from "@/config/db";
-// import {
-//   normalizeRole,
-// } from "@/lib/leaveRules";
-
-// function getUserId(request: NextRequest) {
-//   return request.headers.get("x-user-id");
-// }
-
-// export async function GET(
-//   request: NextRequest
-// ) {
-//   try {
-//     await connectDB();
-
-//     const userId = getUserId(request);
-
-//     if (
-//       !userId ||
-//       !mongoose.Types.ObjectId.isValid(userId)
-//     ) {
-//       return NextResponse.json(
-//         { error: "Authentication required" },
-//         { status: 401 }
-//       );
-//     }
-
-//     const Auth =
-//       (await import("@/models/Auth")).default;
-
-//     const user = await Auth.findById(userId)
-//       .select("_id name email role teamId")
-//       .lean();
-
-//     if (!user) {
-//       return NextResponse.json(
-//         { error: "User not found" },
-//         { status: 404 }
-//       );
-//     }
-
-//     const role = normalizeRole(user.role);
-
-//     const levelMap: Record<string, string> = {
-//       "team-lead": "PENDING_TEAM_LEAD",
-//       "senior-teamlead":
-//         "PENDING_SENIOR_TEAMLEAD",
-//       hr: "PENDING_HR",
-//       admin: "PENDING_ADMIN",
-//     };
-
-//     const status = levelMap[role];
-
-//     if (!status) {
-//       return NextResponse.json([]);
-//     }
-
-//     const filter: any = { status };
-
-//     // Team Leads only see requests from their team.
-//     if (role === "team-lead") {
-//       filter.teamId = user.teamId || null;
-//     }
-
-//     const records = await Leave.find(filter)
-//       .populate(
-//         "employeeId",
-//         "name email role teamId"
-//       )
-//       .populate(
-//         "teamId",
-//         "name code"
-//       )
-//       .sort({ createdAt: 1 });
-
-//     return NextResponse.json(records);
-//   } catch (error) {
-//     console.error(
-//       "GET /api/leaves/pending error:",
-//       error
-//     );
-
-//     return NextResponse.json(
-//       { error: "Internal server error" },
-//       { status: 500 }
-//     );
-//   }
-// }
-
 import { NextRequest, NextResponse } from "next/server";
 
 import Leave from "@/models/Leave";
@@ -99,6 +7,7 @@ import { connectDB } from "@/config/db";
 import { getCurrentUser } from "@/lib/getuser";
 
 import {
+  canApproveLeave,
   normalizeRole,
 } from "@/lib/leaveRules";
 
@@ -178,7 +87,7 @@ export async function GET(
 
     /*
      * =====================================================
-     * NORMALIZE ROLE
+     * NORMALIZE CURRENT USER ROLE
      * =====================================================
      */
 
@@ -188,121 +97,31 @@ export async function GET(
 
     /*
      * =====================================================
-     * APPROVAL STATUS BY ROLE
-     *
-     * survey-tester
-     *      ↓
-     * team-lead
-     *      ↓
-     * senior-teamlead
-     *      ↓
-     * hr
-     *      ↓
-     * admin
-     *
-     * team-lead
-     *      ↓
-     * senior-teamlead
-     *      ↓
-     * hr
-     *      ↓
-     * admin
-     *
-     * senior-teamlead
-     *      ↓
-     * hr
-     *      ↓
-     * admin
-     *
-     * data-quality-analyst
-     *      ↓
-     * hr
-     *      ↓
-     * admin
-     *
-     * hr
-     *      ↓
-     * admin
+     * ONLY PENDING_APPROVAL
      * =====================================================
-     */
-
-    const levelMap: Record<
-      string,
-      string
-    > = {
-      "team-lead":
-        "PENDING_TEAM_LEAD",
-
-      "senior-teamlead":
-        "PENDING_SENIOR_TEAMLEAD",
-
-      hr:
-        "PENDING_HR",
-
-      admin:
-        "PENDING_ADMIN",
-    };
-
-    const status =
-      levelMap[role];
-
-    /*
-     * Employees who are not approval authorities
-     * don't have pending approvals.
-     */
-
-    if (!status) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-      });
-    }
-
-    /*
-     * =====================================================
-     * BUILD FILTER
-     * =====================================================
-     */
-
-    const filter: Record<
-      string,
-      unknown
-    > = {
-      status,
-    };
-
-    /*
-     * =====================================================
-     * TEAM LEAD SCOPE
      *
-     * Team Leads can only approve leave requests
-     * belonging to their own team.
+     * There is NO:
      *
-     * If the Team Lead has no team assigned,
-     * return no requests rather than exposing
-     * requests with teamId = null.
-     * =====================================================
-     */
-
-    if (role === "team-lead") {
-      if (!user.teamId) {
-        return NextResponse.json({
-          success: true,
-          data: [],
-        });
-      }
-
-      filter.teamId = user.teamId;
-    }
-
-    /*
-     * =====================================================
-     * FETCH PENDING REQUESTS
+     * PENDING_TEAM_LEAD
+     * PENDING_SENIOR_TEAMLEAD
+     * PENDING_HR
+     * PENDING_ADMIN
+     *
+     * anymore.
+     *
+     * Every leave starts as:
+     *
+     * PENDING_APPROVAL
+     *
+     * Then we determine whether the current user is
+     * authorized to approve each employee's leave.
      * =====================================================
      */
 
     const records =
-      await Leave.find(filter)
+      await Leave.find({
+        status: "PENDING_APPROVAL",
+      })
         .populate(
           "employeeId",
           "name email role teamId"
@@ -322,13 +141,106 @@ export async function GET(
 
     /*
      * =====================================================
+     * FILTER BY APPROVAL PERMISSION
+     * =====================================================
+     *
+     * Example:
+     *
+     * survey-tester
+     *   -> team-lead
+     *   -> senior-teamlead
+     *   -> hr
+     *   -> admin
+     *
+     * team-lead
+     *   -> senior-teamlead
+     *   -> hr
+     *   -> admin
+     *
+     * data-quality-analyst
+     *   -> hr
+     *   -> admin
+     *
+     * senior-teamlead
+     *   -> hr
+     *   -> admin
+     *
+     * hr
+     *   -> admin
+     * =====================================================
+     */
+
+    const allowedRecords =
+      records.filter((leave: any) => {
+        /*
+         * Never show the user's own leave
+         * in pending approvals.
+         */
+        const employeeId =
+          leave.employeeId?._id?.toString() ||
+          leave.employeeId?.toString();
+
+        if (
+          employeeId ===
+          user._id.toString()
+        ) {
+          return false;
+        }
+
+        /*
+         * Check whether current user's role
+         * can approve this employee's leave.
+         */
+        if (
+          !canApproveLeave(
+            leave.employeeRole,
+            role
+          )
+        ) {
+          return false;
+        }
+
+        /*
+         * =================================================
+         * TEAM LEAD SCOPE
+         * =================================================
+         *
+         * Team Lead can only see leaves from
+         * their own team.
+         *
+         * Other roles can see according to their
+         * approval permission.
+         */
+
+        if (role === "team-lead") {
+          if (!user.teamId) {
+            return false;
+          }
+
+          const leaveTeamId =
+            leave.teamId?._id?.toString() ||
+            leave.teamId?.toString();
+
+          if (
+            leaveTeamId !==
+            user.teamId.toString()
+          ) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+    /*
+     * =====================================================
      * RESPONSE
      * =====================================================
      */
 
     return NextResponse.json({
       success: true,
-      data: records,
+      data: allowedRecords,
     });
   } catch (error) {
     console.error(

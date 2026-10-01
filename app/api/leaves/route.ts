@@ -1,306 +1,3 @@
-// import { NextRequest, NextResponse } from "next/server";
-// import mongoose from "mongoose";
-// import Leave from "@/models/Leave";
-// import { connectDB } from "@/config/db";
-// import { createAuditLog } from "@/lib/auditLog";
-// import {
-//   calculateCalendarDays,
-//   getApprovalFlow,
-//   getPaidLeaveSummary,
-//   normalizeRole,
-//   pendingStatus,
-// } from "@/lib/leaveRules";
-
-// function getUserId(request: NextRequest, body?: any) {
-//   return (
-//     request.headers.get("x-user-id") ||
-//     body?.userId ||
-//     null
-//   );
-// }
-
-// export async function GET(request: NextRequest) {
-//   try {
-//     await connectDB();
-
-//     const { searchParams } =
-//       new URL(request.url);
-
-//     const userId =
-//       searchParams.get("userId");
-
-//     const status =
-//       searchParams.get("status");
-
-//     const filter: any = {};
-
-//     if (userId) {
-//       if (!mongoose.Types.ObjectId.isValid(userId)) {
-//         return NextResponse.json(
-//           { error: "Invalid userId" },
-//           { status: 400 }
-//         );
-//       }
-
-//       filter.employeeId =
-//         new mongoose.Types.ObjectId(userId);
-//     }
-
-//     if (status) filter.status = status;
-
-//     const records = await Leave.find(filter)
-//       .populate(
-//         "employeeId",
-//         "name email role teamId"
-//       )
-//       .populate(
-//         "teamId",
-//         "name code"
-//       )
-//       .populate(
-//         "approvalHistory.approverId",
-//         "name email role"
-//       )
-//       .sort({ createdAt: -1 });
-
-//     return NextResponse.json(records);
-//   } catch (error) {
-//     console.error(
-//       "GET /api/leaves error:",
-//       error
-//     );
-
-//     return NextResponse.json(
-//       { error: "Internal server error" },
-//       { status: 500 }
-//     );
-//   }
-// }
-
-// export async function POST(
-//   request: NextRequest
-// ) {
-//   try {
-//     await connectDB();
-
-//     const body = await request.json();
-
-//     const employeeId =
-//       getUserId(request, body);
-
-//     if (
-//       !employeeId ||
-//       !mongoose.Types.ObjectId.isValid(
-//         employeeId
-//       )
-//     ) {
-//       return NextResponse.json(
-//         {
-//           error:
-//             "Authenticated employee is required",
-//         },
-//         { status: 401 }
-//       );
-//     }
-
-//     const user = await getUser(employeeId);
-
-//     if (!user) {
-//       return NextResponse.json(
-//         { error: "Employee not found" },
-//         { status: 404 }
-//       );
-//     }
-
-//     const leaveType =
-//       String(body.leaveType || "")
-//         .trim()
-//         .toUpperCase();
-
-//     if (
-//       leaveType !== "PAID" &&
-//       leaveType !== "UNPAID"
-//     ) {
-//       return NextResponse.json(
-//         {
-//           error:
-//             "leaveType must be PAID or UNPAID",
-//         },
-//         { status: 400 }
-//       );
-//     }
-
-//     const startDate = new Date(
-//       body.startDate
-//     );
-
-//     const endDate = new Date(
-//       body.endDate
-//     );
-
-//     if (
-//       Number.isNaN(startDate.getTime()) ||
-//       Number.isNaN(endDate.getTime())
-//     ) {
-//       return NextResponse.json(
-//         { error: "Invalid leave dates" },
-//         { status: 400 }
-//       );
-//     }
-
-//     startDate.setHours(0, 0, 0, 0);
-//     endDate.setHours(23, 59, 59, 999);
-
-//     if (endDate < startDate) {
-//       return NextResponse.json(
-//         {
-//           error:
-//             "End date cannot be before start date",
-//         },
-//         { status: 400 }
-//       );
-//     }
-
-//     const totalDays =
-//       calculateCalendarDays(
-//         startDate,
-//         endDate
-//       );
-
-//     const reason =
-//       String(body.reason || "").trim();
-
-//     if (!reason) {
-//       return NextResponse.json(
-//         { error: "Reason is required" },
-//         { status: 400 }
-//       );
-//     }
-
-//     const role = normalizeRole(user.role);
-//     const flow = getApprovalFlow(role);
-
-//     if (role === "admin") {
-//       return NextResponse.json(
-//         {
-//           error:
-//             "Admin does not need to apply for leave through the approval workflow.",
-//         },
-//         { status: 400 }
-//       );
-//     }
-
-//     // Prevent overlapping active leave requests.
-//     const overlapping =
-//       await Leave.findOne({
-//         employeeId: user._id,
-//         status: {
-//           $nin: ["REJECTED", "CANCELLED"],
-//         },
-//         startDate: { $lte: endDate },
-//         endDate: { $gte: startDate },
-//       }).lean();
-
-//     if (overlapping) {
-//       return NextResponse.json(
-//         {
-//           error:
-//             "You already have an overlapping leave request.",
-//         },
-//         { status: 409 }
-//       );
-//     }
-
-//     if (leaveType === "PAID") {
-//       const summary =
-//         await getPaidLeaveSummary(
-//           user._id.toString(),
-//           startDate.getFullYear(),
-//           startDate.getMonth() + 1
-//         );
-
-//       if (!summary.eligible) {
-//         return NextResponse.json(
-//           {
-//             error:
-//               "Paid leave is unavailable because you have more than 3 absent days this month.",
-//             paidLeaveSummary: summary,
-//           },
-//           { status: 400 }
-//         );
-//       }
-
-//       if (totalDays > summary.remaining) {
-//         return NextResponse.json(
-//           {
-//             error: `You have only ${summary.remaining} paid leave day(s) remaining this month.`,
-//             paidLeaveSummary: summary,
-//           },
-//           { status: 400 }
-//         );
-//       }
-//     }
-
-//     const firstLevel = flow[0];
-
-//     const leave = await Leave.create({
-//       employeeId: user._id,
-//       employeeName: user.name || "",
-//       employeeEmail: user.email || "",
-//       employeeRole: user.role,
-//       teamId: user.teamId || null,
-//       leaveType,
-//       startDate,
-//       endDate,
-//       totalDays,
-//       reason,
-//       status: pendingStatus(firstLevel),
-//       currentApprovalLevel: firstLevel,
-//       approvalHistory: [],
-//     });
-
-//     await createAuditLog({
-//       userId: user._id.toString(),
-//       action: "CREATE",
-//       module: "Leave Management",
-//       description:
-//         `Applied for ${leaveType} leave from ${startDate.toISOString()} to ${endDate.toISOString()}`,
-//       entityType: "Leave",
-//       entityId: leave._id.toString(),
-//       metadata: {
-//         leaveType,
-//         totalDays,
-//         role: user.role,
-//         firstApprovalLevel: firstLevel,
-//       },
-//     });
-
-//     return NextResponse.json(
-//       leave,
-//       { status: 201 }
-//     );
-//   } catch (error) {
-//     console.error(
-//       "POST /api/leaves error:",
-//       error
-//     );
-
-//     return NextResponse.json(
-//       { error: "Internal server error" },
-//       { status: 500 }
-//     );
-//   }
-// }
-
-// async function getUser(id: string) {
-//   return (
-//     await import("@/models/Auth")
-//   ).default.findById(id)
-//     .select("_id name email role teamId")
-//     .lean();
-// }
-
-
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 
@@ -313,10 +10,9 @@ import { getCurrentUser } from "@/lib/getuser";
 
 import {
   calculateCalendarDays,
-  getApprovalFlow,
+  getAllowedApprovers,
   getPaidLeaveSummary,
   normalizeRole,
-  pendingStatus,
 } from "@/lib/leaveRules";
 
 /* =========================================================
@@ -332,9 +28,97 @@ import {
    Do NOT accept userId from query parameters.
 ========================================================= */
 
-export async function GET(request: NextRequest) {
+// export async function GET(request: NextRequest) {
+//   try {
+//     const currentUser = await getCurrentUser();
+
+//     if (!currentUser) {
+//       return NextResponse.json(
+//         {
+//           success: false,
+//           message: "Unauthorized",
+//         },
+//         { status: 401 }
+//       );
+//     }
+
+//     await connectDB();
+
+//     const { searchParams } = new URL(request.url);
+
+//     const status = searchParams.get("status");
+
+//     const filter: {
+//       employeeId: mongoose.Types.ObjectId;
+//       status?: string;
+//     } = {
+//       employeeId: new mongoose.Types.ObjectId(
+//         currentUser.userId
+//       ),
+//     };
+
+//     /*
+//      * Optional status filter.
+//      *
+//      * Example:
+//      * /api/leaves?status=APPROVED
+//      */
+
+//     if (status) {
+//       filter.status = status;
+//     }
+
+//     const records = await Leave.find(filter)
+//       .populate(
+//         "employeeId",
+//         "name email role teamId"
+//       )
+//       .populate(
+//         "teamId",
+//         "name code"
+//       )
+//       .populate(
+//         "approvalHistory.approverId",
+//         "name email role"
+//       )
+//       .sort({
+//         createdAt: -1,
+//       })
+//       .lean();
+
+//     return NextResponse.json({
+//       success: true,
+//       data: records,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "GET /api/leaves error:",
+//       error
+//     );
+
+//     return NextResponse.json(
+//       {
+//         success: false,
+//         message: "Internal server error",
+//       },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+export async function GET(
+  request: NextRequest
+) {
   try {
-    const currentUser = await getCurrentUser();
+    /*
+     * =====================================================
+     * AUTHENTICATION
+     * =====================================================
+     */
+
+    const currentUser =
+      await getCurrentUser();
 
     if (!currentUser) {
       return NextResponse.json(
@@ -346,7 +130,46 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    /*
+     * =====================================================
+     * VALIDATE USER ID
+     * =====================================================
+     */
+
+    if (
+      !currentUser.userId ||
+      !mongoose.Types.ObjectId.isValid(
+        currentUser.userId
+      )
+    ) {
+      console.error(
+        "Invalid currentUser.userId:",
+        currentUser.userId
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Invalid authenticated user ID",
+        },
+        { status: 401 }
+      );
+    }
+
+    /*
+     * =====================================================
+     * DATABASE
+     * =====================================================
+     */
+
     await connectDB();
+
+    /*
+     * =====================================================
+     * OPTIONAL STATUS FILTER
+     * =====================================================
+     */
 
     const { searchParams } =
       new URL(request.url);
@@ -354,43 +177,70 @@ export async function GET(request: NextRequest) {
     const status =
       searchParams.get("status");
 
+    const allowedStatuses = [
+      "PENDING_APPROVAL",
+      "APPROVED",
+      "REJECTED",
+      "CANCELLED",
+    ];
+
+    if (
+      status &&
+      !allowedStatuses.includes(status)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid leave status",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * =====================================================
+     * BUILD FILTER
+     * =====================================================
+     */
+
     const filter: {
       employeeId: mongoose.Types.ObjectId;
       status?: string;
     } = {
-      employeeId: new mongoose.Types.ObjectId(
-        currentUser.userId
-      ),
+      employeeId:
+        new mongoose.Types.ObjectId(
+          currentUser.userId
+        ),
     };
-
-    /*
-     * Optional status filter.
-     *
-     * Example:
-     * /api/leaves?status=APPROVED
-     */
 
     if (status) {
       filter.status = status;
     }
 
-    const records = await Leave.find(filter)
-      .populate(
-        "employeeId",
-        "name email role teamId"
-      )
-      .populate(
-        "teamId",
-        "name code"
-      )
-      .populate(
-        "approvalHistory.approverId",
-        "name email role"
-      )
-      .sort({
-        createdAt: -1,
-      })
-      .lean();
+    /*
+     * =====================================================
+     * FETCH LEAVES
+     *
+     * IMPORTANT:
+     * No populate here.
+     *
+     * This avoids errors if Auth/Team models are not
+     * registered for population in this route.
+     * =====================================================
+     */
+
+    const records =
+      await Leave.find(filter)
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+    /*
+     * =====================================================
+     * RESPONSE
+     * =====================================================
+     */
 
     return NextResponse.json({
       success: true,
@@ -401,6 +251,26 @@ export async function GET(request: NextRequest) {
       "GET /api/leaves error:",
       error
     );
+
+    if (error instanceof Error) {
+      console.error(
+        "ERROR MESSAGE:",
+        error.message
+      );
+
+      console.error(
+        "ERROR STACK:",
+        error.stack
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: error.message,
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {
@@ -425,6 +295,28 @@ export async function GET(request: NextRequest) {
    - query parameter
 
    It comes from getCurrentUser().
+
+   APPROVAL WORKFLOW:
+   ------------------
+   Any ONE authorized approver can approve.
+
+   survey-tester:
+     team-lead OR senior-teamlead OR hr OR admin
+
+   team-lead:
+     senior-teamlead OR hr OR admin
+
+   data-quality-analyst:
+     hr OR admin
+
+   senior-teamlead:
+     hr OR admin
+
+   hr:
+     admin
+
+   admin:
+     cannot apply through this workflow
 ========================================================= */
 
 export async function POST(
@@ -453,7 +345,9 @@ export async function POST(
     await connectDB();
 
     /*
-     * Validate authenticated user ID.
+     * =====================================================
+     * VALIDATE AUTHENTICATED USER ID
+     * =====================================================
      */
 
     if (
@@ -464,8 +358,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Invalid authenticated user.",
+          message: "Invalid authenticated user.",
         },
         { status: 401 }
       );
@@ -507,8 +400,52 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
+          message: "Your account is inactive.",
+        },
+        { status: 403 }
+      );
+    }
+
+    /*
+     * =====================================================
+     * NORMALIZE EMPLOYEE ROLE
+     * =====================================================
+     */
+
+    const role = normalizeRole(user.role);
+
+    /*
+     * Admin does not need leave approval.
+     */
+
+    if (role === "admin") {
+      return NextResponse.json(
+        {
+          success: false,
           message:
-            "Your account is inactive.",
+            "Admin does not need to apply for leave through the approval workflow.",
+        },
+        { status: 400 }
+      );
+    }
+
+    /*
+     * =====================================================
+     * GET ALLOWED APPROVERS
+     *
+     * This replaces the old sequential approval flow.
+     * =====================================================
+     */
+
+    const allowedApprovers =
+      getAllowedApprovers(role);
+
+    if (allowedApprovers.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "No leave approval workflow is configured for your role.",
         },
         { status: 403 }
       );
@@ -658,54 +595,6 @@ export async function POST(
 
     /*
      * =====================================================
-     * ROLE / APPROVAL FLOW
-     * =====================================================
-     */
-
-    const role = normalizeRole(
-      user.role
-    );
-
-    const flow =
-      getApprovalFlow(role);
-
-    /*
-     * Admin does not need leave approval.
-     * According to your workflow, admin should not submit
-     * normal employee leave requests.
-     */
-
-    if (role === "admin") {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Admin does not need to apply for leave through the approval workflow.",
-        },
-        { status: 400 }
-      );
-    }
-
-    /*
-     * Unknown role protection.
-     */
-
-    if (
-      !Array.isArray(flow) ||
-      flow.length === 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "No leave approval workflow is configured for your role.",
-        },
-        { status: 403 }
-      );
-    }
-
-    /*
-     * =====================================================
      * PREVENT OVERLAPPING LEAVE REQUESTS
      *
      * Rejected/cancelled requests don't block new requests.
@@ -755,7 +644,8 @@ export async function POST(
      * Otherwise:
      *     entitlement = 1
      *
-     * The summary also subtracts already-approved paid leave.
+     * The summary also subtracts already-approved
+     * paid leave.
      * =====================================================
      */
 
@@ -838,26 +728,14 @@ export async function POST(
 
     /*
      * =====================================================
-     * FIRST APPROVAL LEVEL
-     * =====================================================
-     */
-
-    const firstLevel = flow[0];
-
-    if (!firstLevel) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Unable to determine the first approval level.",
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * =====================================================
      * CREATE LEAVE
+     *
+     * IMPORTANT:
+     *
+     * There is NO first approval level.
+     * There is NO currentApprovalLevel.
+     *
+     * All authorized approvers can see/approve this request.
      * =====================================================
      */
 
@@ -871,8 +749,11 @@ export async function POST(
         employeeEmail:
           user.email || "",
 
+        /*
+         * Store normalized role.
+         */
         employeeRole:
-          user.role,
+          role,
 
         teamId:
           user.teamId || null,
@@ -887,12 +768,15 @@ export async function POST(
 
         reason,
 
+        /*
+         * NEW APPROVAL STATUS
+         */
         status:
-          pendingStatus(firstLevel),
+          "PENDING_APPROVAL",
 
-        currentApprovalLevel:
-          firstLevel,
-
+        /*
+         * Approval history starts empty.
+         */
         approvalHistory: [],
       });
 
@@ -923,9 +807,8 @@ export async function POST(
       metadata: {
         leaveType,
         totalDays,
-        role: user.role,
-        firstApprovalLevel:
-          firstLevel,
+        role,
+        allowedApprovers,
       },
     });
 
@@ -956,7 +839,8 @@ export async function POST(
      */
 
     if (
-      error instanceof mongoose.Error.ValidationError
+      error instanceof
+      mongoose.Error.ValidationError
     ) {
       return NextResponse.json(
         {

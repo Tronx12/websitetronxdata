@@ -148,19 +148,22 @@ export async function POST(
 
     /*
      * =====================================================
-     * FINALIZED REQUEST CHECK
+     * ONLY PENDING LEAVE CAN BE CANCELLED
+     * =====================================================
      *
-     * Approved, rejected and already cancelled
-     * requests cannot be cancelled.
+     * New workflow:
+     *
+     * PENDING_APPROVAL -> CANCELLED
+     *
+     * APPROVED          -> cannot cancel
+     * REJECTED          -> cannot cancel
+     * CANCELLED         -> cannot cancel
      * =====================================================
      */
 
     if (
-      [
-        "APPROVED",
-        "REJECTED",
-        "CANCELLED",
-      ].includes(leave.status)
+      leave.status !==
+      "PENDING_APPROVAL"
     ) {
       return NextResponse.json(
         {
@@ -174,13 +177,35 @@ export async function POST(
 
     /*
      * =====================================================
+     * SAVE PREVIOUS STATUS
+     *
+     * IMPORTANT:
+     * Save this BEFORE changing the status.
+     * =====================================================
+     */
+
+    const previousStatus =
+      leave.status;
+
+    /*
+     * =====================================================
      * CANCEL LEAVE
      * =====================================================
      */
 
-    leave.status = "CANCELLED";
+    leave.status =
+      "CANCELLED";
 
-    leave.currentApprovalLevel = null;
+    /*
+     * IMPORTANT:
+     *
+     * Do NOT use:
+     *
+     * leave.currentApprovalLevel = null
+     *
+     * because currentApprovalLevel no longer
+     * exists in the new Leave schema.
+     */
 
     await leave.save();
 
@@ -218,8 +243,10 @@ export async function POST(
         employeeRole:
           user.role,
 
-        previousStatus:
-          leave.status,
+        previousStatus,
+
+        newStatus:
+          "CANCELLED",
       },
     });
 
@@ -231,7 +258,8 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: "Leave cancelled.",
+      message:
+        "Leave cancelled successfully.",
       data: leave,
     });
   } catch (error) {
@@ -240,11 +268,25 @@ export async function POST(
       error
     );
 
+    if (error instanceof Error) {
+      console.error(
+        "ERROR MESSAGE:",
+        error.message
+      );
+
+      console.error(
+        "ERROR STACK:",
+        error.stack
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
         message:
-          "Internal server error",
+          error instanceof Error
+            ? error.message
+            : "Internal server error",
       },
       { status: 500 }
     );

@@ -9,14 +9,44 @@ import { createAuditLog } from "@/lib/auditLog";
 import { getCurrentUser } from "@/lib/getuser";
 
 import {
-  nextApproval,
+  canApproveLeave,
   normalizeRole,
-  pendingStatus,
 } from "@/lib/leaveRules";
 
 type Params = {
   params: Promise<{ id: string }>;
 };
+
+/* =========================================================
+   POST /api/leaves/[id]/approve
+
+   NEW APPROVAL WORKFLOW:
+
+   survey-tester
+     -> team-lead OR senior-teamlead OR hr OR admin
+
+   team-lead
+     -> senior-teamlead OR hr OR admin
+
+   data-quality-analyst
+     -> hr OR admin
+
+   senior-teamlead
+     -> hr OR admin
+
+   hr
+     -> admin
+
+   IMPORTANT:
+   Only ONE approval is required.
+
+   Once an authorized approver approves:
+       PENDING_APPROVAL
+              ↓
+          APPROVED
+
+   There is NO sequential approval.
+========================================================= */
 
 export async function POST(
   request: NextRequest,
@@ -26,13 +56,6 @@ export async function POST(
     /*
      * =====================================================
      * AUTHENTICATE APPROVER
-     *
-     * Never trust:
-     * - x-user-id
-     * - body.approverId
-     * - query userId
-     *
-     * The authenticated user comes from the JWT cookies.
      * =====================================================
      */
 
@@ -106,8 +129,6 @@ export async function POST(
     /*
      * =====================================================
      * LOAD APPROVER
-     *
-     * Always load the current database record.
      * =====================================================
      */
 
@@ -166,22 +187,19 @@ export async function POST(
 
     /*
      * =====================================================
-     * PREVENT DOUBLE APPROVAL
+     * ONLY PENDING APPROVAL CAN BE APPROVED
      * =====================================================
      */
 
     if (
-      [
-        "APPROVED",
-        "REJECTED",
-        "CANCELLED",
-      ].includes(leave.status)
+      leave.status !==
+      "PENDING_APPROVAL"
     ) {
       return NextResponse.json(
         {
           success: false,
           message:
-            "This leave request is already finalized.",
+            "This leave request is no longer pending approval.",
         },
         { status: 400 }
       );
@@ -189,82 +207,19 @@ export async function POST(
 
     /*
      * =====================================================
-     * CURRENT APPROVAL LEVEL
+     * PREVENT SELF APPROVAL
      * =====================================================
      */
 
-    const requiredLevel =
-      leave.currentApprovalLevel;
-
-    if (!requiredLevel) {
+    if (
+      String(leave.employeeId) ===
+      String(approver._id)
+    ) {
       return NextResponse.json(
         {
           success: false,
           message:
-            "No approval is pending.",
-        },
-        { status: 400 }
-      );
-    }
-
-    /*
-     * =====================================================
-     * APPROVER ROLE
-     * =====================================================
-     */
-
-    const role = normalizeRole(
-      approver.role
-    );
-
-    /*
-     * Each approval level has one authorized role.
-     */
-
-    const roleForLevel: Record<
-      string,
-      string
-    > = {
-      TEAM_LEAD: "team-lead",
-
-      SENIOR_TEAMLEAD:
-        "senior-teamlead",
-
-      HR: "hr",
-
-      ADMIN: "admin",
-    };
-
-    const requiredRole =
-      roleForLevel[requiredLevel];
-
-    /*
-     * Unknown approval level protection.
-     */
-
-    if (!requiredRole) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Invalid approval level.",
-        },
-        { status: 500 }
-      );
-    }
-
-    /*
-     * =====================================================
-     * ROLE CHECK
-     * =====================================================
-     */
-
-    if (requiredRole !== role) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            `Only ${requiredRole} can approve this request.`,
+            "You cannot approve your own leave request.",
         },
         { status: 403 }
       );
@@ -272,16 +227,73 @@ export async function POST(
 
     /*
      * =====================================================
-     * TEAM LEAD CHECK
+     * NORMALIZE APPROVER ROLE
+     * =====================================================
+     */
+
+    const approverRole =
+      normalizeRole(
+        approver.role
+      );
+
+    /*
+     * =====================================================
+     * CHECK APPROVAL PERMISSION
+     * =====================================================
      *
-     * Team Lead can approve only leave requests
+     * This is the main authorization check.
+     *
+     * Example:
+     *
+     * survey-tester + team-lead
+     *        => true
+     *
+     * survey-tester + hr
+     *        => true
+     *
+     * data-quality-analyst + team-lead
+     *        => false
+     * =====================================================
+     */
+
+    const allowed =
+      canApproveLeave(
+        leave.employeeRole,
+        approverRole
+      );
+
+    if (!allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "You are not authorized to approve this leave request.",
+        },
+        { status: 403 }
+      );
+    }
+
+    /*
+     * =====================================================
+     * TEAM LEAD SCOPE
+     * =====================================================
+     *
+     * Team Leads can only approve leave requests
      * belonging to their assigned team.
+     *
+     * HR/Admin/Senior Team Lead do not have this
+     * restriction here.
      * =====================================================
      */
 
     if (
-      requiredLevel === "TEAM_LEAD"
+      approverRole ===
+      "team-lead"
     ) {
+      /*
+       * Team Lead must have a team.
+       */
+
       if (!approver.teamId) {
         return NextResponse.json(
           {
@@ -293,6 +305,10 @@ export async function POST(
         );
       }
 
+      /*
+       * Leave must belong to a team.
+       */
+
       if (!leave.teamId) {
         return NextResponse.json(
           {
@@ -303,6 +319,10 @@ export async function POST(
           { status: 403 }
         );
       }
+
+      /*
+       * Leave team must match approver team.
+       */
 
       if (
         String(leave.teamId) !==
@@ -321,12 +341,54 @@ export async function POST(
 
     /*
      * =====================================================
-     * ADD APPROVAL HISTORY
+     * APPROVAL HISTORY
+     * =====================================================
+     *
+     * `level` is only for audit/history.
+     * It does NOT determine the next approver.
      * =====================================================
      */
 
+    const approvalLevelMap: Record<
+      string,
+      string
+    > = {
+      "team-lead":
+        "TEAM_LEAD",
+
+      "senior-teamlead":
+        "SENIOR_TEAMLEAD",
+
+      hr:
+        "HR",
+
+      admin:
+        "ADMIN",
+    };
+
+    const approvalLevel =
+      approvalLevelMap[
+        approverRole
+      ];
+
+    if (!approvalLevel) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Invalid approver role.",
+        },
+        { status: 403 }
+      );
+    }
+
+    /*
+     * Add approval history.
+     */
+
     leave.approvalHistory.push({
-      level: requiredLevel,
+      level:
+        approvalLevel,
 
       approverId:
         new mongoose.Types.ObjectId(
@@ -339,51 +401,39 @@ export async function POST(
       approverEmail:
         approver.email || "",
 
-      action: "APPROVED",
+      action:
+        "APPROVED",
 
       comment,
 
-      actionAt: new Date(),
+      actionAt:
+        new Date(),
     });
-
-    /*
-     * =====================================================
-     * DETERMINE NEXT APPROVAL
-     * =====================================================
-     */
-
-    const next =
-      nextApproval(
-        leave.employeeRole,
-        requiredLevel
-      );
 
     /*
      * =====================================================
      * FINAL APPROVAL
      * =====================================================
+     *
+     * Any ONE authorized approver is enough.
+     *
+     * PENDING_APPROVAL
+     *       ↓
+     *    APPROVED
+     *
+     * There is NO nextApproval().
+     * =====================================================
      */
 
-    if (!next) {
-      leave.status = "APPROVED";
-
-      leave.currentApprovalLevel = null;
-    } else {
-      /*
-       * Continue approval chain.
-       */
-
-      leave.status =
-        pendingStatus(next);
-
-      leave.currentApprovalLevel =
-        next as any;
-    }
+    leave.status =
+      "APPROVED";
 
     /*
-     * =====================================================
-     * SAVE
-     * =====================================================
+     * Do NOT use:
+     *
+     * leave.currentApprovalLevel
+     *
+     * because that field no longer exists.
      */
 
     await leave.save();
@@ -398,13 +448,14 @@ export async function POST(
       userId:
         currentUser.userId,
 
-      action: "UPDATE",
+      action:
+        "UPDATE",
 
       module:
         "Leave Management",
 
       description:
-        `Approved leave ${leave._id.toString()} at ${requiredLevel} level`,
+        `Approved leave ${leave._id.toString()}`,
 
       entityType:
         "Leave",
@@ -416,12 +467,6 @@ export async function POST(
         leaveId:
           leave._id.toString(),
 
-        level:
-          requiredLevel,
-
-        nextLevel:
-          next,
-
         status:
           leave.status,
 
@@ -430,6 +475,11 @@ export async function POST(
 
         approverRole:
           approver.role,
+
+        employeeRole:
+          leave.employeeRole,
+
+        approvalLevel,
       },
     });
 
@@ -442,9 +492,8 @@ export async function POST(
     return NextResponse.json({
       success: true,
 
-      message: next
-        ? `Leave approved and sent to ${next}.`
-        : "Leave fully approved.",
+      message:
+        "Leave approved successfully.",
 
       data: leave,
     });
@@ -454,11 +503,25 @@ export async function POST(
       error
     );
 
+    if (error instanceof Error) {
+      console.error(
+        "ERROR MESSAGE:",
+        error.message
+      );
+
+      console.error(
+        "ERROR STACK:",
+        error.stack
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
         message:
-          "Internal server error",
+          error instanceof Error
+            ? error.message
+            : "Internal server error",
       },
       { status: 500 }
     );

@@ -6,6 +6,7 @@ import OfficeOff from "@/models/OfficeOff";
 import OfficeSettings from "@/models/OfficeSettings";
 import WeeklyOffPolicy from "@/models/WeeklyOffPolicy";
 import Shift from "@/models/Shift";
+import "@/models/Team";
 
 import { getCurrentUser } from "@/lib/getuser";
 import { createAuditLog } from "@/lib/auditLog";
@@ -35,79 +36,217 @@ function getClientIp(req: NextRequest) {
  * GET
  * =========================================================
  */
+// export async function GET(req: NextRequest) {
+//   try {
+//     await connectDB();
+
+//     const user = await getCurrentUser();
+//     if (!user?.userId) {
+//       return NextResponse.json(
+//         { success: false, message: "Unauthorized" },
+//         { status: 401 }
+//       );
+//     }
+
+//     const { searchParams } = new URL(req.url);
+//     const year = searchParams.get("year") || new Date().getFullYear().toString();
+//     const yearNumber = Number(year);
+
+//     if (!Number.isInteger(yearNumber) || yearNumber < 2000 || yearNumber > 2100) {
+//       return NextResponse.json(
+//         { success: false, message: "Invalid year" },
+//         { status: 400 }
+//       );
+//     }
+
+//     const startDate = new Date(`${yearNumber}-01-01T00:00:00.000Z`);
+//     const endDate = new Date(`${yearNumber + 1}-01-01T00:00:00.000Z`);
+
+//     const [officeOffs, settings, weeklyPolicies, shifts] = await Promise.all([
+//       OfficeOff.find({
+//         date: {
+//           $gte: startDate,
+//           $lt: endDate,
+//         },
+//         isActive: true,
+//       })
+//         .populate("createdBy", "name email role")
+//         .populate("teamIds", "name")
+//         .populate("shiftIds", "name code")
+//         .populate("employeeIds", "name email")
+//         .sort({ date: 1 })
+//         .lean(),
+
+//       OfficeSettings.findOne().lean(),
+
+//       WeeklyOffPolicy.find({
+//         isActive: true,
+//       })
+//         .populate("teamId", "name")
+//         .populate("employeeId", "name email")
+//         .sort({ effectiveFrom: 1 })
+//         .lean(),
+
+//       Shift.find({
+//         isActive: true,
+//       })
+//         .sort({ name: 1 })
+//         .lean(),
+//     ]);
+
+//     return NextResponse.json({
+//       success: true,
+//       data: officeOffs,
+//       settings: {
+//         weekendOff: settings?.weekendOff ?? false,
+//         saturdayOff: settings?.saturdayOff ?? false,
+//         sundayOff: settings?.sundayOff ?? false,
+//       },
+//       weeklyPolicies,
+//       shifts,
+//     });
+//   } catch (error) {
+//     console.error("GET OFFICE OFF ERROR:", error);
+//     return NextResponse.json(
+//       { success: false, message: "Failed to load office off records" },
+//       { status: 500 }
+//     );
+//   }
+// }
+
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
     const user = await getCurrentUser();
+
     if (!user?.userId) {
       return NextResponse.json(
-        { success: false, message: "Unauthorized" },
+        {
+          success: false,
+          message: "Unauthorized",
+        },
         { status: 401 }
       );
     }
 
     const { searchParams } = new URL(req.url);
-    const year = searchParams.get("year") || new Date().getFullYear().toString();
+
+    const year =
+      searchParams.get("year") ||
+      new Date().getFullYear().toString();
+
     const yearNumber = Number(year);
 
-    if (!Number.isInteger(yearNumber) || yearNumber < 2000 || yearNumber > 2100) {
+    if (
+      !Number.isInteger(yearNumber) ||
+      yearNumber < 2000 ||
+      yearNumber > 2100
+    ) {
       return NextResponse.json(
-        { success: false, message: "Invalid year" },
+        {
+          success: false,
+          message: "Invalid year",
+        },
         { status: 400 }
       );
     }
 
-    const startDate = new Date(`${yearNumber}-01-01T00:00:00.000Z`);
-    const endDate = new Date(`${yearNumber + 1}-01-01T00:00:00.000Z`);
+    const startDate = new Date(
+      `${yearNumber}-01-01T00:00:00.000Z`
+    );
 
-    const [officeOffs, settings, weeklyPolicies, shifts] = await Promise.all([
-      OfficeOff.find({
-        date: {
-          $gte: startDate,
-          $lt: endDate,
-        },
-        isActive: true,
-      })
-        .populate("createdBy", "name email role")
-        .populate("teamIds", "name")
-        .populate("shiftIds", "name code")
-        .populate("employeeIds", "name email")
-        .sort({ date: 1 })
-        .lean(),
+    const endDate = new Date(
+      `${yearNumber + 1}-01-01T00:00:00.000Z`
+    );
 
-      OfficeSettings.findOne().lean(),
+    // ----------------------------------------
+    // OFFICE OFF
+    // ----------------------------------------
 
-      WeeklyOffPolicy.find({
+    const officeOffs = await OfficeOff.find({
+      date: {
+        $gte: startDate,
+        $lt: endDate,
+      },
+      isActive: true,
+    })
+      .populate("createdBy", "name email role")
+      .populate("teamIds", "name")
+      .populate("shiftIds", "name code")
+      .populate("employeeIds", "name email")
+      .sort({ date: 1 })
+      .lean();
+
+    // ----------------------------------------
+    // SETTINGS
+    // ----------------------------------------
+
+    const settings =
+      await OfficeSettings.findOne().lean();
+
+    // ----------------------------------------
+    // WEEKLY POLICIES
+    // ----------------------------------------
+
+    const weeklyPolicies =
+      await WeeklyOffPolicy.find({
         isActive: true,
       })
         .populate("teamId", "name")
         .populate("employeeId", "name email")
         .sort({ effectiveFrom: 1 })
-        .lean(),
+        .lean();
 
-      Shift.find({
-        isActive: true,
-      })
-        .sort({ name: 1 })
-        .lean(),
-    ]);
+    // ----------------------------------------
+    // SHIFTS
+    // ----------------------------------------
+
+    const shifts = await Shift.find({
+      isActive: true,
+    })
+      .sort({ name: 1 })
+      .lean();
 
     return NextResponse.json({
       success: true,
       data: officeOffs,
+
       settings: {
-        weekendOff: settings?.weekendOff ?? false,
-        saturdayOff: settings?.saturdayOff ?? false,
-        sundayOff: settings?.sundayOff ?? false,
+        weekendOff:
+          settings?.weekendOff ?? false,
+
+        saturdayOff:
+          settings?.saturdayOff ?? false,
+
+        sundayOff:
+          settings?.sundayOff ?? false,
       },
+
       weeklyPolicies,
       shifts,
     });
-  } catch (error) {
-    console.error("GET OFFICE OFF ERROR:", error);
+  } catch (error: any) {
+    console.error(
+      "GET OFFICE OFF ERROR:",
+      error
+    );
+
     return NextResponse.json(
-      { success: false, message: "Failed to load office off records" },
+      {
+        success: false,
+        message:
+          error?.message ||
+          "Failed to load office off records",
+
+        error:
+          process.env.NODE_ENV === "development"
+            ? {
+                name: error?.name,
+                message: error?.message,
+              }
+            : undefined,
+      },
       { status: 500 }
     );
   }

@@ -1,164 +1,282 @@
 import mongoose from "mongoose";
+
 import Attendance from "@/models/Attendance";
 import Leave from "@/models/Leave";
-import Auth from "@/models/Auth";
 
-export const APPROVAL_FLOW: Record<string, string[]> = {
-  "survey-tester": ["TEAM_LEAD", "SENIOR_TEAMLEAD", "HR", "ADMIN"],
-  "team-lead": ["SENIOR_TEAMLEAD", "HR", "ADMIN"],
-  "senior-teamlead": ["HR", "ADMIN"],
-  "data-quality-analyst": ["HR", "ADMIN"],
-  "hr": ["ADMIN"],
+/* =========================================================
+   APPROVAL ROLES
+========================================================= */
+
+export type ApprovalRole =
+  | "survey-tester"
+  | "team-lead"
+  | "senior-teamlead"
+  | "data-quality-analyst"
+  | "hr"
+  | "admin";
+
+/* =========================================================
+   APPROVAL PERMISSIONS
+========================================================= */
+
+/**
+ * Employee role -> roles allowed to approve
+ *
+ * IMPORTANT:
+ * This is NOT sequential.
+ * Any ONE authorized approver can approve.
+ */
+export const APPROVAL_PERMISSIONS: Record<
+  ApprovalRole,
+  ApprovalRole[]
+> = {
+  "survey-tester": [
+    "team-lead",
+    "senior-teamlead",
+    "hr",
+    "admin",
+  ],
+
+  "team-lead": [
+    "senior-teamlead",
+    "hr",
+    "admin",
+  ],
+
+  "data-quality-analyst": [
+    "hr",
+    "admin",
+  ],
+
+  "senior-teamlead": [
+    "hr",
+    "admin",
+  ],
+
+  hr: [
+    "admin",
+  ],
+
   admin: [],
 };
 
-export function normalizeRole(role: unknown) {
-  return String(role || "").trim().toLowerCase().replace(/_/g, "-");
+/* =========================================================
+   NORMALIZE ROLE
+========================================================= */
+
+export function normalizeRole(
+  role?: string | null
+): string {
+  return String(role || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-")
+    .replace(/\s+/g, "-");
 }
 
-export function getApprovalFlow(role: unknown): string[] {
-  return APPROVAL_FLOW[normalizeRole(role)] || ["HR", "ADMIN"];
+/* =========================================================
+   GET ALLOWED APPROVERS
+========================================================= */
+
+export function getAllowedApprovers(
+  employeeRole?: string | null
+): string[] {
+  const role = normalizeRole(employeeRole);
+
+  return (
+    APPROVAL_PERMISSIONS[
+      role as ApprovalRole
+    ] || []
+  );
 }
 
-export function pendingStatus(level: string) {
-  return `PENDING_${level}` as const;
+/* =========================================================
+   CHECK APPROVAL PERMISSION
+========================================================= */
+
+export function canApproveLeave(
+  employeeRole: string,
+  approverRole: string
+): boolean {
+  const allowedRoles =
+    getAllowedApprovers(employeeRole);
+
+  return allowedRoles.includes(
+    normalizeRole(approverRole)
+  );
 }
 
-export function nextApproval(
-  role: unknown,
-  currentLevel: string | null
-) {
-  const flow = getApprovalFlow(role);
-  if (!flow.length) return null;
-
-  if (!currentLevel) return flow[0];
-
-  const index = flow.indexOf(currentLevel);
-  return index >= 0 && index + 1 < flow.length
-    ? flow[index + 1]
-    : null;
-}
-
-function dayStart(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function dayEnd(date: Date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
+/* =========================================================
+   CALCULATE CALENDAR DAYS
+========================================================= */
 
 export function calculateCalendarDays(
   startDate: Date,
   endDate: Date
-) {
-  const start = dayStart(startDate);
-  const end = dayStart(endDate);
+): number {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
 
-  const diff =
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  const difference =
     end.getTime() - start.getTime();
 
-  return Math.floor(
-    diff / (1000 * 60 * 60 * 24)
-  ) + 1;
+  return (
+    Math.floor(
+      difference /
+        (1000 * 60 * 60 * 24)
+    ) + 1
+  );
 }
 
-/**
- * Counts actual Attendance documents marked ABSENT in the month.
- * Approved leave records are not counted as absence.
- *
- * The exact Attendance status strings in the supplied attendance
- * route include "present", "worked-on-holiday", and
- * "worked-on-weekly-off". This function therefore only counts
- * explicit "absent" records.
- */
+/* =========================================================
+   GET ABSENT DAYS
+========================================================= */
+
 export async function getAbsentDays(
-  employeeId: string,
+  employeeId: mongoose.Types.ObjectId,
   year: number,
   month: number
-) {
-  const start = new Date(year, month - 1, 1);
-  const end = new Date(year, month, 0, 23, 59, 59, 999);
-
-  return Attendance.countDocuments({
-    userId: new mongoose.Types.ObjectId(employeeId),
-    date: { $gte: start, $lte: end },
-    status: "absent",
-  });
-}
-
-export async function getPaidLeaveSummary(
-  employeeId: string,
-  year: number,
-  month: number
-) {
-  const absentDays = await getAbsentDays(
-    employeeId,
+): Promise<number> {
+  const start = new Date(
     year,
-    month
+    month - 1,
+    1
   );
 
-  const entitlement = absentDays > 3 ? 0 : 1;
-
-  const monthStart = new Date(year, month - 1, 1);
-  const monthEnd = new Date(
+  const end = new Date(
     year,
     month,
-    0,
-    23,
-    59,
-    59,
-    999
+    1
   );
 
-  const approvedPaidLeaves =
-    await Leave.find({
-      employeeId: new mongoose.Types.ObjectId(employeeId),
-      leaveType: "PAID",
-      status: "APPROVED",
-      startDate: { $lte: monthEnd },
-      endDate: { $gte: monthStart },
+  const records =
+    await Attendance.find({
+      employeeId,
+
+      status: "absent",
+
+      date: {
+        $gte: start,
+        $lt: end,
+      },
     }).lean();
 
-  let used = 0;
+  return records.length;
+}
 
-  for (const leave of approvedPaidLeaves) {
-    const start =
-      new Date(leave.startDate) < monthStart
-        ? monthStart
-        : new Date(leave.startDate);
+/* =========================================================
+   PAID LEAVE SUMMARY
+========================================================= */
 
-    const end =
-      new Date(leave.endDate) > monthEnd
-        ? monthEnd
-        : new Date(leave.endDate);
+export async function getPaidLeaveSummary(
+  employeeId:
+    | string
+    | mongoose.Types.ObjectId,
+  year: number,
+  month: number
+) {
+  const employeeObjectId =
+    new mongoose.Types.ObjectId(
+      employeeId.toString()
+    );
 
-    used += calculateCalendarDays(start, end);
-  }
+  /*
+   * Get absent days for this month.
+   */
+  const absentDays =
+    await getAbsentDays(
+      employeeObjectId,
+      year,
+      month
+    );
 
-  const remaining = Math.max(
-    0,
-    entitlement - used
+  /*
+   * Monthly paid leave entitlement.
+   *
+   * More than 3 absent days = no paid leave.
+   */
+  const monthlyEntitlement = 1;
+
+  const eligible =
+    absentDays <= 3;
+
+  /*
+   * Current month range.
+   */
+  const start = new Date(
+    year,
+    month - 1,
+    1
   );
+
+  const end = new Date(
+    year,
+    month,
+    1
+  );
+
+  /*
+   * Find already approved paid leaves.
+   */
+  const paidLeaves =
+    await Leave.find({
+      employeeId:
+        employeeObjectId,
+
+      leaveType: "PAID",
+
+      status: "APPROVED",
+
+      startDate: {
+        $lt: end,
+      },
+
+      endDate: {
+        $gte: start,
+      },
+    }).lean();
+
+  /*
+   * Calculate already-used paid leave days.
+   */
+  const used =
+    paidLeaves.reduce(
+      (
+        total: number,
+        leave: any
+      ) =>
+        total +
+        Number(
+          leave.totalDays || 0
+        ),
+      0
+    );
+
+  /*
+   * Calculate remaining entitlement.
+   */
+  const remaining = eligible
+    ? Math.max(
+        monthlyEntitlement - used,
+        0
+      )
+    : 0;
 
   return {
     year,
     month,
+
     absentDays,
-    monthlyEntitlement: 1,
-    eligible: absentDays <= 3,
+
+    monthlyEntitlement,
+
+    eligible,
+
     used,
+
     remaining,
   };
-}
-
-export async function getUserForLeave(
-  userId: string
-) {
-  return Auth.findById(userId)
-    .select("_id name email role teamId")
-    .lean();
 }

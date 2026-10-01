@@ -462,7 +462,7 @@ export default function ApplyLeavePage() {
        */
 
       setTimeout(() => {
-        router.push("/survey-tester/leave-management");
+        router.push("/team-lead/leave-management");
         router.refresh();
       }, 500);
     } catch (error) {
@@ -491,7 +491,7 @@ export default function ApplyLeavePage() {
 
       <div className="mb-6">
         <Link
-          href="/survey-tester/leave-management"
+          href="/team-lead/leave-management"
           className="text-sm text-gray-500 hover:text-gray-900"
         >
           ← Back to Leave Management
