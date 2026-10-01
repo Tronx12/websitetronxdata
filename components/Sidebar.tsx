@@ -5,6 +5,31 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SIDEBAR_ITEMS, UserRole } from "../types/role";
 
+// import {
+//   ChevronLeft,
+//   ChevronRight,
+//   LogOut,
+//   Menu,
+//   X,
+//   LayoutDashboard,
+//   CalendarCheck,
+//   CalendarPlus,
+//   UserCircle,
+//   FileSpreadsheet,
+//   Users,
+//   BarChart3,
+//   Settings,
+//   UsersRound,
+//   Network,
+//   CalendarCog,
+//   Database,
+//   ScrollText,
+//   CalendarOff,
+//   ClipboardList,
+//   BadgeCheck,
+//   Home,
+// } from "lucide-react";
+
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,21 +37,41 @@ import {
   Menu,
   X,
   LayoutDashboard,
+
+  // Attendance
   CalendarCheck,
   CalendarPlus,
+  CalendarCog,
+  CalendarDays,
+  CalendarOff,
+
+  // Users / Teams
   UserCircle,
-  FileSpreadsheet,
   Users,
-  BarChart3,
-  Settings,
   UsersRound,
   Network,
-  CalendarCog,
+
+  // Leave / Documents
+  FileSpreadsheet,
+  FileText,
+  FileCheck,
+
+  // Survey / Data
   Database,
-  ScrollText,
-  CalendarOff,
+  BarChart3,
   ClipboardList,
+
+  // OE
+  Send,
+  Trophy,
+  ChartNoAxesCombined,
   BadgeCheck,
+  Target,
+
+  // Security / Logs
+  ShieldCheck,
+  ScrollText,
+
   Home,
 } from "lucide-react";
 
@@ -42,27 +87,59 @@ interface SidebarProps {
 // =====================================================
 // Keys must exactly match the icon names in types/role.ts
 
+// const iconMap = {
+//   LayoutDashboard,
+//   CalendarCheck,
+//   CalendarPlus,
+//   UserCircle,
+//   FileSpreadsheet,
+//   Users,
+//   BarChart3,
+//   Settings,
+//   UsersRound,
+//   Network,
+//   CalendarCog,
+//   Database,
+//   ScrollText,
+//   CalendarOff,
+
+//   // OE Panel
+//   ClipboardList,
+
+//   // OE DQA Panel
+//   BadgeCheck,
+// };
+
 const iconMap = {
   LayoutDashboard,
+
   CalendarCheck,
   CalendarPlus,
-  UserCircle,
-  FileSpreadsheet,
-  Users,
-  BarChart3,
-  Settings,
-  UsersRound,
-  Network,
   CalendarCog,
-  Database,
-  ScrollText,
+  CalendarDays,
   CalendarOff,
 
-  // OE Panel
+  UserCircle,
+  Users,
+  UsersRound,
+  Network,
+
+  FileSpreadsheet,
+  FileText,
+  FileCheck,
+
+  Database,
+  BarChart3,
   ClipboardList,
 
-  // OE DQA Panel
+  Send,
+  Trophy,
+  ChartNoAxesCombined,
   BadgeCheck,
+  Target,
+
+  ShieldCheck,
+  ScrollText,
 };
 
 export function Sidebar({

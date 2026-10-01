@@ -22,7 +22,7 @@ interface UserData {
   _id: string;
   name: string;
   email: string;
-  role: "admin" | "hr" | "team-lead" | "survey-tester";
+  role: "admin" | "hr" | "team-lead" | "survey-tester" |"senior-teamlead" | "data-quality-analyst";
   phoneNumber?: string;
   workingShift?: "day" | "night";
   employeeId?: string;
@@ -43,13 +43,37 @@ const roleLabels: Record<UserData["role"], string> = {
   hr: "HR",
   "team-lead": "Team Lead",
   "survey-tester": "Survey Tester",
+  "senior-teamlead":"Senior TeamLead",
+  "data-quality-analyst":"Data Quality Analyst",
 };
 
+// const roleColors: Record<UserData["role"], string> = {
+//   admin: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+//   hr: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+//   "team-lead": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+//   "survey-tester": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+//    "data-quality-analyst": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+//     "senior-teamlead": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+// };
+
 const roleColors: Record<UserData["role"], string> = {
-  admin: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  hr: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  "team-lead": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  "survey-tester": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  admin:
+    "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+
+  hr:
+    "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+
+  "team-lead":
+    "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+
+  "survey-tester":
+    "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+
+  "data-quality-analyst":
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+
+  "senior-teamlead":
+    "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
 };
 
 const shiftLabels: Record<"day" | "night", string> = {

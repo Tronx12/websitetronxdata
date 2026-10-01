@@ -6,7 +6,7 @@ import { connectDB } from "@/config/db";
 import Auth from "@/models/Auth";
 import { getCurrentUser } from "@/lib/getuser";
 
-const allowedRoles = ["admin", "hr", "team-lead"];
+const allowedRoles = ["admin", "hr", "team-lead","senior-teamlead","data-quality-analyst"];
 
 export async function GET() {
   try {
