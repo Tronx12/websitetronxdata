@@ -85,7 +85,7 @@ export async function PUT(
       lunchEnd,
       isLate,
       lateByMinutes,
-      loginLocationAddress,
+      // loginLocationAddress,
     } = body;
 
     const before = {
@@ -95,7 +95,7 @@ export async function PUT(
       lunchEnd: record.lunchEnd,
       isLate: record.isLate,
       lateByMinutes: record.lateByMinutes,
-      loginLocationAddress: record.loginLocationAddress,
+      // loginLocationAddress: record.loginLocationAddress,
     };
 
     if (loggingTime !== undefined) record.loggingTime = loggingTime;
@@ -104,7 +104,7 @@ export async function PUT(
     if (lunchEnd !== undefined) record.lunchEnd = lunchEnd;
     if (typeof isLate === "boolean") record.isLate = isLate;
     if (lateByMinutes !== undefined) record.lateByMinutes = lateByMinutes;
-    if (loginLocationAddress !== undefined) record.loginLocationAddress = loginLocationAddress;
+    // if (loginLocationAddress !== undefined) record.loginLocationAddress = loginLocationAddress;
 
     record.updatedBy = new mongoose.Types.ObjectId(currentUser.userId);
 
@@ -133,7 +133,7 @@ export async function PUT(
           lunchEnd: record.lunchEnd,
           isLate: record.isLate,
           lateByMinutes: record.lateByMinutes,
-          loginLocationAddress: record.loginLocationAddress,
+          // loginLocationAddress: record.loginLocationAddress,
         },
       },
     });

@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       lunchEnd,
       isLate,
       lateByMinutes,
-      loginLocationAddress,
+      // loginLocationAddress,
     } = body;
 
     if (!userId || !date) {
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
       lunchEnd,
       isLate: !!isLate,
       lateByMinutes: lateByMinutes || 0,
-      loginLocationAddress,
+      // loginLocationAddress,
       updatedBy: currentUser.userId,
     });
 
