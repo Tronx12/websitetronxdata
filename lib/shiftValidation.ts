@@ -78,18 +78,17 @@ export const DEFAULT_RULES: ShiftRules = {
     logoutOpen: 19 * 60, // 7:00 PM
   },
 
-  night: {
-    loginOpen: 21 * 60 + 30, // 9:30 PM
-    lateAfter: 22 * 60 + 10, // 10:10 PM
+ night: {
+  loginOpen: 21 * 60 + 30, // 9:30 PM
 
-    // IMPORTANT:
-    // Night shift ends at 6:30 AM.
-    dayRollover: 6 * 60 + 30,
+  lateAfter: 22 * 60 + 10, // 10:10 PM
 
-    // Logout allowed from 6:30 AM.
-    logoutOpen: 6 * 60 + 30,
-  },
+  // Night shift ends at 6:00 AM IST
+  dayRollover: 6 * 60,
 
+  // Logout allowed from 6:00 AM IST
+  logoutOpen: 6 * 60,
+},
   lunch: {
     minMinutes: 30,
     maxMinutes: 35,

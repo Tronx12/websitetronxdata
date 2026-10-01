@@ -99,7 +99,7 @@ export async function PUT(req, { params }) {
 
     // Authorization
     if (
-      !["admin", "hr"].includes(
+      !["admin", "hr","senior-teamlead"].includes(
         currentUser.role
       )
     ) {
@@ -188,70 +188,238 @@ export async function PUT(req, { params }) {
        TEAM LEAD
     ----------------------------------------- */
 
-    if (teamLeadId !== undefined) {
-      if (teamLeadId === null || teamLeadId === "") {
-        team.teamLead = null;
-      } else {
-        const lead = await Auth.findById(
-          teamLeadId
-        ).select("_id role");
+    // if (teamLeadId !== undefined) {
+    //   if (teamLeadId === null || teamLeadId === "") {
+    //     team.teamLead = null;
+    //   } else {
+    //     const lead = await Auth.findById(
+    //       teamLeadId
+    //     ).select("_id role");
 
-        if (
-          !lead ||
-          lead.role !== "team-lead"
-        ) {
-          return NextResponse.json(
-            {
-              success: false,
-              message: "Invalid team lead",
-            },
-            { status: 400 }
-          );
-        }
+    //     if (
+    //       !lead ||
+    //       lead.role !== "team-lead"
+    //     ) {
+    //       return NextResponse.json(
+    //         {
+    //           success: false,
+    //           message: "Invalid team lead",
+    //         },
+    //         { status: 400 }
+    //       );
+    //     }
 
-        team.teamLead = lead._id;
-      }
+    //     team.teamLead = lead._id;
+    //   }
+    // }
+
+    /* -----------------------------------------
+   TEAM LEAD
+----------------------------------------- */
+
+if (teamLeadId !== undefined) {
+  if (teamLeadId === null || teamLeadId === "") {
+    team.teamLead = null;
+  } else {
+    const lead = await Auth.findById(teamLeadId)
+      .select("_id role");
+
+    if (!lead) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid team lead",
+        },
+        { status: 400 }
+      );
     }
+
+    if (String(lead.role).toLowerCase() !== "team-lead") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Selected user must have team-lead role",
+        },
+        { status: 400 }
+      );
+    }
+
+    team.teamLead = lead._id;
+  }
+}
 
     /* -----------------------------------------
        MEMBERS
     ----------------------------------------- */
 
-    if (memberIds !== undefined) {
-      if (!Array.isArray(memberIds)) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "memberIds must be an array",
-          },
-          { status: 400 }
-        );
+    // if (memberIds !== undefined) {
+    //   if (!Array.isArray(memberIds)) {
+    //     return NextResponse.json(
+    //       {
+    //         success: false,
+    //         message:
+    //           "memberIds must be an array",
+    //       },
+    //       { status: 400 }
+    //     );
+    //   }
+
+    //   const members = await Auth.find({
+    //     _id: {
+    //       $in: memberIds,
+    //     },
+    //     role: "survey-tester",
+    //   }).select("_id role");
+
+    //   if (
+    //     members.length !==
+    //     memberIds.length
+    //   ) {
+    //     return NextResponse.json(
+    //       {
+    //         success: false,
+    //         message:
+    //           "One or more invalid members",
+    //       },
+    //       { status: 400 }
+    //     );
+    //   }
+
+    //   team.members = memberIds;
+    // }
+
+ /* -----------------------------------------
+   MEMBERS
+----------------------------------------- */
+
+if (memberIds !== undefined) {
+  if (!Array.isArray(memberIds)) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "memberIds must be an array",
+      },
+      { status: 400 }
+    );
+  }
+
+  // =========================================
+  // CLEAN + DEDUPLICATE IDS
+  // =========================================
+
+  const cleanMemberIds = [
+    ...new Set(
+      memberIds
+        .filter(
+          (id) =>
+            id !== null &&
+            id !== undefined &&
+            String(id).trim() !== ""
+        )
+        .map((id) => String(id).trim())
+    ),
+  ];
+
+  console.log("=================================");
+  console.log("TEAM MEMBER UPDATE");
+  console.log("Received member IDs:", cleanMemberIds);
+  console.log("=================================");
+
+  // =========================================
+  // VALIDATE EACH USER
+  // =========================================
+
+  const validMembers = [];
+ const invalidMemberIds = [];
+
+  for (const memberId of cleanMemberIds) {
+    try {
+      const member = await Auth.findById(memberId)
+        .select("_id name email role");
+
+      if (!member) {
+        invalidMemberIds.push(memberId);
+        continue;
       }
 
-      const members = await Auth.find({
-        _id: {
-          $in: memberIds,
-        },
-        role: "survey-tester",
-      }).select("_id role");
+      validMembers.push(member);
 
-      if (
-        members.length !==
-        memberIds.length
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "One or more invalid members",
-          },
-          { status: 400 }
-        );
-      }
+      console.log("VALID MEMBER:", {
+        id: String(member._id),
+        name: member.name,
+        email: member.email,
+        role: member.role,
+      });
+    } catch (error) {
+      console.error(
+        `Error checking member ${memberId}:`,
+        error
+      );
 
-      team.members = memberIds;
+      invalidMemberIds.push(memberId);
     }
+  }
+
+  // =========================================
+  // INVALID USERS
+  // =========================================
+
+  if (invalidMemberIds.length > 0) {
+    console.error(
+      "INVALID MEMBER IDS:",
+      invalidMemberIds
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "One or more invalid members",
+        invalidMemberIds,
+      },
+      { status: 400 }
+    );
+  }
+
+  // =========================================
+  // DETERMINE TEAM LEAD
+  // =========================================
+
+  const finalTeamLeadId =
+    teamLeadId !== undefined
+      ? teamLeadId
+        ? String(teamLeadId)
+        : null
+      : team.teamLead
+        ? String(team.teamLead)
+        : null;
+
+  // =========================================
+  // REMOVE TEAM LEAD FROM MEMBERS
+  // =========================================
+
+  const finalMemberIds = cleanMemberIds.filter(
+    (memberId) =>
+      memberId !== finalTeamLeadId
+  );
+
+  console.log(
+    "Final Team Lead:",
+    finalTeamLeadId
+  );
+
+  console.log(
+    "Final Members:",
+    finalMemberIds
+  );
+
+  // =========================================
+  // SAVE
+  // =========================================
+
+  team.members = finalMemberIds;
+}
+
+
 
     /* -----------------------------------------
        SAVE
@@ -341,7 +509,7 @@ export async function DELETE(
 
     // Only admin and HR can delete teams
     if (
-      !["admin", "hr"].includes(
+      !["admin", "hr","senior-teamlead"].includes(
         currentUser.role
       )
     ) {

@@ -402,12 +402,20 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "FileCheck",
     roles: ["admin"],
   },
+
+      {
+    label: " Attendance Dashboard",
+    path: "/admin/attendance/dashboard",
+    icon: "CalendarCog",
+    roles: ["admin"],
+  },
   {
     label: "Manage Attendance",
     path: "/admin/attendance",
     icon: "CalendarCog",
     roles: ["admin"],
   },
+
   {
     label: "Manage Missing Attendance",
     path: "/admin/missing-attendence",
@@ -418,6 +426,12 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     label: "Add Survey Target",
     path: "/admin/survey-target",
     icon: "Target",
+    roles: ["admin"],
+  },
+   {
+    label: "Manage Survey Performance",
+    path: "/admin/survey-performance",
+    icon: "Database",
     roles: ["admin"],
   },
   {
