@@ -139,7 +139,7 @@ export default function LeaveManagementClient({
   const canViewApprovals = [
     "team-lead",
     "senior-teamlead",
-    "data-quality-analyst",
+    // "data-quality-analyst",
     "hr",
     "admin",
   ].includes(normalizedRole);

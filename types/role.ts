@@ -195,6 +195,13 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "FileCheck",
     roles: ["senior-teamlead"],
   },
+
+    {
+    label: "Manage Survey Performance",
+    path: "/senior-teamlead/survey-performance",
+    icon: "Database",
+    roles: ["senior-teamlead"],
+  },
   {
     label: "Team Surveys Data",
     path: "/senior-teamlead/survey-data",
@@ -266,6 +273,12 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "FileText",
     roles: ["data-quality-analyst"],
   },
+    {
+    label: "Manage Survey Performance",
+    path: "/data-quality-analyst/survey-performance",
+    icon: "Database",
+    roles: ["data-quality-analyst"],
+  },
   {
     label: "Team Surveys Data",
     path: "/data-quality-analyst/survey-data",
@@ -312,6 +325,12 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   // =========================================================
   // HR
   // =========================================================
+        {
+    label: " Attendance Dashboard",
+    path: "/hr/attendance/dashboard",
+    icon: "CalendarCog",
+    roles: ["hr"],
+  },
 
   {
     label: "Attendance",
