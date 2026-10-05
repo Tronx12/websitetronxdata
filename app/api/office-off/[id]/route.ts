@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 import { connectDB } from "@/config/db";
 import OfficeOff from "@/models/OfficeOff";
+import Attendance from "@/models/Attendance";
 import { getCurrentUser } from "@/lib/getuser";
 import { createAuditLog } from "@/lib/auditLog";
 
@@ -62,6 +63,28 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     officeOff.isActive = false;
     officeOff.updatedBy = new mongoose.Types.ObjectId(user.userId);
     await officeOff.save();
+
+    // Clean up attendance records created for this office-off:
+    // 1. Remove placeholder attendance records where user did not log in
+    await Attendance.deleteMany({
+      holidayId: officeOff._id,
+      loggingTime: null,
+    });
+
+    // 2. For employees who actually logged in on that holiday, revert holiday flags
+    await Attendance.updateMany(
+      {
+        holidayId: officeOff._id,
+        loggingTime: { $ne: null },
+      },
+      {
+        $set: {
+          holiday: false,
+          holidayId: null,
+          status: "present",
+        },
+      }
+    );
 
     await createAuditLog({
       userId: user.userId,

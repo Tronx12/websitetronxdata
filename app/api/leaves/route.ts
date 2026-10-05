@@ -619,12 +619,12 @@ export async function POST(
        */
 
       if (summary.remaining <= 0) {
-        if (!summary.eligible && summary.carriedForward <= 0) {
+        if (!summary.eligible) {
           return NextResponse.json(
             {
               success: false,
               message:
-                "Paid leave is unavailable because you have more than 3 absent days this month and no carried-forward leaves.",
+                "Paid leave is unavailable because you have more than 3 absent days this month.",
               paidLeaveSummary: summary,
             },
             { status: 400 }

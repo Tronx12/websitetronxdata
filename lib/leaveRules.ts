@@ -123,7 +123,7 @@ export interface MonthLeaveData {
   absentDays: number;
   eligible: boolean;
   earned: number;
-  carriedForward: number;
+  carriedForward: number; // always 0 — carry forward removed
   totalAvailable: number;
   used: number; // paid leaves used
   unpaidUsed: number;
@@ -133,7 +133,7 @@ export interface MonthLeaveData {
 export interface YearLeaveData {
   year: number;
   totalEarned: number;
-  carriedForwardFromPrevYear: number;
+  carriedForwardFromPrevYear: number; // always 0 — carry forward removed
   totalPaidUsed: number;
   totalUnpaidUsed: number;
   totalAbsentDays: number;
@@ -254,7 +254,6 @@ export async function getComprehensiveLeaveSummary(
     return { usedPaid, usedUnpaid };
   };
 
-  let runningBalance = 0;
   const allMonthlyData: MonthLeaveData[] = [];
   const fromYear = Math.min(startYear, selectedYear);
 
@@ -268,16 +267,12 @@ export async function getComprehensiveLeaveSummary(
       const absentDays = absentMap.get(key) || 0;
       const { usedPaid, usedUnpaid } = getLeavesForMonth(y, m);
 
-      // Rule: Earn 1 paid leave if absentDays <= 3
+      // Rule: Earn 1 paid leave if absentDays <= 3 (no carry forward)
       const eligible = absentDays <= 3;
       const earned = eligible ? 1 : 0;
-      const carriedForward = runningBalance;
-      const totalAvailable = carriedForward + earned;
+      const carriedForward = 0; // carry forward removed
+      const totalAvailable = earned;
       const remaining = Math.max(0, totalAvailable - usedPaid);
-
-      if (y < selectedYear || (y === selectedYear && m <= selectedMonth)) {
-        runningBalance = remaining;
-      }
 
       allMonthlyData.push({
         year: y,
@@ -307,17 +302,16 @@ export async function getComprehensiveLeaveSummary(
     absentDays: 0,
     eligible: true,
     earned: 1,
-    carriedForward: runningBalance,
-    totalAvailable: runningBalance + 1,
+    carriedForward: 0,
+    totalAvailable: 1,
     used: 0,
     unpaidUsed: 0,
-    remaining: runningBalance + 1,
+    remaining: 1,
   };
 
   // Yearly Summary for selectedYear
   const yearMonths = allMonthlyData.filter((d) => d.year === selectedYear);
-  const firstMonthOfThisYear = yearMonths[0];
-  const carriedForwardFromPrevYear = firstMonthOfThisYear ? firstMonthOfThisYear.carriedForward : 0;
+  const carriedForwardFromPrevYear = 0; // carry forward removed
 
   const totalYearEarned = yearMonths.reduce((sum, d) => sum + d.earned, 0);
   const totalYearPaidUsed = yearMonths.reduce((sum, d) => sum + d.used, 0);

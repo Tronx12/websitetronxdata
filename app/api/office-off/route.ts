@@ -6,7 +6,9 @@ import OfficeOff from "@/models/OfficeOff";
 import OfficeSettings from "@/models/OfficeSettings";
 import WeeklyOffPolicy from "@/models/WeeklyOffPolicy";
 import Shift from "@/models/Shift";
-import "@/models/Team";
+import Team from "@/models/Team";
+import Auth from "@/models/Auth";
+import Attendance from "@/models/Attendance";
 
 import { getCurrentUser } from "@/lib/getuser";
 import { createAuditLog } from "@/lib/auditLog";
@@ -29,6 +31,210 @@ function getClientIp(req: NextRequest) {
     req.headers.get("x-real-ip") ||
     null
   );
+}
+
+/**
+ * Resolve which employee IDs are affected by an office-off based on scope.
+ */
+async function resolveAffectedEmployeeIds(
+  scope: string,
+  teamIds: string[],
+  shiftIds: string[],
+  employeeIds: string[]
+): Promise<mongoose.Types.ObjectId[]> {
+  const activeFilter = { isActive: { $ne: false } };
+
+  switch (scope) {
+    case "all": {
+      const users = await Auth.find(activeFilter).select("_id").lean();
+      return users.map((u) => u._id);
+    }
+
+    case "team": {
+      const teamObjectIds = teamIds.map(
+        (id) => new mongoose.Types.ObjectId(id)
+      );
+      const teams = await Team.find({
+        _id: { $in: teamObjectIds },
+        isActive: true,
+      })
+        .select("members teamLead")
+        .lean();
+
+      const userIdSet = new Set<string>();
+      for (const team of teams) {
+        if (team.teamLead) {
+          userIdSet.add(team.teamLead.toString());
+        }
+        if (Array.isArray(team.members)) {
+          for (const memberId of team.members) {
+            userIdSet.add(memberId.toString());
+          }
+        }
+      }
+
+      const userObjectIds = Array.from(userIdSet).map(
+        (id) => new mongoose.Types.ObjectId(id)
+      );
+      const activeUsers = await Auth.find({
+        _id: { $in: userObjectIds },
+        ...activeFilter,
+      })
+        .select("_id")
+        .lean();
+      return activeUsers.map((u) => u._id);
+    }
+
+    case "shift": {
+      const shifts = await Shift.find({
+        _id: { $in: shiftIds.map((id) => new mongoose.Types.ObjectId(id)) },
+        isActive: true,
+      })
+        .select("code")
+        .lean();
+
+      const shiftCodes = shifts.map((s) => ((s as any).code || "").toLowerCase());
+      if (shiftCodes.length === 0) return [];
+
+      const users = await Auth.find({
+        workingShift: { $in: shiftCodes },
+        ...activeFilter,
+      })
+        .select("_id")
+        .lean();
+      return users.map((u) => u._id);
+    }
+
+    case "employee": {
+      const userObjectIds = employeeIds.map(
+        (id) => new mongoose.Types.ObjectId(id)
+      );
+      const activeUsers = await Auth.find({
+        _id: { $in: userObjectIds },
+        ...activeFilter,
+      })
+        .select("_id")
+        .lean();
+      return activeUsers.map((u) => u._id);
+    }
+
+    default:
+      return [];
+  }
+}
+
+/**
+ * Create or update attendance records for all affected employees for office-off dates.
+ */
+async function syncAttendanceForOfficeOff(
+  officeOffDocs: any[],
+  affectedEmployeeIds: mongoose.Types.ObjectId[]
+) {
+  if (affectedEmployeeIds.length === 0 || officeOffDocs.length === 0) return 0;
+
+  let created = 0;
+
+  for (const offDoc of officeOffDocs) {
+    const offDate = new Date(offDoc.date);
+    offDate.setUTCHours(0, 0, 0, 0);
+    const nextDate = new Date(offDate);
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+
+    const existingRecords = await Attendance.find({
+      userId: { $in: affectedEmployeeIds },
+      date: { $gte: offDate, $lt: nextDate },
+    })
+      .select("userId status loggingTime")
+      .lean();
+
+    const existingUserMap = new Map<string, any>();
+    for (const r of existingRecords) {
+      existingUserMap.set(r.userId.toString(), r);
+    }
+
+    // Map office-off type to attendance status
+    const offType = offDoc.type || "holiday";
+    const attendanceStatus = offType === "festival" ? "festival" : "holiday";
+    const remarks = `${offType === "festival" ? "Festival" : "Holiday"}: ${offDoc.title}`;
+
+    const newRecords: any[] = [];
+    const updateOps: any[] = [];
+
+    for (const empId of affectedEmployeeIds) {
+      const existing = existingUserMap.get(empId.toString());
+      if (!existing) {
+        newRecords.push({
+          userId: empId,
+          date: offDate,
+          shiftDate: offDate,
+          status: attendanceStatus,
+          holiday: true,
+          holidayId: offDoc._id,
+          remarks,
+        });
+      } else {
+        // If employee already had a record without login (e.g. absent or placeholder),
+        // update status to holiday/festival
+        if (!existing.loggingTime) {
+          updateOps.push({
+            updateOne: {
+              filter: { _id: existing._id },
+              update: {
+                $set: {
+                  status: attendanceStatus,
+                  holiday: true,
+                  holidayId: offDoc._id,
+                  remarks,
+                },
+              },
+            },
+          });
+        } else {
+          // If worked, update holiday flag and status to worked-on-holiday
+          updateOps.push({
+            updateOne: {
+              filter: { _id: existing._id },
+              update: {
+                $set: {
+                  holiday: true,
+                  holidayId: offDoc._id,
+                  status: "worked-on-holiday",
+                },
+              },
+            },
+          });
+        }
+      }
+    }
+
+    if (newRecords.length > 0) {
+      try {
+        const result = await Attendance.insertMany(newRecords, {
+          ordered: false,
+        });
+        created += result.length;
+      } catch (bulkError: any) {
+        if (bulkError?.insertedDocs) {
+          created += bulkError.insertedDocs.length;
+        }
+        console.error(
+          "Partial failure creating attendance for office-off:",
+          bulkError?.message
+        );
+      }
+    }
+
+    if (updateOps.length > 0) {
+      try {
+        await Attendance.bulkWrite(updateOps, { ordered: false });
+        created += updateOps.length;
+      } catch (err: any) {
+        console.error("Bulk write error updating attendance for office off:", err?.message);
+      }
+    }
+  }
+
+  return created;
 }
 
 /*
@@ -242,9 +448,9 @@ export async function GET(req: NextRequest) {
         error:
           process.env.NODE_ENV === "development"
             ? {
-                name: error?.name,
-                message: error?.message,
-              }
+              name: error?.name,
+              message: error?.message,
+            }
             : undefined,
       },
       { status: 500 }
@@ -421,11 +627,28 @@ export async function POST(req: NextRequest) {
 
     const officeOffs = await OfficeOff.insertMany(records);
 
+    // ── Sync attendance records for affected employees ──
+    let attendanceCreated = 0;
+    try {
+      const affectedEmployeeIds = await resolveAffectedEmployeeIds(
+        scope,
+        teamIds,
+        shiftIds,
+        employeeIds
+      );
+      attendanceCreated = await syncAttendanceForOfficeOff(
+        officeOffs,
+        affectedEmployeeIds
+      );
+    } catch (syncError) {
+      console.error("Error syncing attendance for office-off:", syncError);
+    }
+
     await createAuditLog({
       userId: user.userId,
       action: "CREATE",
       module: "Office Off",
-      description: `Created ${officeOffs.length}-day office off: ${title.trim()}`,
+      description: `Created ${officeOffs.length}-day office off: ${title.trim()}. Attendance marked for ${attendanceCreated} employee-days.`,
       entityType: "OfficeOff",
       entityId: groupId,
       metadata: {
@@ -440,6 +663,7 @@ export async function POST(req: NextRequest) {
         employeeIds,
         isPaid,
         description: description?.trim() || null,
+        attendanceCreated,
       },
       ipAddress: getClientIp(req),
       userAgent: req.headers.get("user-agent") || null,
@@ -448,8 +672,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: `${officeOffs.length} office off days created successfully`,
+        message: `${officeOffs.length} office off days created. Attendance marked for ${attendanceCreated} employees.`,
         data: officeOffs,
+        attendanceCreated,
       },
       { status: 201 }
     );

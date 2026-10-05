@@ -4286,6 +4286,52 @@ export default function SurveyPerformancePage() {
 
       const isTeamLead =
         normalizedRole === "teamlead" || normalizedRole === "team_lead";
+       const isDQA =
+  normalizedRole === "data_quality_analyst" ||
+  normalizedRole === "dataqualityanalyst" ||
+  normalizedRole === "dqa";
+
+
+if (isDQA || isSurveyTester) {
+  const currentUserId = String(data.userId || "").trim();
+
+  const currentUserEmail = String(data.email || "")
+    .trim()
+    .toLowerCase();
+
+  const currentUserName = String(data.name || "")
+    .trim()
+    .toLowerCase();
+
+  const ownUser = apiUsers.filter((user) => {
+    const userId = String(user.userId || "").trim();
+
+    const email = String(user.email || "")
+      .trim()
+      .toLowerCase();
+
+    const name = String(user.name || "")
+      .trim()
+      .toLowerCase();
+
+    return (
+      (currentUserId && userId === currentUserId) ||
+      (currentUserEmail && email === currentUserEmail) ||
+      (currentUserName && name === currentUserName)
+    );
+  });
+
+  setUsers(deduplicateUsers(ownUser));
+
+} else if (isTeamLead) {
+
+  // existing Team Lead logic
+
+} else {
+
+  // HR/Admin
+  setUsers(deduplicateUsers(apiUsers));
+}
 
       if (isTeamLead) {
         const allowedIds = new Set(
@@ -4682,11 +4728,19 @@ export default function SurveyPerformancePage() {
     );
   }
 
-  const showUsers =
-    role === "teamlead" ||
-    role === "team_lead" ||
-    role === "hr" ||
-    role === "admin";
+const normalizedDisplayRole = String(role || "")
+  .trim()
+  .toLowerCase()
+  .replace(/[-\s]+/g, "_");
+
+const showUsers =
+  normalizedDisplayRole === "teamlead" ||
+  normalizedDisplayRole === "team_lead" ||
+  normalizedDisplayRole === "hr" ||
+  normalizedDisplayRole === "data_quality_analyst" ||
+  normalizedDisplayRole === "dataqualityanalyst" ||
+  normalizedDisplayRole === "dqa" ||
+  normalizedDisplayRole === "admin";
 
   // ==========================================================
   // UI

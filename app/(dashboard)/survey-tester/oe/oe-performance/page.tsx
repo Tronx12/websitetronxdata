@@ -932,53 +932,666 @@
 //   );
 // }
 
-// import SubmitView from "@/components/SubmitView";
-// export default function Page(){return <main className="min-h-screen p-4 md:p-8"><SubmitView/></main>}
 
-import { getCurrentUser } from "@/lib/getuser";
+"use client";
 
-import OEPerformancePage from "@/components/oe/OePerformance";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
 
-export default async function OESubmitPage() {
-  const user = await getCurrentUser();
+type Status = "APPROVED" | "REJECTED" | "PENDING";
 
-  if (!user) {
-    return (
-      <main className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-xl font-bold text-slate-800">
-            Authentication Required
-          </h1>
+interface OERecord {
+  rowIndex: number;
+  id: string;
+  timestamp?: string;
+  date?: string;
+  memberName?: string;
+  pid?: string;
+  projectId?: string;
+  qNumber?: string;
+  oeResponse?: string;
+  status: Status;
 
-          <p className="mt-2 text-sm text-slate-500">
-            Please login again to submit an OE response.
-          </p>
-        </div>
-      </main>
-    );
+  humanScore?: number | string;
+  relScore?: number | string;
+  relevanceScore?: number | string;
+
+  rejectReason?: string;
+  dqaCorrection?: string;
+}
+
+interface CurrentUser {
+  userId: string;
+  name?: string;
+  email?: string;
+  role?: string;
+}
+
+interface OEPerformanceResponse {
+  success: boolean;
+  records: OERecord[];
+  summary?: {
+    total?: number;
+    approved?: number;
+    rejected?: number;
+    pending?: number;
+    avgHuman?: number;
+    avgRelevancy?: number;
+  };
+}
+
+function normalize(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function numberValue(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatDate(value?: string): string {
+  if (!value) return "";
+
+  const text = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const [year, month, day] = text.split("-");
+    return `${day}-${month}-${year}`;
   }
 
-  if (!user.name?.trim()) {
-    return (
-      <main className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-xl font-bold text-slate-800">
-            Member Name Not Found
-          </h1>
+  return text;
+}
 
-          <p className="mt-2 text-sm text-slate-500">
-            Your account does not have a member name configured.
-          </p>
+export default function OEPerformancePage() {
+  const [currentUser, setCurrentUser] =
+    useState<CurrentUser | null>(null);
+
+  const [allRecords, setAllRecords] =
+    useState<OERecord[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  const [search, setSearch] = useState("");
+  const [status, setStatus] =
+    useState<"ALL" | Status>("ALL");
+
+  const [expandedId, setExpandedId] =
+    useState<string | null>(null);
+
+  /*
+   * ============================================================
+   * GET CURRENT LOGGED-IN USER
+   *
+   * Your application uses JWT cookies.
+   * This endpoint must return the authenticated user.
+   * ============================================================
+   */
+  const loadCurrentUser = useCallback(async () => {
+    const response = await fetch("/api/auth/me", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error("Unable to get current user.");
+    }
+
+    const result = await response.json();
+
+    const user =
+      result?.user ??
+      result?.data ??
+      result;
+
+    if (!user?.userId && !user?._id) {
+      throw new Error("Current user was not found.");
+    }
+
+    return {
+      userId: String(user.userId ?? user._id),
+      name: user.name ?? "",
+      email: user.email ?? "",
+      role: user.role ?? "",
+    } satisfies CurrentUser;
+  }, []);
+
+  /*
+   * ============================================================
+   * LOAD OE PERFORMANCE
+   *
+   * IMPORTANT:
+   * API may return multiple users.
+   *
+   * We immediately filter the result using the logged-in
+   * user's name.
+   * ============================================================
+   */
+  const loadPerformance = useCallback(async () => {
+    try {
+      setError("");
+
+      if (allRecords.length === 0) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      const user = await loadCurrentUser();
+
+      setCurrentUser(user);
+
+      /*
+       * Existing API.
+       *
+       * Keep your current API action here.
+       */
+      const result =
+        await api<OEPerformanceResponse>(
+          "getOEPerformance",
+          {
+            fromDate: "",
+            toDate: "",
+            projectId: "",
+            employee: "",
+            status: "",
+          }
+        );
+
+      if (!result?.success) {
+        throw new Error(
+          "Unable to load OE performance."
+        );
+      }
+
+      const records = Array.isArray(result.records)
+        ? result.records
+        : [];
+
+      /*
+       * ========================================================
+       * CRITICAL FIX
+       *
+       * ONLY CURRENT USER
+       *
+       * Example:
+       *
+       * logged in:
+       * Shivam Agrahari
+       *
+       * records:
+       * Shivam Agrahari
+       * Rahul
+       * Amit
+       *
+       * result:
+       * Shivam Agrahari ONLY
+       * ========================================================
+       */
+
+      const loggedInName =
+        normalize(user.name);
+
+      const loggedInEmail =
+        normalize(user.email);
+
+      const myRecords = records.filter(
+        (record) => {
+          const recordName =
+            normalize(record.memberName);
+
+          /*
+           * Primary match: employee/member name.
+           */
+          if (
+            loggedInName &&
+            recordName === loggedInName
+          ) {
+            return true;
+          }
+
+          /*
+           * Optional fallback if your OE data stores
+           * email instead of memberName.
+           */
+          const recordEmail =
+            normalize(
+              (record as OERecord & {
+                email?: string;
+              }).email
+            );
+
+          if (
+            loggedInEmail &&
+            recordEmail === loggedInEmail
+          ) {
+            return true;
+          }
+
+          return false;
+        }
+      );
+
+      setAllRecords(myRecords);
+    } catch (err) {
+      console.error(
+        "OE Performance Error:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load OE performance."
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [loadCurrentUser, allRecords.length]);
+
+  useEffect(() => {
+    loadPerformance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /*
+   * ============================================================
+   * STATUS + SEARCH
+   *
+   * These now work ONLY on current user's records.
+   * ============================================================
+   */
+  const filteredRecords = useMemo(() => {
+    const query =
+      search.trim().toLowerCase();
+
+    return allRecords.filter((record) => {
+      if (
+        status !== "ALL" &&
+        record.status !== status
+      ) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return (
+        normalize(record.id).includes(query) ||
+        normalize(record.pid).includes(query) ||
+        normalize(record.projectId).includes(query) ||
+        normalize(record.qNumber).includes(query) ||
+        normalize(record.oeResponse).includes(query)
+      );
+    });
+  }, [allRecords, search, status]);
+
+  /*
+   * ============================================================
+   * USER-SPECIFIC SUMMARY
+   *
+   * DO NOT use global API summary here.
+   * Calculate it from myRecords.
+   * ============================================================
+   */
+
+  const summary = useMemo(() => {
+    const total = allRecords.length;
+
+    const approved =
+      allRecords.filter(
+        (r) => r.status === "APPROVED"
+      ).length;
+
+    const rejected =
+      allRecords.filter(
+        (r) => r.status === "REJECTED"
+      ).length;
+
+    const pending =
+      allRecords.filter(
+        (r) => r.status === "PENDING"
+      ).length;
+
+    const humanScores = allRecords
+      .map((r) =>
+        numberValue(r.humanScore)
+      )
+      .filter((n) => n > 0);
+
+    const relevanceScores = allRecords
+      .map((r) =>
+        numberValue(
+          r.relScore ??
+            r.relevanceScore
+        )
+      )
+      .filter((n) => n > 0);
+
+    const avgHuman =
+      humanScores.length > 0
+        ? humanScores.reduce(
+            (a, b) => a + b,
+            0
+          ) / humanScores.length
+        : 0;
+
+    const avgRelevancy =
+      relevanceScores.length > 0
+        ? relevanceScores.reduce(
+            (a, b) => a + b,
+            0
+          ) / relevanceScores.length
+        : 0;
+
+    return {
+      total,
+      approved,
+      rejected,
+      pending,
+      avgHuman,
+      avgRelevancy,
+    };
+  }, [allRecords]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-sm font-semibold text-slate-500">
+          Loading your OE performance...
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 md:p-6">
-      <div className="mx-auto w-full max-w-7xl">
-        <OEPerformancePage memberName={user.name} />
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-[850px] px-5 py-8">
+
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+
+          {/* HEADER */}
+          <div className="bg-blue-600 px-6 py-7 text-center text-white">
+            <h4 className="text-2xl font-bold">
+              📊 OE Performance
+            </h4>
+
+            <p className="mt-1 text-sm text-blue-100">
+              Your open-end submission history and quality scores
+            </p>
+          </div>
+
+          <div className="p-6">
+
+            {/* USER */}
+            <label className="mb-2 block text-sm font-bold uppercase text-slate-700">
+              YOUR NAME
+            </label>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-slate-700">
+              {currentUser?.name ||
+                currentUser?.email ||
+                "Current User"}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                Name is linked to your account.
+              </span>
+
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+                🔒 Locked
+              </span>
+            </div>
+
+            {/* REFRESH */}
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={loadPerformance}
+                disabled={refreshing}
+                className="rounded-lg bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+              >
+                ↻{" "}
+                {refreshing
+                  ? "Refreshing..."
+                  : "Refresh"}
+              </button>
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            {/* KPI */}
+            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+
+              <Kpi
+                title="TOTAL OEs"
+                value={summary.total}
+              />
+
+              <Kpi
+                title="APPROVED"
+                value={summary.approved}
+                green
+              />
+
+              <Kpi
+                title="AVG HUMAN"
+                value={`${summary.avgHuman.toFixed(
+                  0
+                )}/100`}
+                red
+              />
+
+              <Kpi
+                title="AVG RELEVANCY"
+                value={`${summary.avgRelevancy.toFixed(
+                  0
+                )}/100`}
+                red
+              />
+
+            </div>
+
+            {/* SEARCH */}
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_170px]">
+
+              <input
+                type="text"
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                placeholder="Filter by PID..."
+                className="h-12 rounded-lg border border-slate-200 px-4 outline-none focus:border-blue-500"
+              />
+
+              <select
+                value={status}
+                onChange={(e) =>
+                  setStatus(
+                    e.target.value as
+                      | "ALL"
+                      | Status
+                  )
+                }
+                className="h-12 rounded-lg border border-slate-200 bg-white px-4 outline-none focus:border-blue-500"
+              >
+                <option value="ALL">
+                  All statuses
+                </option>
+
+                <option value="APPROVED">
+                  Approved
+                </option>
+
+                <option value="REJECTED">
+                  Rejected
+                </option>
+
+                <option value="PENDING">
+                  Pending
+                </option>
+              </select>
+
+            </div>
+
+            <div className="mb-3 mt-5 text-sm font-bold text-slate-700">
+              Performance Date
+            </div>
+
+            {/* RECORDS */}
+            <div className="space-y-3">
+
+              {filteredRecords.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 p-10 text-center text-sm text-slate-400">
+                  No OE submissions found.
+                </div>
+              ) : (
+                filteredRecords.map(
+                  (record) => (
+                    <div
+                      key={`${record.rowIndex}-${record.id}`}
+                      className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+                    >
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedId(
+                            expandedId ===
+                              record.id
+                              ? null
+                              : record.id
+                          )
+                        }
+                        className="w-full px-4 py-4 text-left"
+                      >
+
+                        <div className="flex items-center justify-between gap-4">
+
+                          <div className="min-w-0">
+
+                            <div className="flex flex-wrap items-center gap-2">
+
+                              <span className="text-lg font-bold text-blue-600">
+                                Q{record.qNumber}
+                              </span>
+
+                              <span className="text-xs text-slate-500">
+                                PID:{" "}
+                                {record.pid}
+                              </span>
+
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                                {record.status}
+                              </span>
+
+                            </div>
+
+                            <div className="mt-1 text-xs text-slate-400">
+                              {formatDate(
+                                record.date
+                              )}
+                            </div>
+
+                          </div>
+
+                          <span className="text-slate-400">
+                            {expandedId ===
+                            record.id
+                              ? "⌃"
+                              : "⌄"}
+                          </span>
+
+                        </div>
+
+                      </button>
+
+                      {expandedId ===
+                        record.id && (
+                        <div className="border-t border-slate-100 bg-slate-50 p-4">
+
+                          <div className="mb-3 rounded-lg bg-white p-4">
+                            <div className="mb-2 text-xs font-bold uppercase text-slate-400">
+                              OE Response
+                            </div>
+
+                            <div className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                              {record.oeResponse ||
+                                "No response"}
+                            </div>
+                          </div>
+
+                          {record.rejectReason && (
+                            <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+                              <strong>
+                                Rejection:
+                              </strong>{" "}
+                              {
+                                record.rejectReason
+                              }
+                            </div>
+                          )}
+
+                        </div>
+                      )}
+
+                    </div>
+                  )
+                )
+              )}
+
+            </div>
+
+          </div>
+        </div>
       </div>
-    </main>
+    </div>
+  );
+}
+
+function Kpi({
+  title,
+  value,
+  green,
+  red,
+}: {
+  title: string;
+  value: string | number;
+  green?: boolean;
+  red?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+
+      <div className="text-[11px] font-semibold text-slate-400">
+        {title}
+      </div>
+
+      <div
+        className={`mt-2 text-xl font-bold ${
+          green
+            ? "text-green-600"
+            : red
+            ? "text-red-600"
+            : "text-slate-800"
+        }`}
+      >
+        {value}
+      </div>
+
+    </div>
   );
 }

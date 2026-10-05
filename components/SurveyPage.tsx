@@ -1042,6 +1042,7 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [uploadDate, setUploadDate] = useState("");
 
   const [exportRange, setExportRange] = useState<ExportRange>("all");
   const [exportStartDate, setExportStartDate] = useState("");
@@ -1259,23 +1260,45 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
         },
         body: JSON.stringify({
           paste,
+          surveyDate: uploadDate || undefined,
         }),
       });
 
       const json = await res.json();
 
+      // if (json.success) {
+      //   setMessage({
+      //     type: "success",
+      //     text: `${json.message}${
+      //       json.errors?.length ? ` (${json.errors.length} block(s) skipped)` : ""
+      //     }`,
+      //   });
+      //   setPaste("");
+      //   fetchData();
+      //   fetchCategoryCounts();
+      //   fetchDays();
+      // } 
       if (json.success) {
-        setMessage({
-          type: "success",
-          text: `${json.message}${
-            json.errors?.length ? ` (${json.errors.length} block(s) skipped)` : ""
-          }`,
-        });
-        setPaste("");
-        fetchData();
-        fetchCategoryCounts();
-        fetchDays();
-      } else {
+  setMessage({
+    type: "success",
+    text: `${json.message}${
+      uploadDate ? ` for ${uploadDate}` : ""
+    }${json.errors?.length ? ` (${json.errors.length} block(s) skipped)` : ""}`,
+  });
+
+  if (uploadDate) {
+    const [y, m] = uploadDate.split("-").map(Number);
+    setViewMonth(new Date(y, m - 1, 1));
+  }
+
+  setPaste("");
+  setUploadDate("");
+  fetchData();
+  fetchCategoryCounts();
+  fetchDays();
+}
+      
+      else {
         setMessage({ type: "error", text: json.message || "Save failed" });
       }
     } catch (err: any) {
@@ -1488,6 +1511,47 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
           )}
         </div>
       </div>
+
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Upload for date
+    </label>
+    <input
+      type="date"
+      value={uploadDate}
+      max={todayKey}
+      onChange={(e) => setUploadDate(e.target.value)}
+      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
+
+  {uploadDate ? (
+    <>
+      <button
+        type="button"
+        onClick={() => setUploadDate("")}
+        className="text-xs text-blue-600 hover:underline pb-2.5"
+      >
+        Reset to today
+      </button>
+      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-1">
+        Records will be saved under{" "}
+        <strong>
+          {parseLocalDate(uploadDate).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })}
+        </strong>
+      </span>
+    </>
+  ) : (
+    <span className="text-xs text-gray-500 pb-2.5">
+      Leave empty to save under today's date
+    </span>
+  )}
+</div>
 
       {/* Paste Section — no category picker; every block carries its own B2B/B2H/B2C line */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">

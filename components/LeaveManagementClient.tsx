@@ -296,7 +296,7 @@ export default function LeaveManagementClient({
               {summary.monthly.monthName} {summary.monthly.year} Leave Status
             </h2>
             <span className="text-xs text-gray-500">
-              Rule: 1 Paid Leave per month if ≤ 3 absences. Unused leaves carry forward.
+              Rule: 1 Paid Leave per month if ≤ 3 absences.
             </span>
           </div>
 
@@ -304,15 +304,8 @@ export default function LeaveManagementClient({
             <MetricCard
               title="Total Available"
               value={summary.monthly.totalAvailable}
-              subtext={`Earned (${summary.monthly.earned}) + Carried (${summary.monthly.carriedForward})`}
+              subtext={`Earned this month: ${summary.monthly.earned}`}
               highlight
-            />
-
-            <MetricCard
-              title="Carried Forward"
-              value={summary.monthly.carriedForward}
-              subtext="From previous months"
-              color="indigo"
             />
 
             <MetricCard
@@ -353,7 +346,7 @@ export default function LeaveManagementClient({
                   You have earned 1 paid leave for {summary.monthly.monthName} {summary.monthly.year}!
                 </p>
                 <p className="mt-0.5 text-xs text-green-700">
-                  Carried forward from previous months: <strong>{summary.monthly.carriedForward}</strong> | Total usable paid leaves: <strong>{summary.monthly.remaining}</strong>.
+                  Total usable paid leaves: <strong>{summary.monthly.remaining}</strong>.
                 </p>
               </div>
             </div>
@@ -364,13 +357,13 @@ export default function LeaveManagementClient({
                 <p className="font-semibold text-amber-900">
                   Current month paid leave not earned ({summary.monthly.absentDays} absent days &gt; 3 limit).
                 </p>
-                {summary.monthly.carriedForward > 0 ? (
+                {summary.monthly.remaining > 0 ? (
                   <p className="mt-0.5 text-xs text-amber-800">
-                    Good news: You still have <strong>{summary.monthly.carriedForward}</strong> carried-forward paid leaves available to use! (Remaining: <strong>{summary.monthly.remaining}</strong>)
+                    You still have <strong>{summary.monthly.remaining}</strong> paid leave(s) available to use.
                   </p>
                 ) : (
                   <p className="mt-0.5 text-xs text-amber-800">
-                    You have no carried-forward paid leaves available. Any leaves taken this month will be unpaid.
+                    You have no paid leaves available. Any leaves taken this month will be unpaid.
                   </p>
                 )}
               </div>
@@ -387,7 +380,7 @@ export default function LeaveManagementClient({
               {summary.yearly.year} Yearly Leave Summary
             </h2>
             <span className="text-xs text-gray-500">
-              Full 12-Month Accumulation & Carry-Forward Track
+              Full 12-Month Leave Summary
             </span>
           </div>
 
@@ -399,12 +392,7 @@ export default function LeaveManagementClient({
               color="green"
             />
 
-            <MetricCard
-              title="Carried Into Year"
-              value={summary.yearly.carriedForwardFromPrevYear}
-              subtext="From previous year"
-              color="indigo"
-            />
+
 
             <MetricCard
               title="Paid Leaves Used"
@@ -451,7 +439,6 @@ export default function LeaveManagementClient({
                     <th className="p-3">Absent Days</th>
                     <th className="p-3">Eligible?</th>
                     <th className="p-3">Earned</th>
-                    <th className="p-3">Carried In</th>
                     <th className="p-3">Total Available</th>
                     <th className="p-3">Paid Used</th>
                     <th className="p-3">Unpaid Used</th>
@@ -493,7 +480,6 @@ export default function LeaveManagementClient({
                         )}
                       </td>
                       <td className="p-3">{m.earned}</td>
-                      <td className="p-3 text-indigo-600 font-medium">{m.carriedForward}</td>
                       <td className="p-3 font-semibold">{m.totalAvailable}</td>
                       <td className="p-3 text-orange-600">{m.used}</td>
                       <td className="p-3 text-gray-500">{m.unpaidUsed}</td>

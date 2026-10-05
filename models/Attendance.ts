@@ -420,6 +420,7 @@ export type AttendanceStatus =
   | "absent"
   | "half-day"
   | "holiday"
+  | "festival"
   | "weekly-off"
   | "office-off"
   | "leave"
@@ -540,6 +541,7 @@ const AttendanceSchema = new Schema<IAttendance>(
         "absent",
         "half-day",
         "holiday",
+        "festival",
         "weekly-off",
         "office-off",
         "leave",

@@ -73,9 +73,9 @@ export default function ApplyLeaveClient({ role }: Props) {
 
       if (leaveType === "PAID" && summary) {
         if (summary.remaining <= 0) {
-          if (!summary.eligible && summary.carriedForward <= 0) {
+          if (!summary.eligible) {
             throw new Error(
-              "Paid leave is unavailable because you have more than 3 absent days this month and no carried-forward leaves."
+              "Paid leave is unavailable because you have more than 3 absent days this month."
             );
           }
           throw new Error("You have no paid leave remaining.");
@@ -147,7 +147,7 @@ export default function ApplyLeaveClient({ role }: Props) {
       {/* Summary / Balance Card */}
       {summaryLoading ? (
         <div className="rounded-xl border bg-white p-6 text-sm text-gray-500">
-          Loading your leave balance & carry-forward status...
+          Loading your leave balance...
         </div>
       ) : summary ? (
         <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
@@ -160,14 +160,10 @@ export default function ApplyLeaveClient({ role }: Props) {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center text-xs">
             <div className="p-2.5 rounded-lg bg-gray-50">
               <div className="text-gray-500">Earned This Month</div>
               <div className="text-base font-bold text-gray-800 mt-0.5">{summary.earned}</div>
-            </div>
-            <div className="p-2.5 rounded-lg bg-indigo-50">
-              <div className="text-indigo-600 font-medium">Carried Forward</div>
-              <div className="text-base font-bold text-indigo-700 mt-0.5">{summary.carriedForward}</div>
             </div>
             <div className="p-2.5 rounded-lg bg-orange-50">
               <div className="text-orange-600">Used This Month</div>
@@ -179,15 +175,7 @@ export default function ApplyLeaveClient({ role }: Props) {
             </div>
           </div>
 
-          {/* Conditional Guidance Note */}
-          {summary.carriedForward > 0 && (
-            <div className="text-xs text-indigo-700 bg-indigo-50/70 p-2.5 rounded-lg border border-indigo-100 flex items-center gap-2">
-              <span>✨</span>
-              <span>
-                You have <strong>{summary.carriedForward}</strong> unused leave(s) carried forward from previous months!
-              </span>
-            </div>
-          )}
+
 
           {!summary.eligible && (
             <div className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center gap-2">
@@ -195,7 +183,7 @@ export default function ApplyLeaveClient({ role }: Props) {
               <span>
                 Absences this month: <strong>{summary.absentDays}</strong> (&gt;3). Current month paid leave is 0.
                 {summary.remaining > 0
-                  ? ` You can still apply using your ${summary.carriedForward} carried-forward leave(s).`
+                  ? " You can still apply for Unpaid Leave."
                   : " Any leave applied will be Unpaid Leave."}
               </span>
             </div>

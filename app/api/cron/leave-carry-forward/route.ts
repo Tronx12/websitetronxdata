@@ -5,7 +5,7 @@ import LeaveBalance from "@/models/LeaveBalance";
 import { getComprehensiveLeaveSummary } from "@/lib/leaveRules";
 
 /**
- * Monthly Cron Endpoint: Run on 1st of each month to snapshot & carry forward leave balances.
+ * Monthly Cron Endpoint: Run on 1st of each month to snapshot leave balances.
  * Schedule: 0 0 1 * * (1st of every month at 00:00 UTC)
  *
  * GET /api/cron/leave-carry-forward
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
             absentDays: prevSummary.monthly.absentDays,
             isEligible: prevSummary.monthly.eligible,
             earned: prevSummary.monthly.earned,
-            carriedIn: prevSummary.monthly.carriedForward,
+            carriedIn: 0,
             totalAvailable: prevSummary.monthly.totalAvailable,
             usedPaid: prevSummary.monthly.used,
             usedUnpaid: prevSummary.monthly.unpaidUsed,
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
           { upsert: true, new: true }
         );
 
-        // Compute summary for current (new) month to initialize new month carry-forward
+        // Compute summary for current (new) month to initialize
         const currSummary = await getComprehensiveLeaveSummary(
           user._id,
           currentYear,
@@ -82,25 +82,25 @@ export async function GET(req: NextRequest) {
             absentDays: currSummary.monthly.absentDays,
             isEligible: currSummary.monthly.eligible,
             earned: currSummary.monthly.earned,
-            carriedIn: currSummary.monthly.carriedForward,
+            carriedIn: 0,
             totalAvailable: currSummary.monthly.totalAvailable,
             usedPaid: currSummary.monthly.used,
             usedUnpaid: currSummary.monthly.unpaidUsed,
             remaining: currSummary.monthly.remaining,
-            notes: `Initialized with ${currSummary.monthly.carriedForward} carried forward from previous month`,
+            notes: `Initialized for ${currSummary.monthly.monthName} ${currentYear}`,
           },
           { upsert: true, new: true }
         );
 
         processedCount++;
       } catch (userError) {
-        console.error(`Error processing leave carry forward for user ${user._id}:`, userError);
+        console.error(`Error processing leave snapshot for user ${user._id}:`, userError);
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: `Leave carry-forward processed successfully for ${processedCount} active employees.`,
+      message: `Leave snapshot processed successfully for ${processedCount} active employees.`,
       processedCount,
       targetMonth: `${currentMonth}/${currentYear}`,
     });
