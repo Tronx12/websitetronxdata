@@ -84,17 +84,30 @@ interface SurveyPageTeamLeadProps {
   currentUserId: string;
   currentUserName?: string;
 }
+// Same "business date" rule as the backend (IST, rollover at 06:30 AM)
+const getBusinessTodayKey = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
 
-/**
- * Team Lead survey page.
- *
- *  - "My Survey Data": the lead submits and browses their OWN records.
- *  - "My Team's Survey Data": shows ALL team members' records straight away.
- *    A member dropdown narrows it to one person.
- *
- * Download Excel always follows what is on screen: whose data (mine / whole
- * team / one member), the category tab, the search text and the selected day.
- */
+  const get = (t: string) =>
+    Number(parts.find((p) => p.type === t)?.value);
+
+  const d = new Date(Date.UTC(get("year"), get("month") - 1, get("day")));
+  if (get("hour") * 60 + get("minute") < 6 * 60 + 30) {
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  return d.toISOString().slice(0, 10);
+};
+
+const parseLocalDate = (date: string) => new Date(`${date}T00:00:00`);
+
 export default function SurveyPageTeamLead({
   currentUserId,
   currentUserName = "Team Lead",
@@ -106,6 +119,8 @@ export default function SurveyPageTeamLead({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const todayKey = useMemo(() => getBusinessTodayKey(), []);
+  const [uploadDate, setUploadDate] = useState(""); // "" = today (default)
   const [reportLoading, setReportLoading] = useState<"weekly" | "monthly" | null>(null);
 
   const [paste, setPaste] = useState("");
@@ -399,20 +414,33 @@ export default function SurveyPageTeamLead({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paste,
+           surveyDate: uploadDate || undefined,
         }),
       });
 
       const json = await res.json();
 
+      // if (json.success) {
+      //   setMessage({
+      //     type: "success",
+      //     text: `${json.message}${json.errors?.length ? ` (${json.errors.length} block(s) skipped)` : ""
+      //       }`,
+      //   });
+      //   setPaste("");
+      //   refreshAll();
+      // }
       if (json.success) {
-        setMessage({
-          type: "success",
-          text: `${json.message}${json.errors?.length ? ` (${json.errors.length} block(s) skipped)` : ""
-            }`,
-        });
-        setPaste("");
-        refreshAll();
-      } else {
+  setMessage({
+    type: "success",
+    text: `${json.message}${uploadDate ? ` for ${uploadDate}` : ""}${
+      json.errors?.length ? ` (${json.errors.length} block(s) skipped)` : ""
+    }`,
+  });
+  setPaste("");
+  setUploadDate("");
+  refreshAll();
+} 
+       else {
         setMessage({ type: "error", text: json.message || "Save failed" });
       }
     } catch (err: any) {
@@ -1022,11 +1050,53 @@ export default function SurveyPageTeamLead({
 
       {/* Paste Section (only on My Data — team lead submits their own survey data) */}
       {mainTab === "MY_DATA" && (
+
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5" />
             Paste Survey Data
           </h2>
+
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      Upload for date
+    </label>
+    <input
+      type="date"
+      value={uploadDate}
+      max={todayKey}
+      onChange={(e) => setUploadDate(e.target.value)}
+      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
+
+  {uploadDate ? (
+    <>
+      <button
+        type="button"
+        onClick={() => setUploadDate("")}
+        className="text-xs text-blue-600 hover:underline pb-2.5"
+      >
+        Reset to today
+      </button>
+      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-1">
+        Records will be saved under{" "}
+        <strong>
+          {parseLocalDate(uploadDate).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })}
+        </strong>
+      </span>
+    </>
+  ) : (
+    <span className="text-xs text-gray-500 pb-2.5">
+      Leave empty to save under today's date
+    </span>
+  )}
+</div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
