@@ -4284,9 +4284,15 @@ export default function SurveyPerformancePage() {
         .toLowerCase()
         .replace(/[-\s]/g, "_");
 
+        const isSurveyTester =
+  normalizedRole === "survey_tester" ||
+  normalizedRole === "surveytester" ||
+  normalizedRole === "survey-tester" ||
+  normalizedRole === "survey tester";
+
       const isTeamLead =
         normalizedRole === "teamlead" || normalizedRole === "team_lead";
-       const isDQA =
+  const isDQA =
   normalizedRole === "data_quality_analyst" ||
   normalizedRole === "dataqualityanalyst" ||
   normalizedRole === "dqa";
