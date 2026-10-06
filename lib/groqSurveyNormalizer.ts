@@ -1,2129 +1,3539 @@
 
 
-// export type SurveyCategory =
-//   | "B2B"
-//   | "B2C"
-//   | "B2H";
+// // export type SurveyCategory =
+// //   | "B2B"
+// //   | "B2C"
+// //   | "B2H";
 
-// export interface NormalizedSurveyRecord {
-//   category: SurveyCategory;
+// // export interface NormalizedSurveyRecord {
+// //   category: SurveyCategory;
 
-//   // ====================================================
-//   // COMMON PROJECT FIELDS
-//   // ====================================================
+// //   // ====================================================
+// //   // COMMON PROJECT FIELDS
+// //   // ====================================================
 
-//   projectName?: string;
-//   studyType?: string;
-//   counts?: string;
+// //   projectName?: string;
+// //   studyType?: string;
+// //   counts?: string;
 
-//   // ====================================================
-//   // B2C FIELDS
-//   // ====================================================
+// //   // ====================================================
+// //   // B2C FIELDS
+// //   // ====================================================
 
-//   age?: string;
-//   gender?: string;
-//   zipCode?: string;
-//   country?: string;
-//   nationality?: string;
-//   ethnicity?: string;
-//   householdIncome?: string;
-//   personalIncome?: string;
-//   brand?: string;
-//   company?: string;
-//   occupation?: string;
-//   employmentStatus?: string;
-//   maritalStatus?: string;
+// //   age?: string;
+// //   gender?: string;
+// //   zipCode?: string;
+// //   country?: string;
+// //   nationality?: string;
+// //   ethnicity?: string;
+// //   householdIncome?: string;
+// //   personalIncome?: string;
+// //   brand?: string;
+// //   company?: string;
+// //   occupation?: string;
+// //   employmentStatus?: string;
+// //   maritalStatus?: string;
 
-//   // ====================================================
-//   // B2B FIELDS
-//   // ====================================================
+// //   // ====================================================
+// //   // B2B FIELDS
+// //   // ====================================================
 
-//   jobTitle?: string;
-//   industry?: string;
-//   department?: string;
-//   employees?: string;
-//   revenue?: string;
-//   county?: string;
+// //   jobTitle?: string;
+// //   industry?: string;
+// //   department?: string;
+// //   employees?: string;
+// //   revenue?: string;
+// //   county?: string;
 
-//   // ====================================================
-//   // HEALTHCARE / B2H FIELDS
-//   // ====================================================
+// //   // ====================================================
+// //   // HEALTHCARE / B2H FIELDS
+// //   // ====================================================
 
-//   patientAge?: string;
-//   caregiverAge?: string;
-//   patientGender?: string;
-//   caregiverGender?: string;
-//   diseaseCondition?: string;
-//   firstDiagnosed?: string;
-//   medicineName?: string;
-//   currentMedication?: string;
-//   previousMedication?: string;
-//   treatmentDuration?: string;
-//   treatmentResponse?: string;
-//   sideEffects?: string;
-//   otherConditions?: string;
-//   healthcareProvider?: string;
-//   insuranceType?: string;
-//   caregiverRelationship?: string;
-//   treatmentSatisfaction?: string;
+// //   patientAge?: string;
+// //   caregiverAge?: string;
+// //   patientGender?: string;
+// //   caregiverGender?: string;
+// //   diseaseCondition?: string;
+// //   firstDiagnosed?: string;
+// //   medicineName?: string;
+// //   currentMedication?: string;
+// //   previousMedication?: string;
+// //   treatmentDuration?: string;
+// //   treatmentResponse?: string;
+// //   sideEffects?: string;
+// //   otherConditions?: string;
+// //   healthcareProvider?: string;
+// //   insuranceType?: string;
+// //   caregiverRelationship?: string;
+// //   treatmentSatisfaction?: string;
 
-//   // ====================================================
-//   // COMMON RESPONSE FIELDS
-//   // ====================================================
+// //   // ====================================================
+// //   // COMMON RESPONSE FIELDS
+// //   // ====================================================
 
-//   oppo?: string;
-//   note?: string;
+// //   oppo?: string;
+// //   note?: string;
 
-//   // ====================================================
-//   // IDENTIFIERS
-//   // ====================================================
+// //   // ====================================================
+// //   // IDENTIFIERS
+// //   // ====================================================
 
-//   tnxProjectId?: string;
-//   parentId?: string;
-//   childId?: string;
-//   respondentId?: string;
+// //   tnxProjectId?: string;
+// //   parentId?: string;
+// //   childId?: string;
+// //   respondentId?: string;
 
-//   // ====================================================
-//   // RESPONDENT INFORMATION
-//   // ====================================================
+// //   // ====================================================
+// //   // RESPONDENT INFORMATION
+// //   // ====================================================
 
-//   ip?: string;
-//   status?: string;
+// //   ip?: string;
+// //   status?: string;
 
-//   // ====================================================
-//   // EXTRA / UNKNOWN FIELDS
-//   // ====================================================
+// //   // ====================================================
+// //   // EXTRA / UNKNOWN FIELDS
+// //   // ====================================================
 
-//   data: Record<string, string>;
-// }
-
-
-// export interface GroqNormalizationResult {
-//   records: NormalizedSurveyRecord[];
-//   normalizedText?: string;
-//   errors?: string[];
-// }
+// //   data: Record<string, string>;
+// // }
 
 
-// /* ======================================================
-//    CHUNKING
-//    ====================================================== */
+// // export interface GroqNormalizationResult {
+// //   records: NormalizedSurveyRecord[];
+// //   normalizedText?: string;
+// //   errors?: string[];
+// // }
 
-// const MAX_CHARS_PER_CHUNK = 6000;
+
+// // /* ======================================================
+// //    CHUNKING
+// //    ====================================================== */
+
+// // const MAX_CHARS_PER_CHUNK = 6000;
 
 
-// /* ======================================================
-//    SPLIT RECORDS
-//    ====================================================== */
+// // /* ======================================================
+// //    SPLIT RECORDS
+// //    ====================================================== */
 
-// function splitIntoBlocks(
-//   paste: string
-// ): string[] {
+// // function splitIntoBlocks(
+// //   paste: string
+// // ): string[] {
 
-//   const normalized =
-//     paste
+// //   const normalized =
+// //     paste
+// //       .replace(/\r\n/g, "\n")
+// //       .replace(/\r/g, "\n")
+// //       .trim();
+
+// //   if (!normalized) {
+// //     return [];
+// //   }
+
+// //   /*
+// //    * Supports separators such as:
+// //    *
+// //    * --------------------
+// //    * ====================
+// //    * =====
+// //    */
+
+// //   const blocks =
+// //     normalized
+// //       .split(
+// //         /^\s*(?:-{5,}|={3,})\s*$/gm
+// //       )
+// //       .map(
+// //         (block) => block.trim()
+// //       )
+// //       .filter(Boolean);
+
+// //   return blocks.length
+// //     ? blocks
+// //     : [normalized];
+// // }
+
+
+// // /* ======================================================
+// //    CHUNK BLOCKS
+// //    ====================================================== */
+
+// // function chunkBlocks(
+// //   blocks: string[]
+// // ): string[][] {
+
+// //   const chunks: string[][] = [];
+
+// //   let current: string[] = [];
+// //   let currentLength = 0;
+
+// //   for (
+// //     const block of blocks
+// //   ) {
+
+// //     const blockLength =
+// //       block.length;
+
+// //     /*
+// //      * If a single record is larger than the normal
+// //      * chunk size, keep that record by itself.
+// //      */
+
+// //     if (
+// //       blockLength >
+// //       MAX_CHARS_PER_CHUNK
+// //     ) {
+
+// //       if (current.length) {
+// //         chunks.push(current);
+// //         current = [];
+// //         currentLength = 0;
+// //       }
+
+// //       chunks.push([block]);
+
+// //       continue;
+// //     }
+
+
+// //     /*
+// //      * Start a new chunk if the next block would make
+// //      * the chunk too large.
+// //      */
+
+// //     if (
+// //       current.length &&
+// //       currentLength + blockLength >
+// //         MAX_CHARS_PER_CHUNK
+// //     ) {
+
+// //       chunks.push(current);
+
+// //       current = [];
+// //       currentLength = 0;
+// //     }
+
+
+// //     current.push(block);
+
+// //     currentLength +=
+// //       blockLength;
+// //   }
+
+
+// //   if (current.length) {
+// //     chunks.push(current);
+// //   }
+
+
+// //   return chunks;
+// // }
+
+
+// // /* ======================================================
+// //    CLEAN VALUE
+// //    ====================================================== */
+
+// // function cleanValue(
+// //   value: unknown
+// // ): string | undefined {
+
+// //   if (
+// //     value === undefined ||
+// //     value === null
+// //   ) {
+// //     return undefined;
+// //   }
+
+// //   const text =
+// //     String(value).trim();
+
+// //   if (!text) {
+// //     return undefined;
+// //   }
+
+// //   return text;
+// // }
+
+
+// // /* ======================================================
+// //    FORMAT OPPO
+// //    ====================================================== */
+
+// // /*
+// //  * Converts:
+// //  *
+// //  * Answer one
+// //  *
+// //  * Answer two
+// //  *
+// //  * Answer three
+// //  *
+// //  * into:
+// //  *
+// //  * 1- Answer one
+// //  *
+// //  * 2- Answer two
+// //  *
+// //  * 3- Answer three
+// //  *
+// //  *
+// //  * Existing numbering is removed first so we don't get:
+// //  *
+// //  * 1- 1. Answer
+// //  */
+
+// // function formatOppo(
+// //   value: unknown
+// // ): string | undefined {
+
+// //   const cleaned =
+// //     cleanValue(value);
+
+// //   if (!cleaned) {
+// //     return undefined;
+// //   }
+
+
+// //   const normalized =
+// //     cleaned
+// //       .replace(/\r\n/g, "\n")
+// //       .replace(/\r/g, "\n")
+// //       .trim();
+
+
+// //   /*
+// //    * Primary separator:
+// //    *
+// //    * Blank lines between answers.
+// //    */
+
+// //   let answers =
+// //     normalized
+// //       .split(/\n\s*\n+/)
+// //       .map(
+// //         (answer) =>
+// //           answer.trim()
+// //       )
+// //       .filter(Boolean);
+
+
+// //   /*
+// //    * If Groq returned multiple answers as single-line
+// //    * numbered values, handle those too.
+// //    *
+// //    * Example:
+// //    *
+// //    * 1. Answer one
+// //    * 2. Answer two
+// //    * 3. Answer three
+// //    */
+
+// //   if (
+// //     answers.length === 1 &&
+// //     /^\s*\d+\s*[\.\-\):]/m.test(
+// //       answers[0]
+// //     )
+// //   ) {
+
+// //     answers =
+// //       answers[0]
+// //         .split(
+// //           /\n(?=\s*\d+\s*[\.\-\):]\s*)/
+// //         )
+// //         .map(
+// //           (answer) =>
+// //             answer.trim()
+// //         )
+// //         .filter(Boolean);
+// //   }
+
+
+// //   /*
+// //    * If there is only one answer, still return:
+// //    *
+// //    * 1- Answer
+// //    */
+
+// //   const formatted =
+// //     answers.map(
+// //       (
+// //         answer,
+// //         index
+// //       ) => {
+
+// //         /*
+// //          * Remove existing numbering:
+// //          *
+// //          * 1.
+// //          * 1-
+// //          * 1)
+// //          * 1:
+// //          */
+
+// //         const withoutNumber =
+// //           answer
+// //             .replace(
+// //               /^\s*\d+\s*[\.\-\):]\s*/,
+// //               ""
+// //             )
+// //             .trim();
+
+// //         return `${index + 1}- ${withoutNumber}`;
+// //       }
+// //     );
+
+
+// //   return formatted.join(
+// //     "\n\n"
+// //   );
+// // }
+
+
+// // /* ======================================================
+// //    CATEGORY
+// //    ====================================================== */
+
+// // function normalizeCategory(
+// //   value: unknown,
+// //   studyType: unknown
+// // ): SurveyCategory {
+
+// //   const category =
+// //     cleanValue(value)
+// //       ?.toLowerCase();
+
+// //   const study =
+// //     cleanValue(studyType)
+// //       ?.toLowerCase();
+
+
+// //   if (
+// //     category === "healthcare" ||
+// //     category === "health care" ||
+// //     category === "health" ||
+// //     category === "b2h"
+// //   ) {
+// //     return "B2H";
+// //   }
+
+
+// //   if (
+// //     study === "healthcare" ||
+// //     study === "health care" ||
+// //     study === "health" ||
+// //     study === "b2h"
+// //   ) {
+// //     return "B2H";
+// //   }
+
+
+// //   if (
+// //     category === "b2b"
+// //   ) {
+// //     return "B2B";
+// //   }
+
+
+// //   if (
+// //     category === "b2c"
+// //   ) {
+// //     return "B2C";
+// //   }
+
+
+// //   if (
+// //     study === "b2b"
+// //   ) {
+// //     return "B2B";
+// //   }
+
+
+// //   if (
+// //     study === "b2c"
+// //   ) {
+// //     return "B2C";
+// //   }
+
+
+// //   /*
+// //    * B2B is the default because the current application
+// //    * primarily receives B2B data.
+// //    */
+
+// //   return "B2B";
+// // }
+
+
+// // /* ======================================================
+// //    NORMALIZE RECORD
+// //    ====================================================== */
+
+// // function normalizeRecord(
+// //   record: any
+// // ): NormalizedSurveyRecord {
+
+// //   const category =
+// //     normalizeCategory(
+// //       record?.category,
+// //       record?.studyType
+// //     );
+
+
+// //   const data:
+// //     Record<string, string> = {};
+
+
+// //   /* ----------------------------------------------------
+// //      Preserve Groq additional fields
+// //      ---------------------------------------------------- */
+
+// //   if (
+// //     record?.data &&
+// //     typeof record.data === "object" &&
+// //     !Array.isArray(record.data)
+// //   ) {
+
+// //     for (
+// //       const [
+// //         key,
+// //         value
+// //       ] of Object.entries(
+// //         record.data
+// //       )
+// //     ) {
+
+// //       const cleaned =
+// //         cleanValue(value);
+
+// //       if (cleaned) {
+// //         data[key] = cleaned;
+// //       }
+// //     }
+// //   }
+
+
+// //   /* ----------------------------------------------------
+// //      Format Oppo
+// //      ---------------------------------------------------- */
+
+// //   const formattedOppo =
+// //     formatOppo(
+// //       record?.oppo
+// //     );
+
+
+// //   /* ----------------------------------------------------
+// //      Standard field map
+// //      ---------------------------------------------------- */
+
+// //   const fields:
+// //     Array<[string, unknown]> = [
+
+// //     // Common
+// //     [
+// //       "Project Name",
+// //       record?.projectName
+// //     ],
+
+// //     [
+// //       "Study Type",
+// //       record?.studyType
+// //     ],
+
+// //     [
+// //       "Counts",
+// //       record?.counts
+// //     ],
+
+
+// //     // -------------------------
+// //     // B2C
+// //     // -------------------------
+
+// //     [
+// //       "Age",
+// //       record?.age
+// //     ],
+
+// //     [
+// //       "Gender",
+// //       record?.gender
+// //     ],
+
+// //     [
+// //       "ZIP Code",
+// //       record?.zipCode
+// //     ],
+
+// //     [
+// //       "Country",
+// //       record?.country
+// //     ],
+
+// //     [
+// //       "Nationality",
+// //       record?.nationality
+// //     ],
+
+// //     [
+// //       "Ethnicity",
+// //       record?.ethnicity
+// //     ],
+
+// //     [
+// //       "Household Income",
+// //       record?.householdIncome
+// //     ],
+
+// //     [
+// //       "Personal Income",
+// //       record?.personalIncome
+// //     ],
+
+// //     [
+// //       "Brand",
+// //       record?.brand
+// //     ],
+
+// //     [
+// //       "Company",
+// //       record?.company
+// //     ],
+
+// //     [
+// //       "Occupation",
+// //       record?.occupation
+// //     ],
+
+// //     [
+// //       "Employment Status",
+// //       record?.employmentStatus
+// //     ],
+
+// //     [
+// //       "Marital Status",
+// //       record?.maritalStatus
+// //     ],
+
+
+// //     // -------------------------
+// //     // B2B
+// //     // -------------------------
+
+// //     [
+// //       "Job Title",
+// //       record?.jobTitle
+// //     ],
+
+// //     [
+// //       "Industry",
+// //       record?.industry
+// //     ],
+
+// //     [
+// //       "Department",
+// //       record?.department
+// //     ],
+
+// //     [
+// //       "Employees",
+// //       record?.employees
+// //     ],
+
+// //     [
+// //       "Revenue",
+// //       record?.revenue
+// //     ],
+
+// //     [
+// //       "Company",
+// //       record?.company
+// //     ],
+
+// //     [
+// //       "County",
+// //       record?.county
+// //     ],
+
+
+// //     // -------------------------
+// //     // Healthcare
+// //     // -------------------------
+
+// //     [
+// //       "Patient Age",
+// //       record?.patientAge
+// //     ],
+
+// //     [
+// //       "Caregiver Age",
+// //       record?.caregiverAge
+// //     ],
+
+// //     [
+// //       "Patient Gender",
+// //       record?.patientGender
+// //     ],
+
+// //     [
+// //       "Caregiver Gender",
+// //       record?.caregiverGender
+// //     ],
+
+// //     [
+// //       "Disease / Condition",
+// //       record?.diseaseCondition
+// //     ],
+
+// //     [
+// //       "First Diagnosed",
+// //       record?.firstDiagnosed
+// //     ],
+
+// //     [
+// //       "Medicine Name",
+// //       record?.medicineName
+// //     ],
+
+// //     [
+// //       "Current Medication",
+// //       record?.currentMedication
+// //     ],
+
+// //     [
+// //       "Previous Medication",
+// //       record?.previousMedication
+// //     ],
+
+// //     [
+// //       "Treatment Duration",
+// //       record?.treatmentDuration
+// //     ],
+
+// //     [
+// //       "Treatment Response",
+// //       record?.treatmentResponse
+// //     ],
+
+// //     [
+// //       "Side Effects",
+// //       record?.sideEffects
+// //     ],
+
+// //     [
+// //       "Other Conditions",
+// //       record?.otherConditions
+// //     ],
+
+// //     [
+// //       "Healthcare Provider",
+// //       record?.healthcareProvider
+// //     ],
+
+// //     [
+// //       "Insurance Type",
+// //       record?.insuranceType
+// //     ],
+
+// //     [
+// //       "Caregiver Relationship",
+// //       record?.caregiverRelationship
+// //     ],
+
+// //     [
+// //       "Treatment Satisfaction",
+// //       record?.treatmentSatisfaction
+// //     ],
+
+
+// //     // -------------------------
+// //     // Common
+// //     // -------------------------
+
+// //     [
+// //       "Oppo",
+// //       formattedOppo
+// //     ],
+
+// //     [
+// //       "TNX Project ID",
+// //       record?.tnxProjectId
+// //     ],
+
+// //     [
+// //       "Parent ID",
+// //       record?.parentId
+// //     ],
+
+// //     [
+// //       "Child ID",
+// //       record?.childId
+// //     ],
+
+// //     [
+// //       "Respondent ID",
+// //       record?.respondentId
+// //     ],
+
+// //     [
+// //       "Country",
+// //       record?.country
+// //     ],
+
+// //     [
+// //       "IP Address",
+// //       record?.ip
+// //     ],
+
+// //     [
+// //       "Status",
+// //       record?.status
+// //     ],
+
+// //     [
+// //       "Note",
+// //       record?.note
+// //     ],
+// //   ];
+
+
+// //   for (
+// //     const [
+// //       key,
+// //       value
+// //     ] of fields
+// //   ) {
+
+// //     const cleaned =
+// //       cleanValue(value);
+
+// //     if (cleaned) {
+// //       data[key] = cleaned;
+// //     }
+// //   }
+
+
+// //   /* ====================================================
+// //      RETURN
+// //      ==================================================== */
+
+// //   return {
+
+// //     category,
+
+// //     // Common
+// //     projectName:
+// //       cleanValue(
+// //         record?.projectName
+// //       ),
+
+// //     studyType:
+// //       cleanValue(
+// //         record?.studyType
+// //       ),
+
+// //     counts:
+// //       cleanValue(
+// //         record?.counts
+// //       ),
+
+
+// //     // B2C
+// //     age:
+// //       cleanValue(
+// //         record?.age
+// //       ),
+
+// //     gender:
+// //       cleanValue(
+// //         record?.gender
+// //       ),
+
+// //     zipCode:
+// //       cleanValue(
+// //         record?.zipCode
+// //       ),
+
+// //     country:
+// //       cleanValue(
+// //         record?.country
+// //       ),
+
+// //     nationality:
+// //       cleanValue(
+// //         record?.nationality
+// //       ),
+
+// //     ethnicity:
+// //       cleanValue(
+// //         record?.ethnicity
+// //       ),
+
+// //     householdIncome:
+// //       cleanValue(
+// //         record?.householdIncome
+// //       ),
+
+// //     personalIncome:
+// //       cleanValue(
+// //         record?.personalIncome
+// //       ),
+
+// //     brand:
+// //       cleanValue(
+// //         record?.brand
+// //       ),
+
+// //     company:
+// //       cleanValue(
+// //         record?.company
+// //       ),
+
+// //     occupation:
+// //       cleanValue(
+// //         record?.occupation
+// //       ),
+
+// //     employmentStatus:
+// //       cleanValue(
+// //         record?.employmentStatus
+// //       ),
+
+// //     maritalStatus:
+// //       cleanValue(
+// //         record?.maritalStatus
+// //       ),
+
+
+// //     // B2B
+// //     jobTitle:
+// //       cleanValue(
+// //         record?.jobTitle
+// //       ),
+
+// //     industry:
+// //       cleanValue(
+// //         record?.industry
+// //       ),
+
+// //     department:
+// //       cleanValue(
+// //         record?.department
+// //       ),
+
+// //     employees:
+// //       cleanValue(
+// //         record?.employees
+// //       ),
+
+// //     revenue:
+// //       cleanValue(
+// //         record?.revenue
+// //       ),
+
+// //     county:
+// //       cleanValue(
+// //         record?.county
+// //       ),
+
+
+// //     // Healthcare
+// //     patientAge:
+// //       cleanValue(
+// //         record?.patientAge
+// //       ),
+
+// //     caregiverAge:
+// //       cleanValue(
+// //         record?.caregiverAge
+// //       ),
+
+// //     patientGender:
+// //       cleanValue(
+// //         record?.patientGender
+// //       ),
+
+// //     caregiverGender:
+// //       cleanValue(
+// //         record?.caregiverGender
+// //       ),
+
+// //     diseaseCondition:
+// //       cleanValue(
+// //         record?.diseaseCondition
+// //       ),
+
+// //     firstDiagnosed:
+// //       cleanValue(
+// //         record?.firstDiagnosed
+// //       ),
+
+// //     medicineName:
+// //       cleanValue(
+// //         record?.medicineName
+// //       ),
+
+// //     currentMedication:
+// //       cleanValue(
+// //         record?.currentMedication
+// //       ),
+
+// //     previousMedication:
+// //       cleanValue(
+// //         record?.previousMedication
+// //       ),
+
+// //     treatmentDuration:
+// //       cleanValue(
+// //         record?.treatmentDuration
+// //       ),
+
+// //     treatmentResponse:
+// //       cleanValue(
+// //         record?.treatmentResponse
+// //       ),
+
+// //     sideEffects:
+// //       cleanValue(
+// //         record?.sideEffects
+// //       ),
+
+// //     otherConditions:
+// //       cleanValue(
+// //         record?.otherConditions
+// //       ),
+
+// //     healthcareProvider:
+// //       cleanValue(
+// //         record?.healthcareProvider
+// //       ),
+
+// //     insuranceType:
+// //       cleanValue(
+// //         record?.insuranceType
+// //       ),
+
+// //     caregiverRelationship:
+// //       cleanValue(
+// //         record?.caregiverRelationship
+// //       ),
+
+// //     treatmentSatisfaction:
+// //       cleanValue(
+// //         record?.treatmentSatisfaction
+// //       ),
+
+
+// //     // Common
+// //     oppo:
+// //       formattedOppo,
+
+// //     note:
+// //       cleanValue(
+// //         record?.note
+// //       ),
+
+
+// //     // IDs
+// //     tnxProjectId:
+// //       cleanValue(
+// //         record?.tnxProjectId
+// //       ),
+
+// //     parentId:
+// //       cleanValue(
+// //         record?.parentId
+// //       ),
+
+// //     childId:
+// //       cleanValue(
+// //         record?.childId
+// //       ),
+
+// //     respondentId:
+// //       cleanValue(
+// //         record?.respondentId
+// //       ),
+
+
+// //     // Respondent
+// //     ip:
+// //       cleanValue(
+// //         record?.ip
+// //       ),
+
+// //     status:
+// //       cleanValue(
+// //         record?.status
+// //       ),
+
+
+// //     data,
+// //   };
+// // }
+
+
+// // /* ======================================================
+// //    JSON EXTRACTION
+// //    ====================================================== */
+
+// // function extractJson(
+// //   text: string
+// // ): any {
+
+// //   const cleaned =
+// //     text
+// //       .replace(
+// //         /```json/gi,
+// //         ""
+// //       )
+// //       .replace(
+// //         /```/g,
+// //         ""
+// //       )
+// //       .trim();
+
+
+// //   try {
+
+// //     return JSON.parse(
+// //       cleaned
+// //     );
+
+// //   } catch {
+// //     // Continue below.
+// //   }
+
+
+// //   /*
+// //    * Try extracting JSON object from surrounding text.
+// //    */
+
+// //   const firstObject =
+// //     cleaned.indexOf("{");
+
+// //   const lastObject =
+// //     cleaned.lastIndexOf("}");
+
+
+// //   if (
+// //     firstObject !== -1 &&
+// //     lastObject !== -1 &&
+// //     lastObject > firstObject
+// //   ) {
+
+// //     try {
+
+// //       return JSON.parse(
+// //         cleaned.slice(
+// //           firstObject,
+// //           lastObject + 1
+// //         )
+// //       );
+
+// //     } catch {
+// //       // Continue.
+// //     }
+// //   }
+
+
+// //   /*
+// //    * Try JSON array.
+// //    */
+
+// //   const firstArray =
+// //     cleaned.indexOf("[");
+
+// //   const lastArray =
+// //     cleaned.lastIndexOf("]");
+
+
+// //   if (
+// //     firstArray !== -1 &&
+// //     lastArray !== -1 &&
+// //     lastArray > firstArray
+// //   ) {
+
+// //     try {
+
+// //       return JSON.parse(
+// //         cleaned.slice(
+// //           firstArray,
+// //           lastArray + 1
+// //         )
+// //       );
+
+// //     } catch {
+// //       // Continue.
+// //     }
+// //   }
+
+
+// //   throw new Error(
+// //     "Groq did not return valid JSON"
+// //   );
+// // }
+
+
+// // /* ======================================================
+// //    GROQ SINGLE CHUNK
+// //    ====================================================== */
+
+// // async function normalizeChunkWithGroq(
+// //   paste: string
+// // ): Promise<GroqNormalizationResult> {
+
+// //   const apiKey =
+// //     process.env.GROQ_API_KEY;
+
+
+// //   if (!apiKey) {
+
+// //     throw new Error(
+// //       "GROQ_API_KEY is not configured"
+// //     );
+// //   }
+
+
+// //   const model =
+// //     process.env.GROQ_MODEL ||
+// //     "openai/gpt-oss-120b";
+
+
+// //   /* ====================================================
+// //      SYSTEM PROMPT
+// //      ==================================================== */
+
+// //   const systemPrompt = `
+// // You are a professional survey data extraction engine.
+
+// // Your job is to convert raw survey records into structured JSON.
+
+// // The input may contain:
+
+// // B2B
+// // B2C
+// // Healthcare
+// // B2H
+
+// // Automatically identify the correct category.
+
+// // ========================================================
+// // CRITICAL RULES
+// // ========================================================
+
+// // 1. Every numbered record is ONE record.
+
+// // 2. NEVER merge two records.
+
+// // 3. NEVER delete records.
+
+// // 4. NEVER invent information.
+
+// // 5. Missing fields MUST be null.
+
+// // 6. Preserve all supplied values exactly.
+
+// // 7. Preserve IP addresses exactly.
+
+// // 8. Preserve IDs exactly.
+
+// // 9. Preserve income values exactly.
+
+// // 10. Preserve age values exactly.
+
+// // 11. Preserve company names exactly.
+
+// // 12. Preserve job titles exactly.
+
+// // 13. Preserve country names exactly.
+
+// // 14. Preserve the original language.
+
+// // 15. Do NOT translate Oppo.
+
+// // 16. Do NOT summarize Oppo.
+
+// // 17. Do NOT delete Oppo paragraphs.
+
+// // 18. Preserve every Oppo answer.
+
+// // 19. Return ONLY JSON.
+
+// // 20. No markdown.
+
+// // 21. No explanations.
+
+// // 22. Output MUST contain a records array.
+
+
+// // ========================================================
+// // B2B
+// // ========================================================
+
+// // Fields:
+
+// // Project Name
+// // Study Type
+// // Counts
+// // Age
+// // Gender
+// // Job title
+// // Industry
+// // Department
+// // Employees
+// // Brand
+// // Revenue
+// // Company
+// // County
+// // Zip code
+// // Nationality
+// // Household Income
+// // Oppo
+// // TNX Project ID
+// // Parent ID
+// // Child ID
+// // Respondent ID
+// // Country
+// // IP Address
+// // Status
+// // Note
+
+
+// // Map:
+
+// // Project Name -> projectName
+// // Study Type -> studyType
+// // Counts -> counts
+// // Age -> age
+// // Gender -> gender
+// // Job title -> jobTitle
+// // Industry -> industry
+// // Department -> department
+// // Employees -> employees
+// // Brand -> brand
+// // Revenue -> revenue
+// // Company -> company
+// // County -> county
+// // Zip code -> zipCode
+// // Nationality -> nationality
+// // Household Income -> householdIncome
+// // Oppo -> oppo
+// // TNX Project ID -> tnxProjectId
+// // Parent ID -> parentId
+// // Child ID -> childId
+// // Respondent ID -> respondentId
+// // Country -> country
+// // IP Address -> ip
+// // Status -> status
+// // Note -> note
+
+
+// // ========================================================
+// // B2C
+// // ========================================================
+
+// // Fields:
+
+// // Project Name
+// // Study Type
+// // Counts
+// // Age
+// // Gender
+// // ZIP Code
+// // Country
+// // Nationality
+// // Ethnicity
+// // Household Income
+// // Personal Income
+// // Brand
+// // Company
+// // Occupation
+// // Employment Status
+// // Marital Status
+// // Oppo
+// // TNX Project ID
+// // Parent ID
+// // Child ID
+// // Respondent ID
+// // Country
+// // IP Address
+// // Status
+// // Note
+
+
+// // Map:
+
+// // Project Name -> projectName
+// // Study Type -> studyType
+// // Counts -> counts
+// // Age -> age
+// // Gender -> gender
+// // ZIP Code -> zipCode
+// // Country -> country
+// // Nationality -> nationality
+// // Ethnicity -> ethnicity
+// // Household Income -> householdIncome
+// // Personal Income -> personalIncome
+// // Brand -> brand
+// // Company -> company
+// // Occupation -> occupation
+// // Employment Status -> employmentStatus
+// // Marital Status -> maritalStatus
+// // Oppo -> oppo
+// // TNX Project ID -> tnxProjectId
+// // Parent ID -> parentId
+// // Child ID -> childId
+// // Respondent ID -> respondentId
+// // Country -> country
+// // IP Address -> ip
+// // Status -> status
+// // Note -> note
+
+
+// // ========================================================
+// // HEALTHCARE / B2H
+// // ========================================================
+
+// // Fields:
+
+// // Project Name
+// // Study Type
+// // Counts
+// // Patient Age
+// // Caregiver Age
+// // Patient Gender
+// // Caregiver Gender
+// // Disease / Condition
+// // First Diagnosed
+// // Medicine Name
+// // Current Medication
+// // Previous Medication
+// // Treatment Duration
+// // Treatment Response
+// // Side Effects
+// // Other Conditions
+// // Healthcare Provider
+// // Insurance Type
+// // Caregiver Relationship
+// // Treatment Satisfaction
+// // Oppo
+// // TNX Project ID
+// // Parent ID
+// // Child ID
+// // Respondent ID
+// // Country
+// // IP Address
+// // Status
+// // Note
+
+
+// // Map:
+
+// // Project Name -> projectName
+// // Study Type -> studyType
+// // Counts -> counts
+// // Patient Age -> patientAge
+// // Caregiver Age -> caregiverAge
+// // Patient Gender -> patientGender
+// // Caregiver Gender -> caregiverGender
+// // Disease / Condition -> diseaseCondition
+// // First Diagnosed -> firstDiagnosed
+// // Medicine Name -> medicineName
+// // Current Medication -> currentMedication
+// // Previous Medication -> previousMedication
+// // Treatment Duration -> treatmentDuration
+// // Treatment Response -> treatmentResponse
+// // Side Effects -> sideEffects
+// // Other Conditions -> otherConditions
+// // Healthcare Provider -> healthcareProvider
+// // Insurance Type -> insuranceType
+// // Caregiver Relationship -> caregiverRelationship
+// // Treatment Satisfaction -> treatmentSatisfaction
+// // Oppo -> oppo
+// // TNX Project ID -> tnxProjectId
+// // Parent ID -> parentId
+// // Child ID -> childId
+// // Respondent ID -> respondentId
+// // Country -> country
+// // IP Address -> ip
+// // Status -> status
+// // Note -> note
+
+
+// // ========================================================
+// // TNX PROJECT ID RULE
+// // ========================================================
+
+// // The TNX Project ID comes from the HEADER.
+
+// // Example:
+
+// // GMS 79151 - Genpop | TNX543
+
+// // must produce:
+
+// // projectName = "GMS 79151 - Genpop"
+// // tnxProjectId = "TNX543"
+
+// // DO NOT use the respondent number as the TNX Project ID.
+
+
+// // ========================================================
+// // RESPONDENT ID RULE
+// // ========================================================
+
+// // Example:
+
+// // 543 ="371515368214102272" China 118.123.80.10 Completed
+
+// // with header:
+
+// // GMS 79151 - Genpop | TNX543
+
+// // must produce:
+
+// // tnxProjectId = "TNX543"
+
+// // respondentId = "371515368214102272"
+
+// // country = "China"
+
+// // ip = "118.123.80.10"
+
+// // status = "Completed"
+
+
+// // ========================================================
+// // ANOTHER RESPONDENT EXAMPLE
+// // ========================================================
+
+// // Example:
+
+// // 78014 rfderday00srj United States 76.250.239.86 Completed
+
+// // must produce:
+
+// // respondentId = "rfderday00srj"
+
+// // country = "United States"
+
+// // ip = "76.250.239.86"
+
+// // status = "Completed"
+
+// // Do NOT put rfderday00srj into TNX Project ID.
+
+
+// // ========================================================
+// // TRN EXAMPLE
+// // ========================================================
+
+// // Header:
+
+// // TRN 21425 -18-50 YO || TNX300
+
+// // Tail:
+
+// // 21425 jgreefjday00srj United States 76.250.239.112 Completed
+
+// // must produce:
+
+// // projectName = "TRN 21425 -18-50 YO"
+
+// // tnxProjectId = "TNX300"
+
+// // respondentId = "jgreefjday00srj"
+
+// // country = "United States"
+
+// // ip = "76.250.239.112"
+
+// // status = "Completed"
+
+
+// // ========================================================
+// // ROLE RULE
+// // ========================================================
+
+// // If input contains:
+
+// // Job title - Director
+
+// // role-Director of IT Infrastructure
+
+// // then:
+
+// // jobTitle = "Director"
+
+// // and:
+
+// // data = {
+// //   "Role": "Director of IT Infrastructure"
+// // }
+
+// // Do NOT replace Job Title with Role.
+
+
+// // ========================================================
+// // OPPO RULE
+// // ========================================================
+
+// // Oppo can contain multiple paragraphs.
+
+// // Example:
+
+// // Oppo-
+
+// // Answer one.
+
+// // Answer two.
+
+// // Answer three.
+
+// // Answer four.
+
+// // Return ALL answers inside:
+
+// // oppo
+
+// // Do NOT summarize them.
+
+// // Do NOT translate them.
+
+// // Do NOT delete them.
+
+
+// // IMPORTANT:
+
+// // Do NOT add numbering yourself.
+
+// // Return the raw Oppo answer paragraphs.
+
+// // The application will add:
+
+// // 1-
+// // 2-
+// // 3-
+// // 4-
+
+// // automatically.
+
+
+// // ========================================================
+// // NOTE RULE
+// // ========================================================
+
+// // Note -
+
+// // Some note text
+
+// // must become:
+
+// // note = "Some note text"
+
+// // If empty:
+
+// // note = null
+
+
+// // ========================================================
+// // UNKNOWN FIELDS
+// // ========================================================
+
+// // Never delete unknown fields.
+
+// // Put them into:
+
+// // data
+
+// // Example:
+
+// // Spent - $5000
+
+// // becomes:
+
+// // data = {
+// //   "Spent": "$5000"
+// // }
+
+
+// // ========================================================
+// // FINAL OUTPUT
+// // ========================================================
+
+// // Return ONLY JSON.
+
+// // Example:
+
+// // {
+// //   "records": [
+// //     {
+// //       "category": "B2B",
+// //       "projectName": null,
+// //       "studyType": "B2B",
+// //       "counts": null,
+
+// //       "age": null,
+// //       "gender": null,
+// //       "jobTitle": null,
+// //       "industry": null,
+// //       "department": null,
+// //       "employees": null,
+// //       "brand": null,
+// //       "revenue": null,
+// //       "company": null,
+// //       "county": null,
+// //       "zipCode": null,
+// //       "nationality": null,
+// //       "householdIncome": null,
+
+// //       "patientAge": null,
+// //       "caregiverAge": null,
+// //       "patientGender": null,
+// //       "caregiverGender": null,
+// //       "diseaseCondition": null,
+// //       "firstDiagnosed": null,
+// //       "medicineName": null,
+// //       "currentMedication": null,
+// //       "previousMedication": null,
+// //       "treatmentDuration": null,
+// //       "treatmentResponse": null,
+// //       "sideEffects": null,
+// //       "otherConditions": null,
+// //       "healthcareProvider": null,
+// //       "insuranceType": null,
+// //       "caregiverRelationship": null,
+// //       "treatmentSatisfaction": null,
+
+// //       "oppo": null,
+
+// //       "tnxProjectId": null,
+// //       "parentId": null,
+// //       "childId": null,
+// //       "respondentId": null,
+
+// //       "country": null,
+// //       "ip": null,
+// //       "status": null,
+// //       "note": null,
+
+// //       "data": {}
+// //     }
+// //   ]
+// // }
+// // `.trim();
+
+
+// //   /* ====================================================
+// //      API REQUEST
+// //      ==================================================== */
+
+// //   const response =
+// //     await fetch(
+// //       "https://api.groq.com/openai/v1/chat/completions",
+// //       {
+// //         method: "POST",
+
+// //         headers: {
+// //           "Content-Type":
+// //             "application/json",
+
+// //           Authorization:
+// //             `Bearer ${apiKey}`,
+// //         },
+
+// //         body: JSON.stringify({
+// //           model,
+
+// //           temperature: 0,
+
+// //           max_tokens: 16000,
+
+// //           messages: [
+// //             {
+// //               role: "system",
+// //               content:
+// //                 systemPrompt,
+// //             },
+
+// //             {
+// //               role: "user",
+// //               content:
+// //                 paste,
+// //             },
+// //           ],
+
+// //           response_format: {
+// //             type: "json_object",
+// //           },
+// //         }),
+// //       }
+// //     );
+
+
+// //   /* ====================================================
+// //      RESPONSE
+// //      ==================================================== */
+
+// //   const responseText =
+// //     await response.text();
+
+
+// //   if (!response.ok) {
+
+// //     throw new Error(
+// //       `${response.status} ${responseText}`
+// //     );
+// //   }
+
+
+// //   let apiResult: any;
+
+// //   try {
+
+// //     apiResult =
+// //       JSON.parse(
+// //         responseText
+// //       );
+
+// //   } catch {
+
+// //     throw new Error(
+// //       "Groq API returned invalid JSON"
+// //     );
+// //   }
+
+
+// //   const content =
+// //     apiResult
+// //       ?.choices?.[0]
+// //       ?.message
+// //       ?.content;
+
+
+// //   if (
+// //     typeof content !== "string" ||
+// //     !content.trim()
+// //   ) {
+
+// //     console.error(
+// //       "GROQ EMPTY CONTENT:",
+// //       JSON.stringify(
+// //         apiResult,
+// //         null,
+// //         2
+// //       )
+// //     );
+
+// //     throw new Error(
+// //       "Groq returned empty content"
+// //     );
+// //   }
+
+
+// //   /* ====================================================
+// //      PARSE GROQ JSON
+// //      ==================================================== */
+
+// //   let parsed: any;
+
+// //   try {
+
+// //     parsed =
+// //       extractJson(
+// //         content
+// //       );
+
+// //   } catch (error) {
+
+// //     console.error(
+// //       "GROQ CONTENT:",
+// //       content
+// //     );
+
+// //     throw error;
+// //   }
+
+
+// //   /* ====================================================
+// //      GET RECORDS
+// //      ==================================================== */
+
+// //   let records: any[] = [];
+
+
+// //   if (
+// //     parsed &&
+// //     Array.isArray(
+// //       parsed.records
+// //     )
+// //   ) {
+
+// //     records =
+// //       parsed.records;
+
+// //   } else if (
+// //     parsed &&
+// //     Array.isArray(
+// //       parsed.data
+// //     )
+// //   ) {
+
+// //     records =
+// //       parsed.data;
+
+// //   } else if (
+// //     Array.isArray(parsed)
+// //   ) {
+
+// //     records =
+// //       parsed;
+
+// //   } else if (
+// //     parsed &&
+// //     typeof parsed === "object"
+// //   ) {
+
+// //     records = [
+// //       parsed
+// //     ];
+// //   }
+
+
+// //   /* ====================================================
+// //      NORMALIZE RECORDS
+// //      ==================================================== */
+
+// //   const normalizedRecords =
+// //     records.map(
+// //       normalizeRecord
+// //     );
+
+
+// //   console.log(
+// //     `GROQ NORMALIZER: ${normalizedRecords.length} record(s)`
+// //   );
+
+
+// //   return {
+// //     records:
+// //       normalizedRecords,
+
+// //     normalizedText:
+// //       JSON.stringify(
+// //         {
+// //           records:
+// //             normalizedRecords,
+// //         },
+// //         null,
+// //         2
+// //       ),
+// //   };
+// // }
+
+
+// // /* ======================================================
+// //    RETRY
+// //    ====================================================== */
+
+// // async function normalizeChunkWithRetry(
+// //   paste: string,
+// //   chunkLabel: string,
+// //   attempt = 1
+// // ): Promise<GroqNormalizationResult> {
+
+// //   try {
+
+// //     return await normalizeChunkWithGroq(
+// //       paste
+// //     );
+
+// //   } catch (error: any) {
+
+// //     if (attempt < 2) {
+
+// //       console.warn(
+// //         `GROQ ${chunkLabel} failed (attempt ${attempt}), retrying...`,
+// //         error?.message ||
+// //           error
+// //       );
+
+// //       return normalizeChunkWithRetry(
+// //         paste,
+// //         chunkLabel,
+// //         attempt + 1
+// //       );
+// //     }
+
+// //     throw error;
+// //   }
+// // }
+
+
+// // /* ======================================================
+// //    PUBLIC ENTRY POINT
+// //    ====================================================== */
+
+// // export async function normalizeSurveyWithGroq(
+// //   paste: string
+// // ): Promise<GroqNormalizationResult> {
+
+// //   const blocks =
+// //     splitIntoBlocks(
+// //       paste
+// //     );
+
+
+// //   if (!blocks.length) {
+
+// //     return {
+// //       records: [],
+
+// //       normalizedText:
+// //         JSON.stringify(
+// //           {
+// //             records: [],
+// //           },
+// //           null,
+// //           2
+// //         ),
+// //     };
+// //   }
+
+
+// //   /*
+// //    * Single block.
+// //    */
+
+// //   if (
+// //     blocks.length === 1
+// //   ) {
+
+// //     return normalizeChunkWithGroq(
+// //       paste
+// //     );
+// //   }
+
+
+// //   /*
+// //    * Multiple blocks.
+// //    */
+
+// //   // const chunks =
+// //   //   chunkBlocks(
+// //   //     blocks.map(
+// //   //       (block) => [block]
+// //   //     )
+// //   //   );
+
+// //   const chunks = chunkBlocks(blocks);
+
+
+// //   const delimiter =
+// //     "\n--------------------\n";
+
+
+// //   console.log(
+// //     `GROQ NORMALIZER: splitting ${blocks.length} block(s) into ${chunks.length} chunk(s)`
+// //   );
+
+
+// //   const settled =
+// //     await Promise.allSettled(
+// //       chunks.map(
+// //         (chunk, index) =>
+// //           normalizeChunkWithRetry(
+// //             chunk.join(
+// //               delimiter
+// //             ),
+// //             `chunk ${index + 1}/${chunks.length}`
+// //           )
+// //       )
+// //     );
+
+
+// //   const records:
+// //     NormalizedSurveyRecord[] = [];
+
+// //   const errors:
+// //     string[] = [];
+
+
+// //   settled.forEach(
+// //     (
+// //       result,
+// //       index
+// //     ) => {
+
+// //       if (
+// //         result.status ===
+// //         "fulfilled"
+// //       ) {
+
+// //         records.push(
+// //           ...result.value.records
+// //         );
+
+// //       } else {
+
+// //         const blockCount =
+// //           chunks[index].length;
+
+// //         const message =
+// //           result.reason?.message ||
+// //           String(
+// //             result.reason
+// //           );
+
+
+// //         console.error(
+// //           `GROQ CHUNK ${index + 1}/${chunks.length} FAILED:`,
+// //           message
+// //         );
+
+
+// //         errors.push(
+// //           `Chunk ${index + 1}/${chunks.length} (${blockCount} record${
+// //             blockCount === 1
+// //               ? ""
+// //               : "s"
+// //           }) failed to normalize: ${message}`
+// //         );
+// //       }
+// //     }
+// //   );
+
+
+// //   return {
+// //     records,
+
+// //     errors:
+// //       errors.length
+// //         ? errors
+// //         : undefined,
+
+// //     normalizedText:
+// //       JSON.stringify(
+// //         {
+// //           records,
+// //         },
+// //         null,
+// //         2
+// //       ),
+// //   };
+// // }
+
+
+//   export type SurveyCategory =
+//     | "B2B"
+//     | "B2C"
+//     | "B2H";
+
+//   export interface NormalizedSurveyRecord {
+//     category: SurveyCategory;
+
+//     // ====================================================
+//     // COMMON PROJECT FIELDS
+//     // ====================================================
+
+//     projectName?: string;
+//     studyType?: string;
+//     counts?: string;
+
+//     // ====================================================
+//     // B2C FIELDS
+//     // ====================================================
+
+//     age?: string;
+//     gender?: string;
+//     zipCode?: string;
+//     country?: string;
+//     nationality?: string;
+//     ethnicity?: string;
+//     householdIncome?: string;
+//     personalIncome?: string;
+//     brand?: string;
+//     company?: string;
+//     occupation?: string;
+//     employmentStatus?: string;
+//     maritalStatus?: string;
+
+//     // ====================================================
+//     // B2B FIELDS
+//     // ====================================================
+
+//     jobTitle?: string;
+//     industry?: string;
+//     department?: string;
+//     employees?: string;
+//     revenue?: string;
+//     county?: string;
+
+//     // ====================================================
+//     // HEALTHCARE / B2H FIELDS
+//     // ====================================================
+
+//     patientAge?: string;
+//     caregiverAge?: string;
+//     patientGender?: string;
+//     caregiverGender?: string;
+//     diseaseCondition?: string;
+//     firstDiagnosed?: string;
+//     medicineName?: string;
+//     currentMedication?: string;
+//     previousMedication?: string;
+//     treatmentDuration?: string;
+//     treatmentResponse?: string;
+//     sideEffects?: string;
+//     otherConditions?: string;
+//     healthcareProvider?: string;
+//     insuranceType?: string;
+//     caregiverRelationship?: string;
+//     treatmentSatisfaction?: string;
+
+//     // ====================================================
+//     // COMMON RESPONSE FIELDS
+//     // ====================================================
+
+//     oppo?: string;
+//     note?: string;
+
+//     // ====================================================
+//     // IDENTIFIERS
+//     // ====================================================
+
+//     tnxProjectId?: string;
+//     parentId?: string;
+//     childId?: string;
+//     respondentId?: string;
+
+//     // ====================================================
+//     // RESPONDENT INFORMATION
+//     // ====================================================
+
+//     ip?: string;
+//     status?: string;
+
+//     // ====================================================
+//     // EXTRA / UNKNOWN FIELDS
+//     // ====================================================
+
+//     data: Record<string, string>;
+//   }
+
+//   export interface GroqNormalizationResult {
+//     records: NormalizedSurveyRecord[];
+//     normalizedText?: string;
+//     errors?: string[];
+//   }
+
+//   /* ======================================================
+//     CHUNKING
+//     ====================================================== */
+
+//   const MAX_CHARS_PER_CHUNK = 6000;
+
+//   /* ======================================================
+//     SPLIT RECORDS
+//     ====================================================== */
+
+//   function splitIntoBlocks(paste: string): string[] {
+//     const normalized = paste
 //       .replace(/\r\n/g, "\n")
 //       .replace(/\r/g, "\n")
 //       .trim();
 
-//   if (!normalized) {
-//     return [];
-//   }
-
-//   /*
-//    * Supports separators such as:
-//    *
-//    * --------------------
-//    * ====================
-//    * =====
-//    */
-
-//   const blocks =
-//     normalized
-//       .split(
-//         /^\s*(?:-{5,}|={3,})\s*$/gm
-//       )
-//       .map(
-//         (block) => block.trim()
-//       )
-//       .filter(Boolean);
-
-//   return blocks.length
-//     ? blocks
-//     : [normalized];
-// }
-
-
-// /* ======================================================
-//    CHUNK BLOCKS
-//    ====================================================== */
-
-// function chunkBlocks(
-//   blocks: string[]
-// ): string[][] {
-
-//   const chunks: string[][] = [];
-
-//   let current: string[] = [];
-//   let currentLength = 0;
-
-//   for (
-//     const block of blocks
-//   ) {
-
-//     const blockLength =
-//       block.length;
+//     if (!normalized) {
+//       return [];
+//     }
 
 //     /*
-//      * If a single record is larger than the normal
-//      * chunk size, keep that record by itself.
-//      */
+//     * Supports separators such as:
+//     *
+//     * --------------------
+//     * ====================
+//     * =====
+//     */
 
-//     if (
-//       blockLength >
-//       MAX_CHARS_PER_CHUNK
-//     ) {
+//     const blocks = normalized
+//       .split(/^\s*(?:-{5,}|={3,})\s*$/gm)
+//       .map((block) => block.trim())
+//       .filter(Boolean);
 
-//       if (current.length) {
+//     return blocks.length ? blocks : [normalized];
+//   }
+
+//   /* ======================================================
+//     CHUNK BLOCKS
+//     ====================================================== */
+
+//   function chunkBlocks(blocks: string[]): string[][] {
+//     const chunks: string[][] = [];
+
+//     let current: string[] = [];
+//     let currentLength = 0;
+
+//     for (const block of blocks) {
+//       const blockLength = block.length;
+
+//       /*
+//       * If a single record is larger than the normal
+//       * chunk size, keep that record by itself.
+//       */
+
+//       if (blockLength > MAX_CHARS_PER_CHUNK) {
+//         if (current.length) {
+//           chunks.push(current);
+//           current = [];
+//           currentLength = 0;
+//         }
+
+//         chunks.push([block]);
+//         continue;
+//       }
+
+//       /*
+//       * Start a new chunk if the next block would make
+//       * the chunk too large.
+//       */
+
+//       if (
+//         current.length &&
+//         currentLength + blockLength > MAX_CHARS_PER_CHUNK
+//       ) {
 //         chunks.push(current);
 //         current = [];
 //         currentLength = 0;
 //       }
 
-//       chunks.push([block]);
-
-//       continue;
+//       current.push(block);
+//       currentLength += blockLength;
 //     }
 
-
-//     /*
-//      * Start a new chunk if the next block would make
-//      * the chunk too large.
-//      */
-
-//     if (
-//       current.length &&
-//       currentLength + blockLength >
-//         MAX_CHARS_PER_CHUNK
-//     ) {
-
+//     if (current.length) {
 //       chunks.push(current);
-
-//       current = [];
-//       currentLength = 0;
 //     }
 
-
-//     current.push(block);
-
-//     currentLength +=
-//       blockLength;
+//     return chunks;
 //   }
 
+//   /* ======================================================
+//     CLEAN VALUE
+//     ====================================================== */
 
-//   if (current.length) {
-//     chunks.push(current);
+//   function cleanValue(value: unknown): string | undefined {
+//     if (value === undefined || value === null) {
+//       return undefined;
+//     }
+
+//     const text = String(value).trim();
+
+//     if (!text) {
+//       return undefined;
+//     }
+
+//     return text;
 //   }
 
+//   /* ======================================================
+//     FORMAT OPPO
+//     ====================================================== */
 
-//   return chunks;
-// }
+//   /*
+//   * Converts:
+//   *
+//   * Answer one
+//   *
+//   * Answer two
+//   *
+//   * Answer three
+//   *
+//   * into:
+//   *
+//   * 1- Answer one
+//   *
+//   * 2- Answer two
+//   *
+//   * 3- Answer three
+//   *
+//   *
+//   * Existing numbering is removed first so we don't get:
+//   *
+//   * 1- 1. Answer
+//   */
 
+//   function formatOppo(value: unknown): string | undefined {
+//     const cleaned = cleanValue(value);
 
-// /* ======================================================
-//    CLEAN VALUE
-//    ====================================================== */
+//     if (!cleaned) {
+//       return undefined;
+//     }
 
-// function cleanValue(
-//   value: unknown
-// ): string | undefined {
-
-//   if (
-//     value === undefined ||
-//     value === null
-//   ) {
-//     return undefined;
-//   }
-
-//   const text =
-//     String(value).trim();
-
-//   if (!text) {
-//     return undefined;
-//   }
-
-//   return text;
-// }
-
-
-// /* ======================================================
-//    FORMAT OPPO
-//    ====================================================== */
-
-// /*
-//  * Converts:
-//  *
-//  * Answer one
-//  *
-//  * Answer two
-//  *
-//  * Answer three
-//  *
-//  * into:
-//  *
-//  * 1- Answer one
-//  *
-//  * 2- Answer two
-//  *
-//  * 3- Answer three
-//  *
-//  *
-//  * Existing numbering is removed first so we don't get:
-//  *
-//  * 1- 1. Answer
-//  */
-
-// function formatOppo(
-//   value: unknown
-// ): string | undefined {
-
-//   const cleaned =
-//     cleanValue(value);
-
-//   if (!cleaned) {
-//     return undefined;
-//   }
-
-
-//   const normalized =
-//     cleaned
+//     const normalized = cleaned
 //       .replace(/\r\n/g, "\n")
 //       .replace(/\r/g, "\n")
 //       .trim();
 
+//     /*
+//     * Primary separator:
+//     *
+//     * Blank lines between answers.
+//     */
 
-//   /*
-//    * Primary separator:
-//    *
-//    * Blank lines between answers.
-//    */
-
-//   let answers =
-//     normalized
+//     let answers = normalized
 //       .split(/\n\s*\n+/)
-//       .map(
-//         (answer) =>
-//           answer.trim()
-//       )
+//       .map((answer) => answer.trim())
 //       .filter(Boolean);
 
+//     /*
+//     * If the model returned multiple answers as single-line
+//     * numbered values, handle those too.
+//     *
+//     * Example:
+//     *
+//     * 1. Answer one
+//     * 2. Answer two
+//     * 3. Answer three
+//     */
 
-//   /*
-//    * If Groq returned multiple answers as single-line
-//    * numbered values, handle those too.
-//    *
-//    * Example:
-//    *
-//    * 1. Answer one
-//    * 2. Answer two
-//    * 3. Answer three
-//    */
-
-//   if (
-//     answers.length === 1 &&
-//     /^\s*\d+\s*[\.\-\):]/m.test(
-//       answers[0]
-//     )
-//   ) {
-
-//     answers =
-//       answers[0]
-//         .split(
-//           /\n(?=\s*\d+\s*[\.\-\):]\s*)/
-//         )
-//         .map(
-//           (answer) =>
-//             answer.trim()
-//         )
+//     if (
+//       answers.length === 1 &&
+//       /^\s*\d+\s*[\.\-\):]/m.test(answers[0])
+//     ) {
+//       answers = answers[0]
+//         .split(/\n(?=\s*\d+\s*[\.\-\):]\s*)/)
+//         .map((answer) => answer.trim())
 //         .filter(Boolean);
+//     }
+
+//     /*
+//     * If there is only one answer, still return:
+//     *
+//     * 1- Answer
+//     */
+
+//     const formatted = answers.map((answer, index) => {
+//       /*
+//       * Remove existing numbering:
+//       *
+//       * 1.
+//       * 1-
+//       * 1)
+//       * 1:
+//       */
+
+//       const withoutNumber = answer
+//         .replace(/^\s*\d+\s*[\.\-\):]\s*/, "")
+//         .trim();
+
+//       return `${index + 1}- ${withoutNumber}`;
+//     });
+
+//     return formatted.join("\n\n");
 //   }
 
+//   /* ======================================================
+//     CATEGORY
+//     ====================================================== */
 
-//   /*
-//    * If there is only one answer, still return:
-//    *
-//    * 1- Answer
-//    */
+//   function normalizeCategory(
+//     value: unknown,
+//     studyType: unknown
+//   ): SurveyCategory {
+//     const category = cleanValue(value)?.toLowerCase();
+//     const study = cleanValue(studyType)?.toLowerCase();
 
-//   const formatted =
-//     answers.map(
-//       (
-//         answer,
-//         index
-//       ) => {
+//     if (
+//       category === "healthcare" ||
+//       category === "health care" ||
+//       category === "health" ||
+//       category === "b2h"
+//     ) {
+//       return "B2H";
+//     }
 
-//         /*
-//          * Remove existing numbering:
-//          *
-//          * 1.
-//          * 1-
-//          * 1)
-//          * 1:
-//          */
+//     if (
+//       study === "healthcare" ||
+//       study === "health care" ||
+//       study === "health" ||
+//       study === "b2h"
+//     ) {
+//       return "B2H";
+//     }
 
-//         const withoutNumber =
-//           answer
-//             .replace(
-//               /^\s*\d+\s*[\.\-\):]\s*/,
-//               ""
-//             )
-//             .trim();
+//     if (category === "b2b") {
+//       return "B2B";
+//     }
 
-//         return `${index + 1}- ${withoutNumber}`;
-//       }
-//     );
+//     if (category === "b2c") {
+//       return "B2C";
+//     }
 
+//     if (study === "b2b") {
+//       return "B2B";
+//     }
 
-//   return formatted.join(
-//     "\n\n"
-//   );
-// }
+//     if (study === "b2c") {
+//       return "B2C";
+//     }
 
+//     /*
+//     * B2B is the default because the current application
+//     * primarily receives B2B data.
+//     */
 
-// /* ======================================================
-//    CATEGORY
-//    ====================================================== */
-
-// function normalizeCategory(
-//   value: unknown,
-//   studyType: unknown
-// ): SurveyCategory {
-
-//   const category =
-//     cleanValue(value)
-//       ?.toLowerCase();
-
-//   const study =
-//     cleanValue(studyType)
-//       ?.toLowerCase();
-
-
-//   if (
-//     category === "healthcare" ||
-//     category === "health care" ||
-//     category === "health" ||
-//     category === "b2h"
-//   ) {
-//     return "B2H";
-//   }
-
-
-//   if (
-//     study === "healthcare" ||
-//     study === "health care" ||
-//     study === "health" ||
-//     study === "b2h"
-//   ) {
-//     return "B2H";
-//   }
-
-
-//   if (
-//     category === "b2b"
-//   ) {
 //     return "B2B";
 //   }
 
+//   /* ======================================================
+//     NORMALIZE RECORD
+//     ====================================================== */
 
-//   if (
-//     category === "b2c"
-//   ) {
-//     return "B2C";
-//   }
-
-
-//   if (
-//     study === "b2b"
-//   ) {
-//     return "B2B";
-//   }
-
-
-//   if (
-//     study === "b2c"
-//   ) {
-//     return "B2C";
-//   }
-
-
-//   /*
-//    * B2B is the default because the current application
-//    * primarily receives B2B data.
-//    */
-
-//   return "B2B";
-// }
-
-
-// /* ======================================================
-//    NORMALIZE RECORD
-//    ====================================================== */
-
-// function normalizeRecord(
-//   record: any
-// ): NormalizedSurveyRecord {
-
-//   const category =
-//     normalizeCategory(
+//   function normalizeRecord(record: any): NormalizedSurveyRecord {
+//     const category = normalizeCategory(
 //       record?.category,
 //       record?.studyType
 //     );
 
+//     const data: Record<string, string> = {};
 
-//   const data:
-//     Record<string, string> = {};
+//     /* ----------------------------------------------------
+//       Preserve additional fields
+//       ---------------------------------------------------- */
 
-
-//   /* ----------------------------------------------------
-//      Preserve Groq additional fields
-//      ---------------------------------------------------- */
-
-//   if (
-//     record?.data &&
-//     typeof record.data === "object" &&
-//     !Array.isArray(record.data)
-//   ) {
-
-//     for (
-//       const [
-//         key,
-//         value
-//       ] of Object.entries(
-//         record.data
-//       )
+//     if (
+//       record?.data &&
+//       typeof record.data === "object" &&
+//       !Array.isArray(record.data)
 //     ) {
+//       for (const [key, value] of Object.entries(record.data)) {
+//         const cleaned = cleanValue(value);
 
-//       const cleaned =
-//         cleanValue(value);
+//         if (cleaned) {
+//           data[key] = cleaned;
+//         }
+//       }
+//     }
+
+//     /* ----------------------------------------------------
+//       Format Oppo
+//       ---------------------------------------------------- */
+
+//     const formattedOppo = formatOppo(record?.oppo);
+
+//     /* ----------------------------------------------------
+//       Standard field map
+//       ---------------------------------------------------- */
+
+//     const fields: Array<[string, unknown]> = [
+//       // Common
+//       ["Project Name", record?.projectName],
+//       ["Study Type", record?.studyType],
+//       ["Counts", record?.counts],
+
+//       // -------------------------
+//       // B2C
+//       // -------------------------
+
+//       ["Age", record?.age],
+//       ["Gender", record?.gender],
+//       ["ZIP Code", record?.zipCode],
+//       ["Country", record?.country],
+//       ["Nationality", record?.nationality],
+//       ["Ethnicity", record?.ethnicity],
+//       ["Household Income", record?.householdIncome],
+//       ["Personal Income", record?.personalIncome],
+//       ["Brand", record?.brand],
+//       ["Company", record?.company],
+//       ["Occupation", record?.occupation],
+//       ["Employment Status", record?.employmentStatus],
+//       ["Marital Status", record?.maritalStatus],
+
+//       // -------------------------
+//       // B2B
+//       // -------------------------
+
+//       ["Job Title", record?.jobTitle],
+//       ["Industry", record?.industry],
+//       ["Department", record?.department],
+//       ["Employees", record?.employees],
+//       ["Revenue", record?.revenue],
+//       ["Company", record?.company],
+//       ["County", record?.county],
+
+//       // -------------------------
+//       // Healthcare
+//       // -------------------------
+
+//       ["Patient Age", record?.patientAge],
+//       ["Caregiver Age", record?.caregiverAge],
+//       ["Patient Gender", record?.patientGender],
+//       ["Caregiver Gender", record?.caregiverGender],
+//       ["Disease / Condition", record?.diseaseCondition],
+//       ["First Diagnosed", record?.firstDiagnosed],
+//       ["Medicine Name", record?.medicineName],
+//       ["Current Medication", record?.currentMedication],
+//       ["Previous Medication", record?.previousMedication],
+//       ["Treatment Duration", record?.treatmentDuration],
+//       ["Treatment Response", record?.treatmentResponse],
+//       ["Side Effects", record?.sideEffects],
+//       ["Other Conditions", record?.otherConditions],
+//       ["Healthcare Provider", record?.healthcareProvider],
+//       ["Insurance Type", record?.insuranceType],
+//       ["Caregiver Relationship", record?.caregiverRelationship],
+//       ["Treatment Satisfaction", record?.treatmentSatisfaction],
+
+//       // -------------------------
+//       // Common
+//       // -------------------------
+
+//       ["Oppo", formattedOppo],
+//       ["TNX Project ID", record?.tnxProjectId],
+//       ["Parent ID", record?.parentId],
+//       ["Child ID", record?.childId],
+//       ["Respondent ID", record?.respondentId],
+//       ["Country", record?.country],
+//       ["IP Address", record?.ip],
+//       ["Status", record?.status],
+//       ["Note", record?.note],
+//     ];
+
+//     for (const [key, value] of fields) {
+//       const cleaned = cleanValue(value);
 
 //       if (cleaned) {
 //         data[key] = cleaned;
 //       }
 //     }
-//   }
 
-
-//   /* ----------------------------------------------------
-//      Format Oppo
-//      ---------------------------------------------------- */
-
-//   const formattedOppo =
-//     formatOppo(
-//       record?.oppo
-//     );
-
-
-//   /* ----------------------------------------------------
-//      Standard field map
-//      ---------------------------------------------------- */
-
-//   const fields:
-//     Array<[string, unknown]> = [
-
-//     // Common
-//     [
-//       "Project Name",
-//       record?.projectName
-//     ],
-
-//     [
-//       "Study Type",
-//       record?.studyType
-//     ],
-
-//     [
-//       "Counts",
-//       record?.counts
-//     ],
-
-
-//     // -------------------------
-//     // B2C
-//     // -------------------------
-
-//     [
-//       "Age",
-//       record?.age
-//     ],
-
-//     [
-//       "Gender",
-//       record?.gender
-//     ],
-
-//     [
-//       "ZIP Code",
-//       record?.zipCode
-//     ],
-
-//     [
-//       "Country",
-//       record?.country
-//     ],
-
-//     [
-//       "Nationality",
-//       record?.nationality
-//     ],
-
-//     [
-//       "Ethnicity",
-//       record?.ethnicity
-//     ],
-
-//     [
-//       "Household Income",
-//       record?.householdIncome
-//     ],
-
-//     [
-//       "Personal Income",
-//       record?.personalIncome
-//     ],
-
-//     [
-//       "Brand",
-//       record?.brand
-//     ],
-
-//     [
-//       "Company",
-//       record?.company
-//     ],
-
-//     [
-//       "Occupation",
-//       record?.occupation
-//     ],
-
-//     [
-//       "Employment Status",
-//       record?.employmentStatus
-//     ],
-
-//     [
-//       "Marital Status",
-//       record?.maritalStatus
-//     ],
-
-
-//     // -------------------------
-//     // B2B
-//     // -------------------------
-
-//     [
-//       "Job Title",
-//       record?.jobTitle
-//     ],
-
-//     [
-//       "Industry",
-//       record?.industry
-//     ],
-
-//     [
-//       "Department",
-//       record?.department
-//     ],
-
-//     [
-//       "Employees",
-//       record?.employees
-//     ],
-
-//     [
-//       "Revenue",
-//       record?.revenue
-//     ],
-
-//     [
-//       "Company",
-//       record?.company
-//     ],
-
-//     [
-//       "County",
-//       record?.county
-//     ],
-
-
-//     // -------------------------
-//     // Healthcare
-//     // -------------------------
-
-//     [
-//       "Patient Age",
-//       record?.patientAge
-//     ],
-
-//     [
-//       "Caregiver Age",
-//       record?.caregiverAge
-//     ],
-
-//     [
-//       "Patient Gender",
-//       record?.patientGender
-//     ],
-
-//     [
-//       "Caregiver Gender",
-//       record?.caregiverGender
-//     ],
-
-//     [
-//       "Disease / Condition",
-//       record?.diseaseCondition
-//     ],
-
-//     [
-//       "First Diagnosed",
-//       record?.firstDiagnosed
-//     ],
-
-//     [
-//       "Medicine Name",
-//       record?.medicineName
-//     ],
-
-//     [
-//       "Current Medication",
-//       record?.currentMedication
-//     ],
-
-//     [
-//       "Previous Medication",
-//       record?.previousMedication
-//     ],
-
-//     [
-//       "Treatment Duration",
-//       record?.treatmentDuration
-//     ],
-
-//     [
-//       "Treatment Response",
-//       record?.treatmentResponse
-//     ],
-
-//     [
-//       "Side Effects",
-//       record?.sideEffects
-//     ],
-
-//     [
-//       "Other Conditions",
-//       record?.otherConditions
-//     ],
-
-//     [
-//       "Healthcare Provider",
-//       record?.healthcareProvider
-//     ],
-
-//     [
-//       "Insurance Type",
-//       record?.insuranceType
-//     ],
-
-//     [
-//       "Caregiver Relationship",
-//       record?.caregiverRelationship
-//     ],
-
-//     [
-//       "Treatment Satisfaction",
-//       record?.treatmentSatisfaction
-//     ],
-
-
-//     // -------------------------
-//     // Common
-//     // -------------------------
-
-//     [
-//       "Oppo",
-//       formattedOppo
-//     ],
-
-//     [
-//       "TNX Project ID",
-//       record?.tnxProjectId
-//     ],
-
-//     [
-//       "Parent ID",
-//       record?.parentId
-//     ],
-
-//     [
-//       "Child ID",
-//       record?.childId
-//     ],
-
-//     [
-//       "Respondent ID",
-//       record?.respondentId
-//     ],
-
-//     [
-//       "Country",
-//       record?.country
-//     ],
-
-//     [
-//       "IP Address",
-//       record?.ip
-//     ],
-
-//     [
-//       "Status",
-//       record?.status
-//     ],
-
-//     [
-//       "Note",
-//       record?.note
-//     ],
-//   ];
-
-
-//   for (
-//     const [
-//       key,
-//       value
-//     ] of fields
-//   ) {
-
-//     const cleaned =
-//       cleanValue(value);
-
-//     if (cleaned) {
-//       data[key] = cleaned;
-//     }
-//   }
-
-
-//   /* ====================================================
-//      RETURN
-//      ==================================================== */
-
-//   return {
-
-//     category,
-
-//     // Common
-//     projectName:
-//       cleanValue(
-//         record?.projectName
-//       ),
-
-//     studyType:
-//       cleanValue(
-//         record?.studyType
-//       ),
-
-//     counts:
-//       cleanValue(
-//         record?.counts
-//       ),
-
-
-//     // B2C
-//     age:
-//       cleanValue(
-//         record?.age
-//       ),
-
-//     gender:
-//       cleanValue(
-//         record?.gender
-//       ),
-
-//     zipCode:
-//       cleanValue(
-//         record?.zipCode
-//       ),
-
-//     country:
-//       cleanValue(
-//         record?.country
-//       ),
-
-//     nationality:
-//       cleanValue(
-//         record?.nationality
-//       ),
-
-//     ethnicity:
-//       cleanValue(
-//         record?.ethnicity
-//       ),
-
-//     householdIncome:
-//       cleanValue(
-//         record?.householdIncome
-//       ),
-
-//     personalIncome:
-//       cleanValue(
-//         record?.personalIncome
-//       ),
-
-//     brand:
-//       cleanValue(
-//         record?.brand
-//       ),
-
-//     company:
-//       cleanValue(
-//         record?.company
-//       ),
-
-//     occupation:
-//       cleanValue(
-//         record?.occupation
-//       ),
-
-//     employmentStatus:
-//       cleanValue(
-//         record?.employmentStatus
-//       ),
-
-//     maritalStatus:
-//       cleanValue(
-//         record?.maritalStatus
-//       ),
-
-
-//     // B2B
-//     jobTitle:
-//       cleanValue(
-//         record?.jobTitle
-//       ),
-
-//     industry:
-//       cleanValue(
-//         record?.industry
-//       ),
-
-//     department:
-//       cleanValue(
-//         record?.department
-//       ),
-
-//     employees:
-//       cleanValue(
-//         record?.employees
-//       ),
-
-//     revenue:
-//       cleanValue(
-//         record?.revenue
-//       ),
-
-//     county:
-//       cleanValue(
-//         record?.county
-//       ),
-
-
-//     // Healthcare
-//     patientAge:
-//       cleanValue(
-//         record?.patientAge
-//       ),
-
-//     caregiverAge:
-//       cleanValue(
-//         record?.caregiverAge
-//       ),
-
-//     patientGender:
-//       cleanValue(
-//         record?.patientGender
-//       ),
-
-//     caregiverGender:
-//       cleanValue(
-//         record?.caregiverGender
-//       ),
-
-//     diseaseCondition:
-//       cleanValue(
-//         record?.diseaseCondition
-//       ),
-
-//     firstDiagnosed:
-//       cleanValue(
-//         record?.firstDiagnosed
-//       ),
-
-//     medicineName:
-//       cleanValue(
-//         record?.medicineName
-//       ),
-
-//     currentMedication:
-//       cleanValue(
-//         record?.currentMedication
-//       ),
-
-//     previousMedication:
-//       cleanValue(
-//         record?.previousMedication
-//       ),
-
-//     treatmentDuration:
-//       cleanValue(
-//         record?.treatmentDuration
-//       ),
-
-//     treatmentResponse:
-//       cleanValue(
-//         record?.treatmentResponse
-//       ),
-
-//     sideEffects:
-//       cleanValue(
-//         record?.sideEffects
-//       ),
-
-//     otherConditions:
-//       cleanValue(
-//         record?.otherConditions
-//       ),
-
-//     healthcareProvider:
-//       cleanValue(
-//         record?.healthcareProvider
-//       ),
-
-//     insuranceType:
-//       cleanValue(
-//         record?.insuranceType
-//       ),
-
-//     caregiverRelationship:
-//       cleanValue(
-//         record?.caregiverRelationship
-//       ),
-
-//     treatmentSatisfaction:
-//       cleanValue(
-//         record?.treatmentSatisfaction
-//       ),
-
-
-//     // Common
-//     oppo:
-//       formattedOppo,
-
-//     note:
-//       cleanValue(
-//         record?.note
-//       ),
-
-
-//     // IDs
-//     tnxProjectId:
-//       cleanValue(
-//         record?.tnxProjectId
-//       ),
-
-//     parentId:
-//       cleanValue(
-//         record?.parentId
-//       ),
-
-//     childId:
-//       cleanValue(
-//         record?.childId
-//       ),
-
-//     respondentId:
-//       cleanValue(
-//         record?.respondentId
-//       ),
-
-
-//     // Respondent
-//     ip:
-//       cleanValue(
-//         record?.ip
-//       ),
-
-//     status:
-//       cleanValue(
-//         record?.status
-//       ),
-
-
-//     data,
-//   };
-// }
-
-
-// /* ======================================================
-//    JSON EXTRACTION
-//    ====================================================== */
-
-// function extractJson(
-//   text: string
-// ): any {
-
-//   const cleaned =
-//     text
-//       .replace(
-//         /```json/gi,
-//         ""
-//       )
-//       .replace(
-//         /```/g,
-//         ""
-//       )
-//       .trim();
-
-
-//   try {
-
-//     return JSON.parse(
-//       cleaned
-//     );
-
-//   } catch {
-//     // Continue below.
-//   }
-
-
-//   /*
-//    * Try extracting JSON object from surrounding text.
-//    */
-
-//   const firstObject =
-//     cleaned.indexOf("{");
-
-//   const lastObject =
-//     cleaned.lastIndexOf("}");
-
-
-//   if (
-//     firstObject !== -1 &&
-//     lastObject !== -1 &&
-//     lastObject > firstObject
-//   ) {
-
-//     try {
-
-//       return JSON.parse(
-//         cleaned.slice(
-//           firstObject,
-//           lastObject + 1
-//         )
-//       );
-
-//     } catch {
-//       // Continue.
-//     }
-//   }
-
-
-//   /*
-//    * Try JSON array.
-//    */
-
-//   const firstArray =
-//     cleaned.indexOf("[");
-
-//   const lastArray =
-//     cleaned.lastIndexOf("]");
-
-
-//   if (
-//     firstArray !== -1 &&
-//     lastArray !== -1 &&
-//     lastArray > firstArray
-//   ) {
-
-//     try {
-
-//       return JSON.parse(
-//         cleaned.slice(
-//           firstArray,
-//           lastArray + 1
-//         )
-//       );
-
-//     } catch {
-//       // Continue.
-//     }
-//   }
-
-
-//   throw new Error(
-//     "Groq did not return valid JSON"
-//   );
-// }
-
-
-// /* ======================================================
-//    GROQ SINGLE CHUNK
-//    ====================================================== */
-
-// async function normalizeChunkWithGroq(
-//   paste: string
-// ): Promise<GroqNormalizationResult> {
-
-//   const apiKey =
-//     process.env.GROQ_API_KEY;
-
-
-//   if (!apiKey) {
-
-//     throw new Error(
-//       "GROQ_API_KEY is not configured"
-//     );
-//   }
-
-
-//   const model =
-//     process.env.GROQ_MODEL ||
-//     "openai/gpt-oss-120b";
-
-
-//   /* ====================================================
-//      SYSTEM PROMPT
-//      ==================================================== */
-
-//   const systemPrompt = `
-// You are a professional survey data extraction engine.
-
-// Your job is to convert raw survey records into structured JSON.
-
-// The input may contain:
-
-// B2B
-// B2C
-// Healthcare
-// B2H
-
-// Automatically identify the correct category.
-
-// ========================================================
-// CRITICAL RULES
-// ========================================================
-
-// 1. Every numbered record is ONE record.
-
-// 2. NEVER merge two records.
-
-// 3. NEVER delete records.
-
-// 4. NEVER invent information.
-
-// 5. Missing fields MUST be null.
-
-// 6. Preserve all supplied values exactly.
-
-// 7. Preserve IP addresses exactly.
-
-// 8. Preserve IDs exactly.
-
-// 9. Preserve income values exactly.
-
-// 10. Preserve age values exactly.
-
-// 11. Preserve company names exactly.
-
-// 12. Preserve job titles exactly.
-
-// 13. Preserve country names exactly.
-
-// 14. Preserve the original language.
-
-// 15. Do NOT translate Oppo.
-
-// 16. Do NOT summarize Oppo.
-
-// 17. Do NOT delete Oppo paragraphs.
-
-// 18. Preserve every Oppo answer.
-
-// 19. Return ONLY JSON.
-
-// 20. No markdown.
-
-// 21. No explanations.
-
-// 22. Output MUST contain a records array.
-
-
-// ========================================================
-// B2B
-// ========================================================
-
-// Fields:
-
-// Project Name
-// Study Type
-// Counts
-// Age
-// Gender
-// Job title
-// Industry
-// Department
-// Employees
-// Brand
-// Revenue
-// Company
-// County
-// Zip code
-// Nationality
-// Household Income
-// Oppo
-// TNX Project ID
-// Parent ID
-// Child ID
-// Respondent ID
-// Country
-// IP Address
-// Status
-// Note
-
-
-// Map:
-
-// Project Name -> projectName
-// Study Type -> studyType
-// Counts -> counts
-// Age -> age
-// Gender -> gender
-// Job title -> jobTitle
-// Industry -> industry
-// Department -> department
-// Employees -> employees
-// Brand -> brand
-// Revenue -> revenue
-// Company -> company
-// County -> county
-// Zip code -> zipCode
-// Nationality -> nationality
-// Household Income -> householdIncome
-// Oppo -> oppo
-// TNX Project ID -> tnxProjectId
-// Parent ID -> parentId
-// Child ID -> childId
-// Respondent ID -> respondentId
-// Country -> country
-// IP Address -> ip
-// Status -> status
-// Note -> note
-
-
-// ========================================================
-// B2C
-// ========================================================
-
-// Fields:
-
-// Project Name
-// Study Type
-// Counts
-// Age
-// Gender
-// ZIP Code
-// Country
-// Nationality
-// Ethnicity
-// Household Income
-// Personal Income
-// Brand
-// Company
-// Occupation
-// Employment Status
-// Marital Status
-// Oppo
-// TNX Project ID
-// Parent ID
-// Child ID
-// Respondent ID
-// Country
-// IP Address
-// Status
-// Note
-
-
-// Map:
-
-// Project Name -> projectName
-// Study Type -> studyType
-// Counts -> counts
-// Age -> age
-// Gender -> gender
-// ZIP Code -> zipCode
-// Country -> country
-// Nationality -> nationality
-// Ethnicity -> ethnicity
-// Household Income -> householdIncome
-// Personal Income -> personalIncome
-// Brand -> brand
-// Company -> company
-// Occupation -> occupation
-// Employment Status -> employmentStatus
-// Marital Status -> maritalStatus
-// Oppo -> oppo
-// TNX Project ID -> tnxProjectId
-// Parent ID -> parentId
-// Child ID -> childId
-// Respondent ID -> respondentId
-// Country -> country
-// IP Address -> ip
-// Status -> status
-// Note -> note
-
-
-// ========================================================
-// HEALTHCARE / B2H
-// ========================================================
-
-// Fields:
-
-// Project Name
-// Study Type
-// Counts
-// Patient Age
-// Caregiver Age
-// Patient Gender
-// Caregiver Gender
-// Disease / Condition
-// First Diagnosed
-// Medicine Name
-// Current Medication
-// Previous Medication
-// Treatment Duration
-// Treatment Response
-// Side Effects
-// Other Conditions
-// Healthcare Provider
-// Insurance Type
-// Caregiver Relationship
-// Treatment Satisfaction
-// Oppo
-// TNX Project ID
-// Parent ID
-// Child ID
-// Respondent ID
-// Country
-// IP Address
-// Status
-// Note
-
-
-// Map:
-
-// Project Name -> projectName
-// Study Type -> studyType
-// Counts -> counts
-// Patient Age -> patientAge
-// Caregiver Age -> caregiverAge
-// Patient Gender -> patientGender
-// Caregiver Gender -> caregiverGender
-// Disease / Condition -> diseaseCondition
-// First Diagnosed -> firstDiagnosed
-// Medicine Name -> medicineName
-// Current Medication -> currentMedication
-// Previous Medication -> previousMedication
-// Treatment Duration -> treatmentDuration
-// Treatment Response -> treatmentResponse
-// Side Effects -> sideEffects
-// Other Conditions -> otherConditions
-// Healthcare Provider -> healthcareProvider
-// Insurance Type -> insuranceType
-// Caregiver Relationship -> caregiverRelationship
-// Treatment Satisfaction -> treatmentSatisfaction
-// Oppo -> oppo
-// TNX Project ID -> tnxProjectId
-// Parent ID -> parentId
-// Child ID -> childId
-// Respondent ID -> respondentId
-// Country -> country
-// IP Address -> ip
-// Status -> status
-// Note -> note
-
-
-// ========================================================
-// TNX PROJECT ID RULE
-// ========================================================
-
-// The TNX Project ID comes from the HEADER.
-
-// Example:
-
-// GMS 79151 - Genpop | TNX543
-
-// must produce:
-
-// projectName = "GMS 79151 - Genpop"
-// tnxProjectId = "TNX543"
-
-// DO NOT use the respondent number as the TNX Project ID.
-
-
-// ========================================================
-// RESPONDENT ID RULE
-// ========================================================
-
-// Example:
-
-// 543 ="371515368214102272" China 118.123.80.10 Completed
-
-// with header:
-
-// GMS 79151 - Genpop | TNX543
-
-// must produce:
-
-// tnxProjectId = "TNX543"
-
-// respondentId = "371515368214102272"
-
-// country = "China"
-
-// ip = "118.123.80.10"
-
-// status = "Completed"
-
-
-// ========================================================
-// ANOTHER RESPONDENT EXAMPLE
-// ========================================================
-
-// Example:
-
-// 78014 rfderday00srj United States 76.250.239.86 Completed
-
-// must produce:
-
-// respondentId = "rfderday00srj"
-
-// country = "United States"
-
-// ip = "76.250.239.86"
-
-// status = "Completed"
-
-// Do NOT put rfderday00srj into TNX Project ID.
-
-
-// ========================================================
-// TRN EXAMPLE
-// ========================================================
-
-// Header:
-
-// TRN 21425 -18-50 YO || TNX300
-
-// Tail:
-
-// 21425 jgreefjday00srj United States 76.250.239.112 Completed
-
-// must produce:
-
-// projectName = "TRN 21425 -18-50 YO"
-
-// tnxProjectId = "TNX300"
-
-// respondentId = "jgreefjday00srj"
-
-// country = "United States"
-
-// ip = "76.250.239.112"
-
-// status = "Completed"
-
-
-// ========================================================
-// ROLE RULE
-// ========================================================
-
-// If input contains:
-
-// Job title - Director
-
-// role-Director of IT Infrastructure
-
-// then:
-
-// jobTitle = "Director"
-
-// and:
-
-// data = {
-//   "Role": "Director of IT Infrastructure"
-// }
-
-// Do NOT replace Job Title with Role.
-
-
-// ========================================================
-// OPPO RULE
-// ========================================================
-
-// Oppo can contain multiple paragraphs.
-
-// Example:
-
-// Oppo-
-
-// Answer one.
-
-// Answer two.
-
-// Answer three.
-
-// Answer four.
-
-// Return ALL answers inside:
-
-// oppo
-
-// Do NOT summarize them.
-
-// Do NOT translate them.
-
-// Do NOT delete them.
-
-
-// IMPORTANT:
-
-// Do NOT add numbering yourself.
-
-// Return the raw Oppo answer paragraphs.
-
-// The application will add:
-
-// 1-
-// 2-
-// 3-
-// 4-
-
-// automatically.
-
-
-// ========================================================
-// NOTE RULE
-// ========================================================
-
-// Note -
-
-// Some note text
-
-// must become:
-
-// note = "Some note text"
-
-// If empty:
-
-// note = null
-
-
-// ========================================================
-// UNKNOWN FIELDS
-// ========================================================
-
-// Never delete unknown fields.
-
-// Put them into:
-
-// data
-
-// Example:
-
-// Spent - $5000
-
-// becomes:
-
-// data = {
-//   "Spent": "$5000"
-// }
-
-
-// ========================================================
-// FINAL OUTPUT
-// ========================================================
-
-// Return ONLY JSON.
-
-// Example:
-
-// {
-//   "records": [
-//     {
-//       "category": "B2B",
-//       "projectName": null,
-//       "studyType": "B2B",
-//       "counts": null,
-
-//       "age": null,
-//       "gender": null,
-//       "jobTitle": null,
-//       "industry": null,
-//       "department": null,
-//       "employees": null,
-//       "brand": null,
-//       "revenue": null,
-//       "company": null,
-//       "county": null,
-//       "zipCode": null,
-//       "nationality": null,
-//       "householdIncome": null,
-
-//       "patientAge": null,
-//       "caregiverAge": null,
-//       "patientGender": null,
-//       "caregiverGender": null,
-//       "diseaseCondition": null,
-//       "firstDiagnosed": null,
-//       "medicineName": null,
-//       "currentMedication": null,
-//       "previousMedication": null,
-//       "treatmentDuration": null,
-//       "treatmentResponse": null,
-//       "sideEffects": null,
-//       "otherConditions": null,
-//       "healthcareProvider": null,
-//       "insuranceType": null,
-//       "caregiverRelationship": null,
-//       "treatmentSatisfaction": null,
-
-//       "oppo": null,
-
-//       "tnxProjectId": null,
-//       "parentId": null,
-//       "childId": null,
-//       "respondentId": null,
-
-//       "country": null,
-//       "ip": null,
-//       "status": null,
-//       "note": null,
-
-//       "data": {}
-//     }
-//   ]
-// }
-// `.trim();
-
-
-//   /* ====================================================
-//      API REQUEST
-//      ==================================================== */
-
-//   const response =
-//     await fetch(
-//       "https://api.groq.com/openai/v1/chat/completions",
-//       {
-//         method: "POST",
-
-//         headers: {
-//           "Content-Type":
-//             "application/json",
-
-//           Authorization:
-//             `Bearer ${apiKey}`,
-//         },
-
-//         body: JSON.stringify({
-//           model,
-
-//           temperature: 0,
-
-//           max_tokens: 16000,
-
-//           messages: [
-//             {
-//               role: "system",
-//               content:
-//                 systemPrompt,
-//             },
-
-//             {
-//               role: "user",
-//               content:
-//                 paste,
-//             },
-//           ],
-
-//           response_format: {
-//             type: "json_object",
-//           },
-//         }),
-//       }
-//     );
-
-
-//   /* ====================================================
-//      RESPONSE
-//      ==================================================== */
-
-//   const responseText =
-//     await response.text();
-
-
-//   if (!response.ok) {
-
-//     throw new Error(
-//       `${response.status} ${responseText}`
-//     );
-//   }
-
-
-//   let apiResult: any;
-
-//   try {
-
-//     apiResult =
-//       JSON.parse(
-//         responseText
-//       );
-
-//   } catch {
-
-//     throw new Error(
-//       "Groq API returned invalid JSON"
-//     );
-//   }
-
-
-//   const content =
-//     apiResult
-//       ?.choices?.[0]
-//       ?.message
-//       ?.content;
-
-
-//   if (
-//     typeof content !== "string" ||
-//     !content.trim()
-//   ) {
-
-//     console.error(
-//       "GROQ EMPTY CONTENT:",
-//       JSON.stringify(
-//         apiResult,
-//         null,
-//         2
-//       )
-//     );
-
-//     throw new Error(
-//       "Groq returned empty content"
-//     );
-//   }
-
-
-//   /* ====================================================
-//      PARSE GROQ JSON
-//      ==================================================== */
-
-//   let parsed: any;
-
-//   try {
-
-//     parsed =
-//       extractJson(
-//         content
-//       );
-
-//   } catch (error) {
-
-//     console.error(
-//       "GROQ CONTENT:",
-//       content
-//     );
-
-//     throw error;
-//   }
-
-
-//   /* ====================================================
-//      GET RECORDS
-//      ==================================================== */
-
-//   let records: any[] = [];
-
-
-//   if (
-//     parsed &&
-//     Array.isArray(
-//       parsed.records
-//     )
-//   ) {
-
-//     records =
-//       parsed.records;
-
-//   } else if (
-//     parsed &&
-//     Array.isArray(
-//       parsed.data
-//     )
-//   ) {
-
-//     records =
-//       parsed.data;
-
-//   } else if (
-//     Array.isArray(parsed)
-//   ) {
-
-//     records =
-//       parsed;
-
-//   } else if (
-//     parsed &&
-//     typeof parsed === "object"
-//   ) {
-
-//     records = [
-//       parsed
-//     ];
-//   }
-
-
-//   /* ====================================================
-//      NORMALIZE RECORDS
-//      ==================================================== */
-
-//   const normalizedRecords =
-//     records.map(
-//       normalizeRecord
-//     );
-
-
-//   console.log(
-//     `GROQ NORMALIZER: ${normalizedRecords.length} record(s)`
-//   );
-
-
-//   return {
-//     records:
-//       normalizedRecords,
-
-//     normalizedText:
-//       JSON.stringify(
-//         {
-//           records:
-//             normalizedRecords,
-//         },
-//         null,
-//         2
-//       ),
-//   };
-// }
-
-
-// /* ======================================================
-//    RETRY
-//    ====================================================== */
-
-// async function normalizeChunkWithRetry(
-//   paste: string,
-//   chunkLabel: string,
-//   attempt = 1
-// ): Promise<GroqNormalizationResult> {
-
-//   try {
-
-//     return await normalizeChunkWithGroq(
-//       paste
-//     );
-
-//   } catch (error: any) {
-
-//     if (attempt < 2) {
-
-//       console.warn(
-//         `GROQ ${chunkLabel} failed (attempt ${attempt}), retrying...`,
-//         error?.message ||
-//           error
-//       );
-
-//       return normalizeChunkWithRetry(
-//         paste,
-//         chunkLabel,
-//         attempt + 1
-//       );
-//     }
-
-//     throw error;
-//   }
-// }
-
-
-// /* ======================================================
-//    PUBLIC ENTRY POINT
-//    ====================================================== */
-
-// export async function normalizeSurveyWithGroq(
-//   paste: string
-// ): Promise<GroqNormalizationResult> {
-
-//   const blocks =
-//     splitIntoBlocks(
-//       paste
-//     );
-
-
-//   if (!blocks.length) {
+//     /* ====================================================
+//       RETURN
+//       ==================================================== */
 
 //     return {
-//       records: [],
+//       category,
 
-//       normalizedText:
-//         JSON.stringify(
+//       // Common
+//       projectName: cleanValue(record?.projectName),
+//       studyType: cleanValue(record?.studyType),
+//       counts: cleanValue(record?.counts),
+
+//       // B2C
+//       age: cleanValue(record?.age),
+//       gender: cleanValue(record?.gender),
+//       zipCode: cleanValue(record?.zipCode),
+//       country: cleanValue(record?.country),
+//       nationality: cleanValue(record?.nationality),
+//       ethnicity: cleanValue(record?.ethnicity),
+//       householdIncome: cleanValue(record?.householdIncome),
+//       personalIncome: cleanValue(record?.personalIncome),
+//       brand: cleanValue(record?.brand),
+//       company: cleanValue(record?.company),
+//       occupation: cleanValue(record?.occupation),
+//       employmentStatus: cleanValue(record?.employmentStatus),
+//       maritalStatus: cleanValue(record?.maritalStatus),
+
+//       // B2B
+//       jobTitle: cleanValue(record?.jobTitle),
+//       industry: cleanValue(record?.industry),
+//       department: cleanValue(record?.department),
+//       employees: cleanValue(record?.employees),
+//       revenue: cleanValue(record?.revenue),
+//       county: cleanValue(record?.county),
+
+//       // Healthcare
+//       patientAge: cleanValue(record?.patientAge),
+//       caregiverAge: cleanValue(record?.caregiverAge),
+//       patientGender: cleanValue(record?.patientGender),
+//       caregiverGender: cleanValue(record?.caregiverGender),
+//       diseaseCondition: cleanValue(record?.diseaseCondition),
+//       firstDiagnosed: cleanValue(record?.firstDiagnosed),
+//       medicineName: cleanValue(record?.medicineName),
+//       currentMedication: cleanValue(record?.currentMedication),
+//       previousMedication: cleanValue(record?.previousMedication),
+//       treatmentDuration: cleanValue(record?.treatmentDuration),
+//       treatmentResponse: cleanValue(record?.treatmentResponse),
+//       sideEffects: cleanValue(record?.sideEffects),
+//       otherConditions: cleanValue(record?.otherConditions),
+//       healthcareProvider: cleanValue(record?.healthcareProvider),
+//       insuranceType: cleanValue(record?.insuranceType),
+//       caregiverRelationship: cleanValue(record?.caregiverRelationship),
+//       treatmentSatisfaction: cleanValue(record?.treatmentSatisfaction),
+
+//       // Common
+//       oppo: formattedOppo,
+//       note: cleanValue(record?.note),
+
+//       // IDs
+//       tnxProjectId: cleanValue(record?.tnxProjectId),
+//       parentId: cleanValue(record?.parentId),
+//       childId: cleanValue(record?.childId),
+//       respondentId: cleanValue(record?.respondentId),
+
+//       // Respondent
+//       ip: cleanValue(record?.ip),
+//       status: cleanValue(record?.status),
+
+//       data,
+//     };
+//   }
+
+//   /* ======================================================
+//     JSON EXTRACTION
+//     ====================================================== */
+
+//   function extractJson(text: string): any {
+//     const cleaned = text
+//       .replace(/```json/gi, "")
+//       .replace(/```/g, "")
+//       .trim();
+
+//     try {
+//       return JSON.parse(cleaned);
+//     } catch {
+//       // Continue below.
+//     }
+
+//     /*
+//     * Try extracting JSON object from surrounding text.
+//     */
+
+//     const firstObject = cleaned.indexOf("{");
+//     const lastObject = cleaned.lastIndexOf("}");
+
+//     if (
+//       firstObject !== -1 &&
+//       lastObject !== -1 &&
+//       lastObject > firstObject
+//     ) {
+//       try {
+//         return JSON.parse(
+//           cleaned.slice(firstObject, lastObject + 1)
+//         );
+//       } catch {
+//         // Continue.
+//       }
+//     }
+
+//     /*
+//     * Try JSON array.
+//     */
+
+//     const firstArray = cleaned.indexOf("[");
+//     const lastArray = cleaned.lastIndexOf("]");
+
+//     if (
+//       firstArray !== -1 &&
+//       lastArray !== -1 &&
+//       lastArray > firstArray
+//     ) {
+//       try {
+//         return JSON.parse(
+//           cleaned.slice(firstArray, lastArray + 1)
+//         );
+//       } catch {
+//         // Continue.
+//       }
+//     }
+
+//     throw new Error("Gemini did not return valid JSON");
+//   }
+
+//   /* ======================================================
+//     GROQ SINGLE CHUNK  (uses Gemini under the hood)
+//     ====================================================== */
+
+//   async function normalizeChunkWithGroq(
+//     paste: string
+//   ): Promise<GroqNormalizationResult> {
+//     const apiKey =
+//       process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY;
+
+//     if (!apiKey) {
+//       throw new Error("GEMINI_API_KEY is not configured");
+//     }
+
+//     const model =
+//       process.env.GEMINI_MODEL ||
+//       process.env.GROQ_MODEL ||
+//       "gemini-3.8-flash";
+
+//     /* ====================================================
+//       SYSTEM PROMPT
+//       ==================================================== */
+
+//     const systemPrompt = `
+//   You are a professional survey data extraction engine.
+
+//   Your job is to convert raw survey records into structured JSON.
+
+//   The input may contain:
+
+//   B2B
+//   B2C
+//   Healthcare
+//   B2H
+
+//   Automatically identify the correct category.
+
+//   ========================================================
+//   CRITICAL RULES
+//   ========================================================
+
+//   1. Every numbered record is ONE record.
+
+//   2. NEVER merge two records.
+
+//   3. NEVER delete records.
+
+//   4. NEVER invent information.
+
+//   5. Missing fields MUST be null.
+
+//   6. Preserve all supplied values exactly.
+
+//   7. Preserve IP addresses exactly.
+
+//   8. Preserve IDs exactly.
+
+//   9. Preserve income values exactly.
+
+//   10. Preserve age values exactly.
+
+//   11. Preserve company names exactly.
+
+//   12. Preserve job titles exactly.
+
+//   13. Preserve country names exactly.
+
+//   14. Preserve the original language.
+
+//   15. Do NOT translate Oppo.
+
+//   16. Do NOT summarize Oppo.
+
+//   17. Do NOT delete Oppo paragraphs.
+
+//   18. Preserve every Oppo answer.
+
+//   19. Return ONLY JSON.
+
+//   20. No markdown.
+
+//   21. No explanations.
+
+//   22. Output MUST contain a records array.
+
+
+//   ========================================================
+//   B2B
+//   ========================================================
+
+//   Fields:
+
+//   Project Name
+//   Study Type
+//   Counts
+//   Age
+//   Gender
+//   Job title
+//   Industry
+//   Department
+//   Employees
+//   Brand
+//   Revenue
+//   Company
+//   County
+//   Zip code
+//   Nationality
+//   Household Income
+//   Oppo
+//   TNX Project ID
+//   Parent ID
+//   Child ID
+//   Respondent ID
+//   Country
+//   IP Address
+//   Status
+//   Note
+
+
+//   Map:
+
+//   Project Name -> projectName
+//   Study Type -> studyType
+//   Counts -> counts
+//   Age -> age
+//   Gender -> gender
+//   Job title -> jobTitle
+//   Industry -> industry
+//   Department -> department
+//   Employees -> employees
+//   Brand -> brand
+//   Revenue -> revenue
+//   Company -> company
+//   County -> county
+//   Zip code -> zipCode
+//   Nationality -> nationality
+//   Household Income -> householdIncome
+//   Oppo -> oppo
+//   TNX Project ID -> tnxProjectId
+//   Parent ID -> parentId
+//   Child ID -> childId
+//   Respondent ID -> respondentId
+//   Country -> country
+//   IP Address -> ip
+//   Status -> status
+//   Note -> note
+
+
+//   ========================================================
+//   B2C
+//   ========================================================
+
+//   Fields:
+
+//   Project Name
+//   Study Type
+//   Counts
+//   Age
+//   Gender
+//   ZIP Code
+//   Country
+//   Nationality
+//   Ethnicity
+//   Household Income
+//   Personal Income
+//   Brand
+//   Company
+//   Occupation
+//   Employment Status
+//   Marital Status
+//   Oppo
+//   TNX Project ID
+//   Parent ID
+//   Child ID
+//   Respondent ID
+//   Country
+//   IP Address
+//   Status
+//   Note
+
+
+//   Map:
+
+//   Project Name -> projectName
+//   Study Type -> studyType
+//   Counts -> counts
+//   Age -> age
+//   Gender -> gender
+//   ZIP Code -> zipCode
+//   Country -> country
+//   Nationality -> nationality
+//   Ethnicity -> ethnicity
+//   Household Income -> householdIncome
+//   Personal Income -> personalIncome
+//   Brand -> brand
+//   Company -> company
+//   Occupation -> occupation
+//   Employment Status -> employmentStatus
+//   Marital Status -> maritalStatus
+//   Oppo -> oppo
+//   TNX Project ID -> tnxProjectId
+//   Parent ID -> parentId
+//   Child ID -> childId
+//   Respondent ID -> respondentId
+//   Country -> country
+//   IP Address -> ip
+//   Status -> status
+//   Note -> note
+
+
+//   ========================================================
+//   HEALTHCARE / B2H
+//   ========================================================
+
+//   Fields:
+
+//   Project Name
+//   Study Type
+//   Counts
+//   Patient Age
+//   Caregiver Age
+//   Patient Gender
+//   Caregiver Gender
+//   Disease / Condition
+//   First Diagnosed
+//   Medicine Name
+//   Current Medication
+//   Previous Medication
+//   Treatment Duration
+//   Treatment Response
+//   Side Effects
+//   Other Conditions
+//   Healthcare Provider
+//   Insurance Type
+//   Caregiver Relationship
+//   Treatment Satisfaction
+//   Oppo
+//   TNX Project ID
+//   Parent ID
+//   Child ID
+//   Respondent ID
+//   Country
+//   IP Address
+//   Status
+//   Note
+
+
+//   Map:
+
+//   Project Name -> projectName
+//   Study Type -> studyType
+//   Counts -> counts
+//   Patient Age -> patientAge
+//   Caregiver Age -> caregiverAge
+//   Patient Gender -> patientGender
+//   Caregiver Gender -> caregiverGender
+//   Disease / Condition -> diseaseCondition
+//   First Diagnosed -> firstDiagnosed
+//   Medicine Name -> medicineName
+//   Current Medication -> currentMedication
+//   Previous Medication -> previousMedication
+//   Treatment Duration -> treatmentDuration
+//   Treatment Response -> treatmentResponse
+//   Side Effects -> sideEffects
+//   Other Conditions -> otherConditions
+//   Healthcare Provider -> healthcareProvider
+//   Insurance Type -> insuranceType
+//   Caregiver Relationship -> caregiverRelationship
+//   Treatment Satisfaction -> treatmentSatisfaction
+//   Oppo -> oppo
+//   TNX Project ID -> tnxProjectId
+//   Parent ID -> parentId
+//   Child ID -> childId
+//   Respondent ID -> respondentId
+//   Country -> country
+//   IP Address -> ip
+//   Status -> status
+//   Note -> note
+
+
+//   ========================================================
+//   TNX PROJECT ID RULE
+//   ========================================================
+
+//   The TNX Project ID comes from the HEADER.
+
+//   Example:
+
+//   GMS 79151 - Genpop | TNX543
+
+//   must produce:
+
+//   projectName = "GMS 79151 - Genpop"
+//   tnxProjectId = "TNX543"
+
+//   DO NOT use the respondent number as the TNX Project ID.
+
+
+//   ========================================================
+//   RESPONDENT ID RULE
+//   ========================================================
+
+//   Example:
+
+//   543 ="371515368214102272" China 118.123.80.10 Completed
+
+//   with header:
+
+//   GMS 79151 - Genpop | TNX543
+
+//   must produce:
+
+//   tnxProjectId = "TNX543"
+
+//   respondentId = "371515368214102272"
+
+//   country = "China"
+
+//   ip = "118.123.80.10"
+
+//   status = "Completed"
+
+
+//   ========================================================
+//   ANOTHER RESPONDENT EXAMPLE
+//   ========================================================
+
+//   Example:
+
+//   78014 rfderday00srj United States 76.250.239.86 Completed
+
+//   must produce:
+
+//   respondentId = "rfderday00srj"
+
+//   country = "United States"
+
+//   ip = "76.250.239.86"
+
+//   status = "Completed"
+
+//   Do NOT put rfderday00srj into TNX Project ID.
+
+
+//   ========================================================
+//   TRN EXAMPLE
+//   ========================================================
+
+//   Header:
+
+//   TRN 21425 -18-50 YO || TNX300
+
+//   Tail:
+
+//   21425 jgreefjday00srj United States 76.250.239.112 Completed
+
+//   must produce:
+
+//   projectName = "TRN 21425 -18-50 YO"
+
+//   tnxProjectId = "TNX300"
+
+//   respondentId = "jgreefjday00srj"
+
+//   country = "United States"
+
+//   ip = "76.250.239.112"
+
+//   status = "Completed"
+
+
+//   ========================================================
+//   ROLE RULE
+//   ========================================================
+
+//   If input contains:
+
+//   Job title - Director
+
+//   role-Director of IT Infrastructure
+
+//   then:
+
+//   jobTitle = "Director"
+
+//   and:
+
+//   data = {
+//     "Role": "Director of IT Infrastructure"
+//   }
+
+//   Do NOT replace Job Title with Role.
+
+
+//   ========================================================
+//   OPPO RULE
+//   ========================================================
+
+//   Oppo can contain multiple paragraphs.
+
+//   Example:
+
+//   Oppo-
+
+//   Answer one.
+
+//   Answer two.
+
+//   Answer three.
+
+//   Answer four.
+
+//   Return ALL answers inside:
+
+//   oppo
+
+//   Do NOT summarize them.
+
+//   Do NOT translate them.
+
+//   Do NOT delete them.
+
+
+//   IMPORTANT:
+
+//   Do NOT add numbering yourself.
+
+//   Return the raw Oppo answer paragraphs.
+
+//   The application will add:
+
+//   1-
+//   2-
+//   3-
+//   4-
+
+//   automatically.
+
+
+//   ========================================================
+//   NOTE RULE
+//   ========================================================
+
+//   Note -
+
+//   Some note text
+
+//   must become:
+
+//   note = "Some note text"
+
+//   If empty:
+
+//   note = null
+
+
+//   ========================================================
+//   UNKNOWN FIELDS
+//   ========================================================
+
+//   Never delete unknown fields.
+
+//   Put them into:
+
+//   data
+
+//   Example:
+
+//   Spent - $5000
+
+//   becomes:
+
+//   data = {
+//     "Spent": "$5000"
+//   }
+
+
+//   ========================================================
+//   FINAL OUTPUT
+//   ========================================================
+
+//   Return ONLY JSON.
+
+//   Example:
+
+//   {
+//     "records": [
+//       {
+//         "category": "B2B",
+//         "projectName": null,
+//         "studyType": "B2B",
+//         "counts": null,
+
+//         "age": null,
+//         "gender": null,
+//         "jobTitle": null,
+//         "industry": null,
+//         "department": null,
+//         "employees": null,
+//         "brand": null,
+//         "revenue": null,
+//         "company": null,
+//         "county": null,
+//         "zipCode": null,
+//         "nationality": null,
+//         "householdIncome": null,
+
+//         "patientAge": null,
+//         "caregiverAge": null,
+//         "patientGender": null,
+//         "caregiverGender": null,
+//         "diseaseCondition": null,
+//         "firstDiagnosed": null,
+//         "medicineName": null,
+//         "currentMedication": null,
+//         "previousMedication": null,
+//         "treatmentDuration": null,
+//         "treatmentResponse": null,
+//         "sideEffects": null,
+//         "otherConditions": null,
+//         "healthcareProvider": null,
+//         "insuranceType": null,
+//         "caregiverRelationship": null,
+//         "treatmentSatisfaction": null,
+
+//         "oppo": null,
+
+//         "tnxProjectId": null,
+//         "parentId": null,
+//         "childId": null,
+//         "respondentId": null,
+
+//         "country": null,
+//         "ip": null,
+//         "status": null,
+//         "note": null,
+
+//         "data": {}
+//       }
+//     ]
+//   }
+//   `.trim();
+
+//     /* ====================================================
+//       API REQUEST  (Gemini)
+//       ==================================================== */
+
+//     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+//     const response = await fetch(url, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         "x-goog-api-key": apiKey,
+//       },
+//       body: JSON.stringify({
+//         systemInstruction: {
+//           parts: [
+//             {
+//               text: systemPrompt,
+//             },
+//           ],
+//         },
+//         contents: [
+//           {
+//             role: "user",
+//             parts: [
+//               {
+//                 text: paste,
+//               },
+//             ],
+//           },
+//         ],
+//         generationConfig: {
+//           temperature: 0,
+//           maxOutputTokens: 16000,
+//           responseMimeType: "application/json",
+//         },
+//       }),
+//     });
+
+//     /* ====================================================
+//       RESPONSE
+//       ==================================================== */
+
+//     const responseText = await response.text();
+
+//     if (!response.ok) {
+//       throw new Error(`${response.status} ${responseText}`);
+//     }
+
+//     let apiResult: any;
+
+//     try {
+//       apiResult = JSON.parse(responseText);
+//     } catch {
+//       throw new Error("Gemini API returned invalid JSON");
+//     }
+
+//     const content =
+//       apiResult?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+//     if (typeof content !== "string" || !content.trim()) {
+//       console.error(
+//         "GEMINI EMPTY CONTENT:",
+//         JSON.stringify(apiResult, null, 2)
+//       );
+
+//       throw new Error("Gemini returned empty content");
+//     }
+
+//     /* ====================================================
+//       PARSE GEMINI JSON
+//       ==================================================== */
+
+//     let parsed: any;
+
+//     try {
+//       parsed = extractJson(content);
+//     } catch (error) {
+//       console.error("GEMINI CONTENT:", content);
+//       throw error;
+//     }
+
+//     /* ====================================================
+//       GET RECORDS
+//       ==================================================== */
+
+//     let records: any[] = [];
+
+//     if (parsed && Array.isArray(parsed.records)) {
+//       records = parsed.records;
+//     } else if (parsed && Array.isArray(parsed.data)) {
+//       records = parsed.data;
+//     } else if (Array.isArray(parsed)) {
+//       records = parsed;
+//     } else if (parsed && typeof parsed === "object") {
+//       records = [parsed];
+//     }
+
+//     /* ====================================================
+//       NORMALIZE RECORDS
+//       ==================================================== */
+
+//     const normalizedRecords = records.map(normalizeRecord);
+
+//     console.log(
+//       `GROQ NORMALIZER: ${normalizedRecords.length} record(s)`
+//     );
+
+//     return {
+//       records: normalizedRecords,
+//       normalizedText: JSON.stringify(
+//         {
+//           records: normalizedRecords,
+//         },
+//         null,
+//         2
+//       ),
+//     };
+//   }
+
+//   /* ======================================================
+//     RETRY (with exponential backoff for 503 / rate limits)
+//     ====================================================== */
+
+//   async function normalizeChunkWithRetry(
+//     paste: string,
+//     chunkLabel: string,
+//     attempt = 1
+//   ): Promise<GroqNormalizationResult> {
+//     const MAX_ATTEMPTS = 4;
+
+//     try {
+//       return await normalizeChunkWithGroq(paste);
+//     } catch (error: any) {
+//       const message = error?.message || String(error);
+
+//       const isRetryable =
+//         message.includes("503") ||
+//         message.includes("UNAVAILABLE") ||
+//         message.includes("high demand") ||
+//         message.includes("429") ||
+//         message.includes("RESOURCE_EXHAUSTED") ||
+//         message.includes("rate limit");
+
+//       if (isRetryable && attempt < MAX_ATTEMPTS) {
+//         // Exponential backoff: 2s, 4s, 8s
+//         const delayMs = Math.pow(2, attempt) * 1000;
+
+//         console.warn(
+//           `GROQ ${chunkLabel} failed (attempt ${attempt}/${MAX_ATTEMPTS}), ` +
+//             `retrying in ${delayMs}ms...`,
+//           message
+//         );
+
+//         await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+//         return normalizeChunkWithRetry(paste, chunkLabel, attempt + 1);
+//       }
+
+//       throw error;
+//     }
+//   }
+
+//   /* ======================================================
+//     PUBLIC ENTRY POINT
+//     ====================================================== */
+
+//   export async function normalizeSurveyWithGroq(
+//     paste: string
+//   ): Promise<GroqNormalizationResult> {
+//     const blocks = splitIntoBlocks(paste);
+
+//     if (!blocks.length) {
+//       return {
+//         records: [],
+//         normalizedText: JSON.stringify(
 //           {
 //             records: [],
 //           },
 //           null,
 //           2
 //         ),
-//     };
-//   }
+//       };
+//     }
 
+//     /*
+//     * Single block.
+//     */
 
-//   /*
-//    * Single block.
-//    */
+//     if (blocks.length === 1) {
+//       return normalizeChunkWithGroq(paste);
+//     }
 
-//   if (
-//     blocks.length === 1
-//   ) {
+//     /*
+//     * Multiple blocks.
+//     */
 
-//     return normalizeChunkWithGroq(
-//       paste
+//     const chunks = chunkBlocks(blocks);
+
+//     const delimiter = "\n--------------------\n";
+
+//     console.log(
+//       `GROQ NORMALIZER: splitting ${blocks.length} block(s) into ${chunks.length} chunk(s)`
 //     );
-//   }
 
-
-//   /*
-//    * Multiple blocks.
-//    */
-
-//   // const chunks =
-//   //   chunkBlocks(
-//   //     blocks.map(
-//   //       (block) => [block]
-//   //     )
-//   //   );
-
-//   const chunks = chunkBlocks(blocks);
-
-
-//   const delimiter =
-//     "\n--------------------\n";
-
-
-//   console.log(
-//     `GROQ NORMALIZER: splitting ${blocks.length} block(s) into ${chunks.length} chunk(s)`
-//   );
-
-
-//   const settled =
-//     await Promise.allSettled(
-//       chunks.map(
-//         (chunk, index) =>
-//           normalizeChunkWithRetry(
-//             chunk.join(
-//               delimiter
-//             ),
-//             `chunk ${index + 1}/${chunks.length}`
-//           )
+//     const settled = await Promise.allSettled(
+//       chunks.map((chunk, index) =>
+//         normalizeChunkWithRetry(
+//           chunk.join(delimiter),
+//           `chunk ${index + 1}/${chunks.length}`
+//         )
 //       )
 //     );
 
+//     const records: NormalizedSurveyRecord[] = [];
+//     const errors: string[] = [];
 
-//   const records:
-//     NormalizedSurveyRecord[] = [];
-
-//   const errors:
-//     string[] = [];
-
-
-//   settled.forEach(
-//     (
-//       result,
-//       index
-//     ) => {
-
-//       if (
-//         result.status ===
-//         "fulfilled"
-//       ) {
-
-//         records.push(
-//           ...result.value.records
-//         );
-
+//     settled.forEach((result, index) => {
+//       if (result.status === "fulfilled") {
+//         records.push(...result.value.records);
 //       } else {
-
-//         const blockCount =
-//           chunks[index].length;
+//         const blockCount = chunks[index].length;
 
 //         const message =
-//           result.reason?.message ||
-//           String(
-//             result.reason
-//           );
-
+//           result.reason?.message || String(result.reason);
 
 //         console.error(
 //           `GROQ CHUNK ${index + 1}/${chunks.length} FAILED:`,
 //           message
 //         );
 
-
 //         errors.push(
 //           `Chunk ${index + 1}/${chunks.length} (${blockCount} record${
-//             blockCount === 1
-//               ? ""
-//               : "s"
+//             blockCount === 1 ? "" : "s"
 //           }) failed to normalize: ${message}`
 //         );
 //       }
-//     }
-//   );
+//     });
 
-
-//   return {
-//     records,
-
-//     errors:
-//       errors.length
-//         ? errors
-//         : undefined,
-
-//     normalizedText:
-//       JSON.stringify(
+//     return {
+//       records,
+//       errors: errors.length ? errors : undefined,
+//       normalizedText: JSON.stringify(
 //         {
 //           records,
 //         },
 //         null,
 //         2
 //       ),
-//   };
-// }
+//     };
+//   }
 
 
 export type SurveyCategory =
@@ -2249,14 +3659,6 @@ function splitIntoBlocks(paste: string): string[] {
     return [];
   }
 
-  /*
-   * Supports separators such as:
-   *
-   * --------------------
-   * ====================
-   * =====
-   */
-
   const blocks = normalized
     .split(/^\s*(?:-{5,}|={3,})\s*$/gm)
     .map((block) => block.trim())
@@ -2266,7 +3668,7 @@ function splitIntoBlocks(paste: string): string[] {
 }
 
 /* ======================================================
-   CHUNK BLOCKS
+   CHUNK BLOCKS (kept for API compatibility; unused in non-AI path)
    ====================================================== */
 
 function chunkBlocks(blocks: string[]): string[][] {
@@ -2278,11 +3680,6 @@ function chunkBlocks(blocks: string[]): string[][] {
   for (const block of blocks) {
     const blockLength = block.length;
 
-    /*
-     * If a single record is larger than the normal
-     * chunk size, keep that record by itself.
-     */
-
     if (blockLength > MAX_CHARS_PER_CHUNK) {
       if (current.length) {
         chunks.push(current);
@@ -2293,11 +3690,6 @@ function chunkBlocks(blocks: string[]): string[][] {
       chunks.push([block]);
       continue;
     }
-
-    /*
-     * Start a new chunk if the next block would make
-     * the chunk too large.
-     */
 
     if (
       current.length &&
@@ -2334,35 +3726,19 @@ function cleanValue(value: unknown): string | undefined {
     return undefined;
   }
 
+  // Treat common null-like strings as empty
+  if (
+    /^(null|undefined|n\/a|na|none|-)$/i.test(text)
+  ) {
+    return undefined;
+  }
+
   return text;
 }
 
 /* ======================================================
    FORMAT OPPO
    ====================================================== */
-
-/*
- * Converts:
- *
- * Answer one
- *
- * Answer two
- *
- * Answer three
- *
- * into:
- *
- * 1- Answer one
- *
- * 2- Answer two
- *
- * 3- Answer three
- *
- *
- * Existing numbering is removed first so we don't get:
- *
- * 1- 1. Answer
- */
 
 function formatOppo(value: unknown): string | undefined {
   const cleaned = cleanValue(value);
@@ -2376,27 +3752,10 @@ function formatOppo(value: unknown): string | undefined {
     .replace(/\r/g, "\n")
     .trim();
 
-  /*
-   * Primary separator:
-   *
-   * Blank lines between answers.
-   */
-
   let answers = normalized
     .split(/\n\s*\n+/)
     .map((answer) => answer.trim())
     .filter(Boolean);
-
-  /*
-   * If the model returned multiple answers as single-line
-   * numbered values, handle those too.
-   *
-   * Example:
-   *
-   * 1. Answer one
-   * 2. Answer two
-   * 3. Answer three
-   */
 
   if (
     answers.length === 1 &&
@@ -2408,22 +3767,7 @@ function formatOppo(value: unknown): string | undefined {
       .filter(Boolean);
   }
 
-  /*
-   * If there is only one answer, still return:
-   *
-   * 1- Answer
-   */
-
   const formatted = answers.map((answer, index) => {
-    /*
-     * Remove existing numbering:
-     *
-     * 1.
-     * 1-
-     * 1)
-     * 1:
-     */
-
     const withoutNumber = answer
       .replace(/^\s*\d+\s*[\.\-\):]\s*/, "")
       .trim();
@@ -2479,12 +3823,444 @@ function normalizeCategory(
     return "B2C";
   }
 
-  /*
-   * B2B is the default because the current application
-   * primarily receives B2B data.
-   */
-
   return "B2B";
+}
+
+/* ======================================================
+   FIELD LABEL → INTERNAL KEY MAP
+   ====================================================== */
+
+const FIELD_MAP: Record<string, string> = {
+  // Common
+  "project name": "projectName",
+  "study type": "studyType",
+  "counts": "counts",
+  "count": "counts",
+
+  // B2C / shared
+  "age": "age",
+  "gender": "gender",
+  "zip code": "zipCode",
+  "zipcode": "zipCode",
+  "zip": "zipCode",
+  "country": "country",
+  "nationality": "nationality",
+  "ethnicity": "ethnicity",
+  "household income": "householdIncome",
+  "personal income": "personalIncome",
+  "brand": "brand",
+  "company": "company",
+  "occupation": "occupation",
+  "employment status": "employmentStatus",
+  "marital status": "maritalStatus",
+
+  // B2B
+  "job title": "jobTitle",
+  "jobtitle": "jobTitle",
+  "title": "jobTitle",
+  "industry": "industry",
+  "department": "department",
+  "employees": "employees",
+  "employee": "employees",
+  "revenue": "revenue",
+  "county": "county",
+
+  // Healthcare
+  "patient age": "patientAge",
+  "caregiver age": "caregiverAge",
+  "patient gender": "patientGender",
+  "caregiver gender": "caregiverGender",
+  "disease / condition": "diseaseCondition",
+  "disease/condition": "diseaseCondition",
+  "disease": "diseaseCondition",
+  "condition": "diseaseCondition",
+  "first diagnosed": "firstDiagnosed",
+  "medicine name": "medicineName",
+  "current medication": "currentMedication",
+  "previous medication": "previousMedication",
+  "treatment duration": "treatmentDuration",
+  "treatment response": "treatmentResponse",
+  "side effects": "sideEffects",
+  "other conditions": "otherConditions",
+  "healthcare provider": "healthcareProvider",
+  "insurance type": "insuranceType",
+  "caregiver relationship": "caregiverRelationship",
+  "treatment satisfaction": "treatmentSatisfaction",
+
+  // Common response / ids
+  "oppo": "oppo",
+  "note": "note",
+  "tnx project id": "tnxProjectId",
+  "tnx projectid": "tnxProjectId",
+  "tnx id": "tnxProjectId",
+  "parent id": "parentId",
+  "child id": "childId",
+  "respondent id": "respondentId",
+  "ip address": "ip",
+  "ip": "ip",
+  "status": "status",
+};
+
+/* ======================================================
+   NORMALIZE FIELD LABEL
+   ====================================================== */
+
+function normalizeLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* ======================================================
+   PARSE HEADER  (projectName + tnxProjectId)
+   ====================================================== */
+
+/*
+ * Examples:
+ *   GMS 79151 - Genpop | TNX543
+ *   TRN 21425 -18-50 YO || TNX300
+ *   Something | TNX123
+ */
+
+function parseHeader(line: string): {
+  projectName?: string;
+  tnxProjectId?: string;
+} {
+  const text = line.trim();
+
+  // | TNX... or || TNX...
+  const tnxMatch = text.match(
+    /\|\|?\s*(TNX\s*\d+|[A-Z]*TNX\d+|[A-Z]{0,5}\d{2,})/i
+  );
+
+  if (tnxMatch) {
+    const tnxProjectId = tnxMatch[1]
+      .replace(/\s+/g, "")
+      .toUpperCase()
+      .replace(/^(?!TNX)/i, (m) => (m.startsWith("TNX") ? m : `TNX${m}`));
+
+    // Prefer exact TNX### form
+    const cleanTnx = (tnxMatch[1].match(/TNX\s*\d+/i) || [
+      tnxMatch[1],
+    ])[0]
+      .replace(/\s+/g, "")
+      .toUpperCase();
+
+    const projectName = text
+      .slice(0, tnxMatch.index)
+      .replace(/\|\|?\s*$/, "")
+      .trim();
+
+    return {
+      projectName: cleanValue(projectName),
+      tnxProjectId: cleanValue(cleanTnx),
+    };
+  }
+
+  // Standalone TNX in line
+  const alone = text.match(/\b(TNX\s*\d+)\b/i);
+  if (alone) {
+    return {
+      projectName: cleanValue(
+        text.replace(alone[0], "").replace(/[|]+/g, "").trim()
+      ),
+      tnxProjectId: alone[1].replace(/\s+/g, "").toUpperCase(),
+    };
+  }
+
+  return {};
+}
+
+/* ======================================================
+   PARSE RESPONDENT / TAIL LINE
+   ====================================================== */
+
+/*
+ * Examples:
+ *   543 ="371515368214102272" China 118.123.80.10 Completed
+ *   78014 rfderday00srj United States 76.250.239.86 Completed
+ *   21425 jgreefjday00srj United States 76.250.239.112 Completed
+ */
+
+function parseRespondentLine(line: string): {
+  respondentId?: string;
+  country?: string;
+  ip?: string;
+  status?: string;
+} {
+  const text = line.trim();
+
+  // IP pattern
+  const ipMatch = text.match(
+    /\b(\d{1,3}(?:\.\d{1,3}){3})\b/
+  );
+
+  if (!ipMatch) {
+    return {};
+  }
+
+  const ip = ipMatch[1];
+  const beforeIp = text.slice(0, ipMatch.index!).trim();
+  const afterIp = text.slice(ipMatch.index! + ip.length).trim();
+
+  // Status is usually the last word(s) after IP
+  const status = cleanValue(afterIp) || undefined;
+
+  // Try:  number ="id"  Country...
+  let respondentId: string | undefined;
+  let country: string | undefined;
+
+  const quoted = beforeIp.match(
+    /=\s*"([^"]+)"\s*(.*)$/
+  );
+  if (quoted) {
+    respondentId = quoted[1].trim();
+    country = quoted[2].trim() || undefined;
+  } else {
+    // Try: leading number + token as id, rest country
+    // e.g. 78014 rfderday00srj United States
+    const parts = beforeIp.split(/\s+/).filter(Boolean);
+
+    if (parts.length >= 2) {
+      // Skip optional leading numeric project code
+      let start = 0;
+      if (/^\d+$/.test(parts[0]) && parts.length >= 3) {
+        start = 1;
+      }
+
+      respondentId = parts[start];
+      country = parts.slice(start + 1).join(" ") || undefined;
+    } else if (parts.length === 1) {
+      respondentId = parts[0];
+    }
+  }
+
+  return {
+    respondentId: cleanValue(respondentId),
+    country: cleanValue(country),
+    ip: cleanValue(ip),
+    status: cleanValue(status),
+  };
+}
+
+/* ======================================================
+   DETECT CATEGORY FROM TEXT
+   ====================================================== */
+
+function detectCategoryFromText(text: string): SurveyCategory | undefined {
+  const lower = text.toLowerCase();
+
+  if (
+    /\b(healthcare|health\s*care|b2h|patient\s*age|caregiver|disease|medication|treatment)\b/.test(
+      lower
+    )
+  ) {
+    return "B2H";
+  }
+
+  if (/\bb2c\b/.test(lower)) {
+    return "B2C";
+  }
+
+  if (/\bb2b\b/.test(lower)) {
+    return "B2B";
+  }
+
+  return undefined;
+}
+
+/* ======================================================
+   PARSE ONE BLOCK → RAW RECORD
+   ====================================================== */
+
+function parseBlock(block: string): Record<string, any> {
+  const lines = block
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((l) => l.trimEnd());
+
+  const raw: Record<string, any> = {
+    data: {} as Record<string, string>,
+  };
+
+  let i = 0;
+
+  // ---------- Header (first non-empty line often)
+  while (i < lines.length && !lines[i].trim()) i++;
+
+  if (i < lines.length) {
+    const header = parseHeader(lines[i]);
+    if (header.projectName || header.tnxProjectId) {
+      if (header.projectName) raw.projectName = header.projectName;
+      if (header.tnxProjectId) raw.tnxProjectId = header.tnxProjectId;
+      i++;
+    }
+  }
+
+  // ---------- Main field walk
+  let currentKey: string | null = null;
+  let currentValueLines: string[] = [];
+  let inOppo = false;
+
+  const flushCurrent = () => {
+    if (!currentKey) return;
+
+    const value = currentValueLines.join("\n").trim();
+
+    if (currentKey === "oppo") {
+      raw.oppo = value || undefined;
+    } else if (currentKey === "note") {
+      raw.note = value || undefined;
+    } else if (FIELD_MAP[normalizeLabel(currentKey)]) {
+      const mapped = FIELD_MAP[normalizeLabel(currentKey)];
+      raw[mapped] = value || undefined;
+    } else {
+      // Unknown → data (preserve original label casing where possible)
+      const label = currentKey.trim();
+      if (value) {
+        raw.data[label] = value;
+      }
+    }
+
+    currentKey = null;
+    currentValueLines = [];
+    inOppo = false;
+  };
+
+  const isFieldStart = (line: string): { key: string; value: string } | null => {
+    // Key - Value   or   Key: Value   or   Key-Value
+    const m = line.match(
+      /^([A-Za-z][A-Za-z0-9 /&().,']*?)\s*[-:]\s*(.*)$/
+    );
+    if (!m) return null;
+
+    const key = m[1].trim();
+    const value = m[2].trim();
+
+    // Avoid treating pure URLs or IPs as keys
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(key)) return null;
+
+    return { key, value };
+  };
+
+  for (; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Empty line
+    if (!trimmed) {
+      if (inOppo && currentKey === "oppo") {
+        // Keep blank lines inside Oppo (paragraph breaks)
+        currentValueLines.push("");
+      }
+      continue;
+    }
+
+    // Respondent / status line (contains IP)
+    if (/\b\d{1,3}(?:\.\d{1,3}){3}\b/.test(trimmed)) {
+      const resp = parseRespondentLine(trimmed);
+      if (resp.respondentId || resp.ip) {
+        flushCurrent();
+        if (resp.respondentId) raw.respondentId = resp.respondentId;
+        if (resp.country) raw.country = resp.country;
+        if (resp.ip) raw.ip = resp.ip;
+        if (resp.status) raw.status = resp.status;
+        continue;
+      }
+    }
+
+    // Header-like line appearing later
+    const lateHeader = parseHeader(trimmed);
+    if (
+      lateHeader.tnxProjectId &&
+      !raw.tnxProjectId &&
+      /TNX/i.test(trimmed)
+    ) {
+      flushCurrent();
+      if (lateHeader.projectName) raw.projectName = lateHeader.projectName;
+      raw.tnxProjectId = lateHeader.tnxProjectId;
+      continue;
+    }
+
+    const field = isFieldStart(trimmed);
+
+    if (field) {
+      const norm = normalizeLabel(field.key);
+
+      // Special: role → data only (do not overwrite jobTitle)
+      if (norm === "role") {
+        flushCurrent();
+        if (field.value) {
+          raw.data["Role"] = field.value;
+        }
+        continue;
+      }
+
+      // Start of Oppo
+      if (norm === "oppo") {
+        flushCurrent();
+        currentKey = "oppo";
+        inOppo = true;
+        if (field.value) {
+          currentValueLines.push(field.value);
+        }
+        continue;
+      }
+
+      // Start of Note
+      if (norm === "note") {
+        flushCurrent();
+        currentKey = "note";
+        inOppo = false;
+        if (field.value) {
+          currentValueLines.push(field.value);
+        }
+        continue;
+      }
+
+      // Known or unknown field
+      flushCurrent();
+      currentKey = field.key;
+      inOppo = false;
+      if (field.value) {
+        currentValueLines.push(field.value);
+      }
+      continue;
+    }
+
+    // Continuation of current multi-line value (especially Oppo)
+    if (currentKey) {
+      currentValueLines.push(trimmed);
+      continue;
+    }
+
+    // Orphan line → try as free text note / data
+    if (!raw.note) {
+      // ignore pure separators
+      if (!/^[-_=]{3,}$/.test(trimmed)) {
+        raw.data[`Line_${Object.keys(raw.data).length + 1}`] = trimmed;
+      }
+    }
+  }
+
+  flushCurrent();
+
+  // Category hints
+  const detected = detectCategoryFromText(block);
+  if (detected) {
+    raw.category = detected;
+  }
+
+  if (raw.studyType) {
+    // already set
+  } else if (detected) {
+    raw.studyType = detected;
+  }
+
+  return raw;
 }
 
 /* ======================================================
@@ -2499,10 +4275,6 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
 
   const data: Record<string, string> = {};
 
-  /* ----------------------------------------------------
-     Preserve additional fields
-     ---------------------------------------------------- */
-
   if (
     record?.data &&
     typeof record.data === "object" &&
@@ -2510,32 +4282,18 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
   ) {
     for (const [key, value] of Object.entries(record.data)) {
       const cleaned = cleanValue(value);
-
       if (cleaned) {
         data[key] = cleaned;
       }
     }
   }
 
-  /* ----------------------------------------------------
-     Format Oppo
-     ---------------------------------------------------- */
-
   const formattedOppo = formatOppo(record?.oppo);
 
-  /* ----------------------------------------------------
-     Standard field map
-     ---------------------------------------------------- */
-
   const fields: Array<[string, unknown]> = [
-    // Common
     ["Project Name", record?.projectName],
     ["Study Type", record?.studyType],
     ["Counts", record?.counts],
-
-    // -------------------------
-    // B2C
-    // -------------------------
 
     ["Age", record?.age],
     ["Gender", record?.gender],
@@ -2551,10 +4309,6 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
     ["Employment Status", record?.employmentStatus],
     ["Marital Status", record?.maritalStatus],
 
-    // -------------------------
-    // B2B
-    // -------------------------
-
     ["Job Title", record?.jobTitle],
     ["Industry", record?.industry],
     ["Department", record?.department],
@@ -2562,10 +4316,6 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
     ["Revenue", record?.revenue],
     ["Company", record?.company],
     ["County", record?.county],
-
-    // -------------------------
-    // Healthcare
-    // -------------------------
 
     ["Patient Age", record?.patientAge],
     ["Caregiver Age", record?.caregiverAge],
@@ -2585,10 +4335,6 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
     ["Caregiver Relationship", record?.caregiverRelationship],
     ["Treatment Satisfaction", record?.treatmentSatisfaction],
 
-    // -------------------------
-    // Common
-    // -------------------------
-
     ["Oppo", formattedOppo],
     ["TNX Project ID", record?.tnxProjectId],
     ["Parent ID", record?.parentId],
@@ -2602,25 +4348,18 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
 
   for (const [key, value] of fields) {
     const cleaned = cleanValue(value);
-
     if (cleaned) {
       data[key] = cleaned;
     }
   }
 
-  /* ====================================================
-     RETURN
-     ==================================================== */
-
   return {
     category,
 
-    // Common
     projectName: cleanValue(record?.projectName),
     studyType: cleanValue(record?.studyType),
     counts: cleanValue(record?.counts),
 
-    // B2C
     age: cleanValue(record?.age),
     gender: cleanValue(record?.gender),
     zipCode: cleanValue(record?.zipCode),
@@ -2635,7 +4374,6 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
     employmentStatus: cleanValue(record?.employmentStatus),
     maritalStatus: cleanValue(record?.maritalStatus),
 
-    // B2B
     jobTitle: cleanValue(record?.jobTitle),
     industry: cleanValue(record?.industry),
     department: cleanValue(record?.department),
@@ -2643,7 +4381,6 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
     revenue: cleanValue(record?.revenue),
     county: cleanValue(record?.county),
 
-    // Healthcare
     patientAge: cleanValue(record?.patientAge),
     caregiverAge: cleanValue(record?.caregiverAge),
     patientGender: cleanValue(record?.patientGender),
@@ -2662,17 +4399,14 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
     caregiverRelationship: cleanValue(record?.caregiverRelationship),
     treatmentSatisfaction: cleanValue(record?.treatmentSatisfaction),
 
-    // Common
     oppo: formattedOppo,
     note: cleanValue(record?.note),
 
-    // IDs
     tnxProjectId: cleanValue(record?.tnxProjectId),
     parentId: cleanValue(record?.parentId),
     childId: cleanValue(record?.childId),
     respondentId: cleanValue(record?.respondentId),
 
-    // Respondent
     ip: cleanValue(record?.ip),
     status: cleanValue(record?.status),
 
@@ -2681,773 +4415,7 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
 }
 
 /* ======================================================
-   JSON EXTRACTION
-   ====================================================== */
-
-function extractJson(text: string): any {
-  const cleaned = text
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
-
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    // Continue below.
-  }
-
-  /*
-   * Try extracting JSON object from surrounding text.
-   */
-
-  const firstObject = cleaned.indexOf("{");
-  const lastObject = cleaned.lastIndexOf("}");
-
-  if (
-    firstObject !== -1 &&
-    lastObject !== -1 &&
-    lastObject > firstObject
-  ) {
-    try {
-      return JSON.parse(
-        cleaned.slice(firstObject, lastObject + 1)
-      );
-    } catch {
-      // Continue.
-    }
-  }
-
-  /*
-   * Try JSON array.
-   */
-
-  const firstArray = cleaned.indexOf("[");
-  const lastArray = cleaned.lastIndexOf("]");
-
-  if (
-    firstArray !== -1 &&
-    lastArray !== -1 &&
-    lastArray > firstArray
-  ) {
-    try {
-      return JSON.parse(
-        cleaned.slice(firstArray, lastArray + 1)
-      );
-    } catch {
-      // Continue.
-    }
-  }
-
-  throw new Error("Gemini did not return valid JSON");
-}
-
-/* ======================================================
-   GROQ SINGLE CHUNK  (uses Gemini under the hood)
-   ====================================================== */
-
-async function normalizeChunkWithGroq(
-  paste: string
-): Promise<GroqNormalizationResult> {
-  const apiKey =
-    process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured");
-  }
-
-  const model =
-    process.env.GEMINI_MODEL ||
-    process.env.GROQ_MODEL ||
-    "gemini-3.8-flash";
-
-  /* ====================================================
-     SYSTEM PROMPT
-     ==================================================== */
-
-  const systemPrompt = `
-You are a professional survey data extraction engine.
-
-Your job is to convert raw survey records into structured JSON.
-
-The input may contain:
-
-B2B
-B2C
-Healthcare
-B2H
-
-Automatically identify the correct category.
-
-========================================================
-CRITICAL RULES
-========================================================
-
-1. Every numbered record is ONE record.
-
-2. NEVER merge two records.
-
-3. NEVER delete records.
-
-4. NEVER invent information.
-
-5. Missing fields MUST be null.
-
-6. Preserve all supplied values exactly.
-
-7. Preserve IP addresses exactly.
-
-8. Preserve IDs exactly.
-
-9. Preserve income values exactly.
-
-10. Preserve age values exactly.
-
-11. Preserve company names exactly.
-
-12. Preserve job titles exactly.
-
-13. Preserve country names exactly.
-
-14. Preserve the original language.
-
-15. Do NOT translate Oppo.
-
-16. Do NOT summarize Oppo.
-
-17. Do NOT delete Oppo paragraphs.
-
-18. Preserve every Oppo answer.
-
-19. Return ONLY JSON.
-
-20. No markdown.
-
-21. No explanations.
-
-22. Output MUST contain a records array.
-
-
-========================================================
-B2B
-========================================================
-
-Fields:
-
-Project Name
-Study Type
-Counts
-Age
-Gender
-Job title
-Industry
-Department
-Employees
-Brand
-Revenue
-Company
-County
-Zip code
-Nationality
-Household Income
-Oppo
-TNX Project ID
-Parent ID
-Child ID
-Respondent ID
-Country
-IP Address
-Status
-Note
-
-
-Map:
-
-Project Name -> projectName
-Study Type -> studyType
-Counts -> counts
-Age -> age
-Gender -> gender
-Job title -> jobTitle
-Industry -> industry
-Department -> department
-Employees -> employees
-Brand -> brand
-Revenue -> revenue
-Company -> company
-County -> county
-Zip code -> zipCode
-Nationality -> nationality
-Household Income -> householdIncome
-Oppo -> oppo
-TNX Project ID -> tnxProjectId
-Parent ID -> parentId
-Child ID -> childId
-Respondent ID -> respondentId
-Country -> country
-IP Address -> ip
-Status -> status
-Note -> note
-
-
-========================================================
-B2C
-========================================================
-
-Fields:
-
-Project Name
-Study Type
-Counts
-Age
-Gender
-ZIP Code
-Country
-Nationality
-Ethnicity
-Household Income
-Personal Income
-Brand
-Company
-Occupation
-Employment Status
-Marital Status
-Oppo
-TNX Project ID
-Parent ID
-Child ID
-Respondent ID
-Country
-IP Address
-Status
-Note
-
-
-Map:
-
-Project Name -> projectName
-Study Type -> studyType
-Counts -> counts
-Age -> age
-Gender -> gender
-ZIP Code -> zipCode
-Country -> country
-Nationality -> nationality
-Ethnicity -> ethnicity
-Household Income -> householdIncome
-Personal Income -> personalIncome
-Brand -> brand
-Company -> company
-Occupation -> occupation
-Employment Status -> employmentStatus
-Marital Status -> maritalStatus
-Oppo -> oppo
-TNX Project ID -> tnxProjectId
-Parent ID -> parentId
-Child ID -> childId
-Respondent ID -> respondentId
-Country -> country
-IP Address -> ip
-Status -> status
-Note -> note
-
-
-========================================================
-HEALTHCARE / B2H
-========================================================
-
-Fields:
-
-Project Name
-Study Type
-Counts
-Patient Age
-Caregiver Age
-Patient Gender
-Caregiver Gender
-Disease / Condition
-First Diagnosed
-Medicine Name
-Current Medication
-Previous Medication
-Treatment Duration
-Treatment Response
-Side Effects
-Other Conditions
-Healthcare Provider
-Insurance Type
-Caregiver Relationship
-Treatment Satisfaction
-Oppo
-TNX Project ID
-Parent ID
-Child ID
-Respondent ID
-Country
-IP Address
-Status
-Note
-
-
-Map:
-
-Project Name -> projectName
-Study Type -> studyType
-Counts -> counts
-Patient Age -> patientAge
-Caregiver Age -> caregiverAge
-Patient Gender -> patientGender
-Caregiver Gender -> caregiverGender
-Disease / Condition -> diseaseCondition
-First Diagnosed -> firstDiagnosed
-Medicine Name -> medicineName
-Current Medication -> currentMedication
-Previous Medication -> previousMedication
-Treatment Duration -> treatmentDuration
-Treatment Response -> treatmentResponse
-Side Effects -> sideEffects
-Other Conditions -> otherConditions
-Healthcare Provider -> healthcareProvider
-Insurance Type -> insuranceType
-Caregiver Relationship -> caregiverRelationship
-Treatment Satisfaction -> treatmentSatisfaction
-Oppo -> oppo
-TNX Project ID -> tnxProjectId
-Parent ID -> parentId
-Child ID -> childId
-Respondent ID -> respondentId
-Country -> country
-IP Address -> ip
-Status -> status
-Note -> note
-
-
-========================================================
-TNX PROJECT ID RULE
-========================================================
-
-The TNX Project ID comes from the HEADER.
-
-Example:
-
-GMS 79151 - Genpop | TNX543
-
-must produce:
-
-projectName = "GMS 79151 - Genpop"
-tnxProjectId = "TNX543"
-
-DO NOT use the respondent number as the TNX Project ID.
-
-
-========================================================
-RESPONDENT ID RULE
-========================================================
-
-Example:
-
-543 ="371515368214102272" China 118.123.80.10 Completed
-
-with header:
-
-GMS 79151 - Genpop | TNX543
-
-must produce:
-
-tnxProjectId = "TNX543"
-
-respondentId = "371515368214102272"
-
-country = "China"
-
-ip = "118.123.80.10"
-
-status = "Completed"
-
-
-========================================================
-ANOTHER RESPONDENT EXAMPLE
-========================================================
-
-Example:
-
-78014 rfderday00srj United States 76.250.239.86 Completed
-
-must produce:
-
-respondentId = "rfderday00srj"
-
-country = "United States"
-
-ip = "76.250.239.86"
-
-status = "Completed"
-
-Do NOT put rfderday00srj into TNX Project ID.
-
-
-========================================================
-TRN EXAMPLE
-========================================================
-
-Header:
-
-TRN 21425 -18-50 YO || TNX300
-
-Tail:
-
-21425 jgreefjday00srj United States 76.250.239.112 Completed
-
-must produce:
-
-projectName = "TRN 21425 -18-50 YO"
-
-tnxProjectId = "TNX300"
-
-respondentId = "jgreefjday00srj"
-
-country = "United States"
-
-ip = "76.250.239.112"
-
-status = "Completed"
-
-
-========================================================
-ROLE RULE
-========================================================
-
-If input contains:
-
-Job title - Director
-
-role-Director of IT Infrastructure
-
-then:
-
-jobTitle = "Director"
-
-and:
-
-data = {
-  "Role": "Director of IT Infrastructure"
-}
-
-Do NOT replace Job Title with Role.
-
-
-========================================================
-OPPO RULE
-========================================================
-
-Oppo can contain multiple paragraphs.
-
-Example:
-
-Oppo-
-
-Answer one.
-
-Answer two.
-
-Answer three.
-
-Answer four.
-
-Return ALL answers inside:
-
-oppo
-
-Do NOT summarize them.
-
-Do NOT translate them.
-
-Do NOT delete them.
-
-
-IMPORTANT:
-
-Do NOT add numbering yourself.
-
-Return the raw Oppo answer paragraphs.
-
-The application will add:
-
-1-
-2-
-3-
-4-
-
-automatically.
-
-
-========================================================
-NOTE RULE
-========================================================
-
-Note -
-
-Some note text
-
-must become:
-
-note = "Some note text"
-
-If empty:
-
-note = null
-
-
-========================================================
-UNKNOWN FIELDS
-========================================================
-
-Never delete unknown fields.
-
-Put them into:
-
-data
-
-Example:
-
-Spent - $5000
-
-becomes:
-
-data = {
-  "Spent": "$5000"
-}
-
-
-========================================================
-FINAL OUTPUT
-========================================================
-
-Return ONLY JSON.
-
-Example:
-
-{
-  "records": [
-    {
-      "category": "B2B",
-      "projectName": null,
-      "studyType": "B2B",
-      "counts": null,
-
-      "age": null,
-      "gender": null,
-      "jobTitle": null,
-      "industry": null,
-      "department": null,
-      "employees": null,
-      "brand": null,
-      "revenue": null,
-      "company": null,
-      "county": null,
-      "zipCode": null,
-      "nationality": null,
-      "householdIncome": null,
-
-      "patientAge": null,
-      "caregiverAge": null,
-      "patientGender": null,
-      "caregiverGender": null,
-      "diseaseCondition": null,
-      "firstDiagnosed": null,
-      "medicineName": null,
-      "currentMedication": null,
-      "previousMedication": null,
-      "treatmentDuration": null,
-      "treatmentResponse": null,
-      "sideEffects": null,
-      "otherConditions": null,
-      "healthcareProvider": null,
-      "insuranceType": null,
-      "caregiverRelationship": null,
-      "treatmentSatisfaction": null,
-
-      "oppo": null,
-
-      "tnxProjectId": null,
-      "parentId": null,
-      "childId": null,
-      "respondentId": null,
-
-      "country": null,
-      "ip": null,
-      "status": null,
-      "note": null,
-
-      "data": {}
-    }
-  ]
-}
-`.trim();
-
-  /* ====================================================
-     API REQUEST  (Gemini)
-     ==================================================== */
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [
-          {
-            text: systemPrompt,
-          },
-        ],
-      },
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: paste,
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0,
-        maxOutputTokens: 16000,
-        responseMimeType: "application/json",
-      },
-    }),
-  });
-
-  /* ====================================================
-     RESPONSE
-     ==================================================== */
-
-  const responseText = await response.text();
-
-  if (!response.ok) {
-    throw new Error(`${response.status} ${responseText}`);
-  }
-
-  let apiResult: any;
-
-  try {
-    apiResult = JSON.parse(responseText);
-  } catch {
-    throw new Error("Gemini API returned invalid JSON");
-  }
-
-  const content =
-    apiResult?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (typeof content !== "string" || !content.trim()) {
-    console.error(
-      "GEMINI EMPTY CONTENT:",
-      JSON.stringify(apiResult, null, 2)
-    );
-
-    throw new Error("Gemini returned empty content");
-  }
-
-  /* ====================================================
-     PARSE GEMINI JSON
-     ==================================================== */
-
-  let parsed: any;
-
-  try {
-    parsed = extractJson(content);
-  } catch (error) {
-    console.error("GEMINI CONTENT:", content);
-    throw error;
-  }
-
-  /* ====================================================
-     GET RECORDS
-     ==================================================== */
-
-  let records: any[] = [];
-
-  if (parsed && Array.isArray(parsed.records)) {
-    records = parsed.records;
-  } else if (parsed && Array.isArray(parsed.data)) {
-    records = parsed.data;
-  } else if (Array.isArray(parsed)) {
-    records = parsed;
-  } else if (parsed && typeof parsed === "object") {
-    records = [parsed];
-  }
-
-  /* ====================================================
-     NORMALIZE RECORDS
-     ==================================================== */
-
-  const normalizedRecords = records.map(normalizeRecord);
-
-  console.log(
-    `GROQ NORMALIZER: ${normalizedRecords.length} record(s)`
-  );
-
-  return {
-    records: normalizedRecords,
-    normalizedText: JSON.stringify(
-      {
-        records: normalizedRecords,
-      },
-      null,
-      2
-    ),
-  };
-}
-
-/* ======================================================
-   RETRY (with exponential backoff for 503 / rate limits)
-   ====================================================== */
-
-async function normalizeChunkWithRetry(
-  paste: string,
-  chunkLabel: string,
-  attempt = 1
-): Promise<GroqNormalizationResult> {
-  const MAX_ATTEMPTS = 4;
-
-  try {
-    return await normalizeChunkWithGroq(paste);
-  } catch (error: any) {
-    const message = error?.message || String(error);
-
-    const isRetryable =
-      message.includes("503") ||
-      message.includes("UNAVAILABLE") ||
-      message.includes("high demand") ||
-      message.includes("429") ||
-      message.includes("RESOURCE_EXHAUSTED") ||
-      message.includes("rate limit");
-
-    if (isRetryable && attempt < MAX_ATTEMPTS) {
-      // Exponential backoff: 2s, 4s, 8s
-      const delayMs = Math.pow(2, attempt) * 1000;
-
-      console.warn(
-        `GROQ ${chunkLabel} failed (attempt ${attempt}/${MAX_ATTEMPTS}), ` +
-          `retrying in ${delayMs}ms...`,
-        message
-      );
-
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-
-      return normalizeChunkWithRetry(paste, chunkLabel, attempt + 1);
-    }
-
-    throw error;
-  }
-}
-
-/* ======================================================
-   PUBLIC ENTRY POINT
+   PUBLIC ENTRY POINT  (same name, no AI)
    ====================================================== */
 
 export async function normalizeSurveyWithGroq(
@@ -3458,79 +4426,37 @@ export async function normalizeSurveyWithGroq(
   if (!blocks.length) {
     return {
       records: [],
-      normalizedText: JSON.stringify(
-        {
-          records: [],
-        },
-        null,
-        2
-      ),
+      normalizedText: JSON.stringify({ records: [] }, null, 2),
     };
   }
-
-  /*
-   * Single block.
-   */
-
-  if (blocks.length === 1) {
-    return normalizeChunkWithGroq(paste);
-  }
-
-  /*
-   * Multiple blocks.
-   */
-
-  const chunks = chunkBlocks(blocks);
-
-  const delimiter = "\n--------------------\n";
-
-  console.log(
-    `GROQ NORMALIZER: splitting ${blocks.length} block(s) into ${chunks.length} chunk(s)`
-  );
-
-  const settled = await Promise.allSettled(
-    chunks.map((chunk, index) =>
-      normalizeChunkWithRetry(
-        chunk.join(delimiter),
-        `chunk ${index + 1}/${chunks.length}`
-      )
-    )
-  );
 
   const records: NormalizedSurveyRecord[] = [];
   const errors: string[] = [];
 
-  settled.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      records.push(...result.value.records);
-    } else {
-      const blockCount = chunks[index].length;
-
-      const message =
-        result.reason?.message || String(result.reason);
-
+  for (let index = 0; index < blocks.length; index++) {
+    try {
+      const raw = parseBlock(blocks[index]);
+      const normalized = normalizeRecord(raw);
+      records.push(normalized);
+    } catch (error: any) {
+      const message = error?.message || String(error);
       console.error(
-        `GROQ CHUNK ${index + 1}/${chunks.length} FAILED:`,
+        `NON-AI PARSER block ${index + 1}/${blocks.length} FAILED:`,
         message
       );
-
       errors.push(
-        `Chunk ${index + 1}/${chunks.length} (${blockCount} record${
-          blockCount === 1 ? "" : "s"
-        }) failed to normalize: ${message}`
+        `Block ${index + 1}/${blocks.length} failed to parse: ${message}`
       );
     }
-  });
+  }
+
+  console.log(
+    `GROQ NORMALIZER (non-AI): ${records.length} record(s)`
+  );
 
   return {
     records,
     errors: errors.length ? errors : undefined,
-    normalizedText: JSON.stringify(
-      {
-        records,
-      },
-      null,
-      2
-    ),
+    normalizedText: JSON.stringify({ records }, null, 2),
   };
 }
