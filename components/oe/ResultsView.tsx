@@ -1320,11 +1320,14 @@ export default function ResultsView({
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
   const [suggestionLoading, setSuggestionLoading] = useState<Record<string, boolean>>({});
 
+  const isFetchingRef = useState<boolean>(false)[0];
+  const fetchingRef = useState<{ inFlight: boolean }>({ inFlight: false })[0];
+
   // =========================================================
   // LOAD RESULTS
   // =========================================================
 
-  const loadResults = async (showRefresh = false) => {
+  const loadResults = async (showRefresh = false, silent = false) => {
     const name = String(memberName || "").trim();
 
     if (!name) {
@@ -1337,14 +1340,18 @@ export default function ResultsView({
       return;
     }
 
-    try {
-      if (showRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+    if (fetchingRef.inFlight) return;
+    fetchingRef.inFlight = true;
 
-      setMessage("");
+    try {
+      if (!silent) {
+        if (showRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+        setMessage("");
+      }
 
       // IMPORTANT:
       // Backend action is getMyResults
@@ -1352,80 +1359,77 @@ export default function ResultsView({
 
       const response = await api<any>("getMyResults", {
         memberName: name,
+        _t: Date.now(),
       });
 
-      // const data = Array.isArray(response)
-      //   ? response
-      //   : response?.results ||
-      //     response?.data ||
-      //     [];
-
-      // setResults(Array.isArray(data) ? data : []);
       const data = Array.isArray(response)
-  ? response
-  : response?.results ||
-    response?.data ||
-    [];
+        ? response
+        : response?.results ||
+          response?.data ||
+          [];
 
-const normalizedResults: OERecord[] = (
-  Array.isArray(data) ? data : []
-).map((item: any) => {
-  const candidates = [
-    item.questionText,
-    item.question,
-    item.actualQuestion,
-    item.questionTitle,
-  ];
+      const normalizedResults: OERecord[] = (
+        Array.isArray(data) ? data : []
+      ).map((item: any) => {
+        const candidates = [
+          item.questionText,
+          item.question,
+          item.actualQuestion,
+          item.questionTitle,
+        ];
 
-  let questionText = "";
+        let questionText = "";
 
-  for (const value of candidates) {
-    const text = String(value ?? "").trim();
+        for (const value of candidates) {
+          const text = String(value ?? "").trim();
 
-    if (
-      text &&
-      !/^Q\s*\d+[A-Z]?$/i.test(text)
-    ) {
-      questionText = text;
-      break;
-    }
-  }
+          if (
+            text &&
+            !/^Q\s*\d+[A-Z]?$/i.test(text)
+          ) {
+            questionText = text;
+            break;
+          }
+        }
 
-  // Legacy records where Column E contains
-  // the complete question instead of Q1/Q2.
-  if (
-    !questionText &&
-    item.qNumber &&
-    !/^Q\s*\d+[A-Z]?$/i.test(
-      String(item.qNumber).trim()
-    )
-  ) {
-    questionText = String(item.qNumber).trim();
-  }
+        // Legacy records where Column E contains
+        // the complete question instead of Q1/Q2.
+        if (
+          !questionText &&
+          item.qNumber &&
+          !/^Q\s*\d+[A-Z]?$/i.test(
+            String(item.qNumber).trim()
+          )
+        ) {
+          questionText = String(item.qNumber).trim();
+        }
 
-  return {
-    ...item,
+        return {
+          ...item,
 
-    qNumber: String(item.qNumber || "").trim(),
+          qNumber: String(item.qNumber || "").trim(),
 
-    // Keep all aliases so the UI/DQA logic can use them
-    questionText,
-    question: questionText,
-    actualQuestion: questionText,
-  };
-});
+          // Keep all aliases so the UI/DQA logic can use them
+          questionText,
+          question: questionText,
+          actualQuestion: questionText,
+        };
+      });
 
-setResults(normalizedResults);
+      setResults(normalizedResults);
+      if (silent) setMessage("");
     } catch (error: any) {
       console.error("getMyResults error:", error);
 
-      setMessage(
-        error?.message ||
-          "Unable to load your OE results."
-      );
-
-      setResults([]);
+      if (!silent) {
+        setMessage(
+          error?.message ||
+            "Unable to load your OE results."
+        );
+        setResults([]);
+      }
     } finally {
+      fetchingRef.inFlight = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -1434,6 +1438,34 @@ setResults(normalizedResults);
   useEffect(() => {
     if (memberName?.trim()) {
       loadResults();
+
+      // Auto-poll results every 5 seconds so employee immediately sees status updates
+      const pollInterval = setInterval(() => {
+        loadResults(false, true);
+      }, 5000);
+
+      const handleOeSubmitted = () => {
+        loadResults(true, false);
+      };
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          loadResults(false, true);
+        }
+      };
+
+      if (typeof window !== "undefined") {
+        window.addEventListener("oe_submitted", handleOeSubmitted);
+        window.addEventListener("visibilitychange", handleVisibilityChange);
+      }
+
+      return () => {
+        clearInterval(pollInterval);
+        if (typeof window !== "undefined") {
+          window.removeEventListener("oe_submitted", handleOeSubmitted);
+          window.removeEventListener("visibilitychange", handleVisibilityChange);
+        }
+      };
     } else {
       setLoading(false);
     }

@@ -147,6 +147,41 @@ export async function GET(req: NextRequest) {
     // AGGREGATE SURVEY DATA BY USER + DAY
     // --------------------------------------------------
 
+    const countExpression = {
+      $let: {
+        vars: {
+          raw: {
+            $ifNull: [
+              "$data.Counts",
+              {
+                $ifNull: [
+                  "$data.counts",
+                  { $ifNull: ["$counts", "1"] },
+                ],
+              },
+            ],
+          },
+        },
+        in: {
+          $let: {
+            vars: {
+              parsed: {
+                $convert: {
+                  input: "$$raw",
+                  to: "int",
+                  onError: 1,
+                  onNull: 1,
+                },
+              },
+            },
+            in: {
+              $cond: [{ $gt: ["$$parsed", 0] }, "$$parsed", 1],
+            },
+          },
+        },
+      },
+    };
+
     const stats =
       await SurveyData.aggregate([
         {
@@ -177,7 +212,7 @@ export async function GET(req: NextRequest) {
             },
 
             totalSubmit: {
-              $sum: 1,
+              $sum: countExpression,
             },
           },
         },

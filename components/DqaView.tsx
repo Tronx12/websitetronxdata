@@ -1695,6 +1695,7 @@ export default function DqaView() {
         // temporary/failed background response.
         if (silent && oes.length === 0 && itemsRef.current.length > 0) {
           setLoaded(true);
+          refreshInFlightRef.current = false;
           return;
         }
 
@@ -1786,7 +1787,7 @@ export default function DqaView() {
       load(true);
     };
 
-    const t = setInterval(refresh, 2000);
+    const t = setInterval(refresh, 4000);
     return () => clearInterval(t);
   }, [loaded, load]);
 
@@ -1954,6 +1955,21 @@ export default function DqaView() {
 
     setLoading(true);
 
+    const now = new Date().toISOString();
+    const updatedItems = itemsRef.current.map((item) =>
+      item.rowIndex === oe.rowIndex
+        ? {
+            ...item,
+            status: "APPROVED",
+            approvedBy: dqaName.trim(),
+            approvedTime: now,
+            dqaCorrection: correction.trim() || item.dqaCorrection,
+          }
+        : item
+    );
+    itemsRef.current = updatedItems;
+    setItems(updatedItems);
+
     try {
 
       await api("approveOE", {
@@ -1968,11 +1984,13 @@ export default function DqaView() {
 
       showToast("✅ OE approved successfully!");
 
-      await load();
+      setTimeout(() => load(true), 600);
 
     } catch (e: any) {
 
       setError(e?.message || "Failed to approve.");
+
+      await load(false);
 
     } finally {
 
@@ -1990,11 +2008,33 @@ export default function DqaView() {
 
     setLoading(true);
 
+    const now = new Date().toISOString();
+    const targetOE = reject;
+    const updatedItems = itemsRef.current.map((item) =>
+      item.rowIndex === targetOE.rowIndex
+        ? {
+            ...item,
+            status: "REJECTED",
+            approvedBy: dqaName.trim(),
+            approvedTime: now,
+            rejectReason: r.trim(),
+          }
+        : item
+    );
+    itemsRef.current = updatedItems;
+    setItems(updatedItems);
+
+    setReject(null);
+
+    setReason("");
+
+    setCustomReason("");
+
     try {
 
       await api("rejectOE", {
 
-        rowIndex: reject.rowIndex,
+        rowIndex: targetOE.rowIndex,
 
         dqaName: dqaName.trim(),
 
@@ -2002,19 +2042,15 @@ export default function DqaView() {
 
       });
 
-      setReject(null);
-
-      setReason("");
-
-      setCustomReason("");
-
       showToast("❌ OE rejected — reason sent to employee");
 
-      await load();
+      setTimeout(() => load(true), 600);
 
     } catch (e: any) {
 
       setError(e?.message || "Failed to reject.");
+
+      await load(false);
 
     } finally {
 
@@ -2032,17 +2068,34 @@ export default function DqaView() {
 
     setLoading(true);
 
+    const updatedItems = itemsRef.current.map((item) =>
+      item.rowIndex === oe.rowIndex
+        ? {
+            ...item,
+            status: "PENDING",
+            approvedBy: "",
+            approvedTime: "",
+            rejectReason: "",
+            dqaCorrection: "",
+          }
+        : item
+    );
+    itemsRef.current = updatedItems;
+    setItems(updatedItems);
+
     try {
 
       await api("recallOE", { rowIndex: oe.rowIndex });
 
       showToast("↩️ Recalled — OE is back to PENDING");
 
-      await load();
+      setTimeout(() => load(true), 600);
 
     } catch (e: any) {
 
       setError(e?.message || "Failed to recall.");
+
+      await load(false);
 
     } finally {
 

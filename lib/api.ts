@@ -73,7 +73,7 @@ export async function api<T = any>(
   action: ApiAction | string,
   data?: Record<string, any>
 ): Promise<T> {
-  const res = await fetch("/api/apps-script", {
+  const res = await fetch(`/api/apps-script?t=${Date.now()}`, {
     method: "POST",
 
     // IMPORTANT:

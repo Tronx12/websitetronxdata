@@ -2708,15 +2708,71 @@ export async function GET(req: NextRequest) {
 
     console.log("Final survey filter:", JSON.stringify(filter, null, 2));
 
-    const [items, total] = await Promise.all([
+    // const [items, total] = await Promise.all([
+    //   SurveyData.find(filter)
+    //     .sort({ [sortBy]: sortOrder })
+    //     .skip(skip)
+    //     .limit(limit)
+    //     .lean(),
+
+    //   SurveyData.countDocuments(filter),
+    // ]);
+
+
+        const [items, countAgg] = await Promise.all([
       SurveyData.find(filter)
         .sort({ [sortBy]: sortOrder })
         .skip(skip)
         .limit(limit)
         .lean(),
 
-      SurveyData.countDocuments(filter),
+      SurveyData.aggregate([
+        { $match: filter },
+        {
+          $addFields: {
+            _countNum: {
+              $let: {
+                vars: {
+                  raw: {
+                    $ifNull: [
+                      "$data.Counts",
+                      {
+                        $ifNull: [
+                          "$data.counts",
+                          { $ifNull: ["$counts", "1"] },
+                        ],
+                      },
+                    ],
+                  },
+                },
+                in: {
+                  $convert: {
+                    input: "$$raw",
+                    to: "int",
+                    onError: 1,
+                    onNull: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            totalCounts: {
+              $sum: {
+                $cond: [{ $gt: ["$_countNum", 0] }, "$_countNum", 1],
+              },
+            },
+          },
+        },
+      ]),
     ]);
+
+    const total = countAgg[0]?.total ?? 0;
+    const totalCounts = countAgg[0]?.totalCounts ?? total;
 
     /* ==================================================
        RESPONSE
@@ -2732,12 +2788,20 @@ export async function GET(req: NextRequest) {
 
       data,
 
-      pagination: {
+            pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total,           // number of saved rows
+        totalCounts,     // sum of Counts field (what the UI should show)
+        totalPages: Math.ceil(total / limit) || 1,
       },
+
+      // pagination: {
+      //   page,
+      //   limit,
+      //   total,
+      //   totalPages: Math.ceil(total / limit),
+      // },
     });
   } catch (error: any) {
     console.error("Survey GET error:", error);

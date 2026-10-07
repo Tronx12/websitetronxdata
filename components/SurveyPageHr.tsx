@@ -1186,7 +1186,7 @@ export default function SurveyPageHr({
             name: person.name,
             email: person.email,
             role: person.role,
-            totalRecords: json.pagination?.total || 0,
+            totalRecords: json.pagination?.totalCounts ?? json.pagination?.total ?? 0,
             lastSubmitted: json.data?.[0]?.createdAt,
           });
         }

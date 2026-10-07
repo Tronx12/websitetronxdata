@@ -169,6 +169,29 @@ export async function GET(req: NextRequest) {
 
     const safeSearch = escapeRegex(search);
 
+    const countExpression = {
+      $let: {
+        vars: {
+          raw: {
+            $ifNull: [
+              "$data.Counts",
+              { $ifNull: ["$data.counts", { $ifNull: ["$counts", "1"] }] },
+            ],
+          },
+        },
+        in: {
+          $let: {
+            vars: {
+              parsed: {
+                $convert: { input: "$$raw", to: "int", onError: 1, onNull: 1 },
+              },
+            },
+            in: { $cond: [{ $gt: ["$$parsed", 0] }, "$$parsed", 1] },
+          },
+        },
+      },
+    };
+
     const pipeline: any[] = [
       /**
        * Group survey records by creator.
@@ -181,7 +204,7 @@ export async function GET(req: NextRequest) {
           _id: "$createdBy",
 
           totalRecords: {
-            $sum: 1,
+            $sum: countExpression,
           },
 
           lastSubmitted: {

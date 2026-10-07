@@ -2153,6 +2153,50 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
     return new Date(n.getFullYear(), n.getMonth(), 1);
   });
 
+  // const fetchCategoryCounts = useCallback(async () => {
+  //   try {
+  //     const categories = ["B2B", "B2H", "B2C"] as const;
+
+  //     const results = await Promise.all(
+  //       categories.map(async (category) => {
+  //         const params = new URLSearchParams({
+  //           page: "1",
+  //           limit: "1",
+  //           sortBy: "createdAt",
+  //           sortOrder: "desc",
+  //           createdBy: userId,
+  //           category,
+  //         });
+
+  //         if (search.trim()) {
+  //           params.set("search", search.trim());
+  //         }
+
+  //         const res = await fetch(`/api/survey?${params.toString()}`);
+
+  //         if (!res.ok) {
+  //           throw new Error(`Failed to fetch ${category} count`);
+  //         }
+
+  //         const json = await res.json();
+
+  //         return {
+  //           category,
+  //           count: json.success ? json.pagination?.total || 0 : 0,
+  //         };
+  //       })
+  //     );
+
+  //     setCategoryCounts({
+  //       B2B: results.find((r) => r.category === "B2B")?.count || 0,
+  //       B2H: results.find((r) => r.category === "B2H")?.count || 0,
+  //       B2C: results.find((r) => r.category === "B2C")?.count || 0,
+  //     });
+  //   } catch (error) {
+  //     console.error("Failed to fetch category counts:", error);
+  //   }
+  // }, [userId, search]);
+
   const fetchCategoryCounts = useCallback(async () => {
     try {
       const categories = ["B2B", "B2H", "B2C"] as const;
@@ -2180,9 +2224,16 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
 
           const json = await res.json();
 
+          // Use sum of Counts field; fall back to row count
+          const count = json.success
+            ? (json.pagination?.totalCounts ??
+               json.pagination?.total ??
+               0)
+            : 0;
+
           return {
             category,
-            count: json.success ? json.pagination?.total || 0 : 0,
+            count,
           };
         })
       );

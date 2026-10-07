@@ -174,6 +174,14 @@ export default function SubmitView({
         }`
       );
 
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("oe_submitted", {
+            detail: { memberName: name },
+          })
+        );
+      }
+
       // Reset response-specific fields.
       setOe("");
       setQuality(null);

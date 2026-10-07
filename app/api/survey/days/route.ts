@@ -47,6 +47,41 @@ export async function GET(req: NextRequest) {
       ];
     }
 
+    const countExpression = {
+      $let: {
+        vars: {
+          raw: {
+            $ifNull: [
+              "$data.Counts",
+              {
+                $ifNull: [
+                  "$data.counts",
+                  { $ifNull: ["$counts", "1"] },
+                ],
+              },
+            ],
+          },
+        },
+        in: {
+          $let: {
+            vars: {
+              parsed: {
+                $convert: {
+                  input: "$$raw",
+                  to: "int",
+                  onError: 1,
+                  onNull: 1,
+                },
+              },
+            },
+            in: {
+              $cond: [{ $gt: ["$$parsed", 0] }, "$$parsed", 1],
+            },
+          },
+        },
+      },
+    };
+
     const data = await Survey.aggregate([
       { $match: match },
       {
@@ -58,7 +93,7 @@ export async function GET(req: NextRequest) {
               timezone,
             },
           },
-          count: { $sum: 1 },
+          count: { $sum: countExpression },
         },
       },
       { $sort: { _id: -1 } },

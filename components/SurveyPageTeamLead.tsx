@@ -136,6 +136,7 @@ export default function SurveyPageTeamLead({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [totalCounts, setTotalCounts] = useState(0);
   const [categoryCounts, setCategoryCounts] = useState({
     B2B: 0,
     B2H: 0,
@@ -278,7 +279,7 @@ export default function SurveyPageTeamLead({
 
           return {
             category,
-            count: json.success ? Number(json.pagination?.total) || 0 : 0,
+            count: json.success ? Number(json.pagination?.totalCounts ?? json.pagination?.total) || 0 : 0,
           };
         })
       );
@@ -333,8 +334,20 @@ export default function SurveyPageTeamLead({
       const pagination = json.pagination || {};
 
       setItems(Array.isArray(json.data) ? json.data : []);
-      setTotal(Number(pagination.total) || 0);
-      setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
+
+// Number of saved survey rows
+setTotal(Number(pagination.total) || 0);
+
+// SUM of Counts field
+setTotalCounts(Number(pagination.totalCounts) || 0);
+
+setTotalPages(
+  Math.max(1, Number(pagination.totalPages) || 1)
+);
+
+      // setItems(Array.isArray(json.data) ? json.data : []);
+      // setTotal(Number(pagination.total) || 0);
+      // setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
     } catch (err) {
       if (requestId !== dataRequestId.current) return;
 
@@ -1243,8 +1256,13 @@ export default function SurveyPageTeamLead({
 
         {/* Category tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto">
-          {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => {
-            const count = tab === "ALL" ? total : categoryCounts[tab];
+          {/* {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => {
+            const count = tab === "ALL" ? total : categoryCounts[tab]; */}
+            {(["ALL", "B2B", "B2H", "B2C"] as const).map((tab) => {
+  const count =
+    tab === "ALL"
+      ? totalCounts
+      : categoryCounts[tab];
 
             return (
               <button
