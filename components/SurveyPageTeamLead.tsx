@@ -121,6 +121,8 @@ export default function SurveyPageTeamLead({
   const [exporting, setExporting] = useState(false);
   const todayKey = useMemo(() => getBusinessTodayKey(), []);
   const [uploadDate, setUploadDate] = useState(""); // "" = today (default)
+  const [dateFrom, setDateFrom] = useState("");
+const [dateTo, setDateTo] = useState("");
   const [reportLoading, setReportLoading] = useState<"weekly" | "monthly" | null>(null);
 
   const [paste, setPaste] = useState("");
@@ -246,122 +248,272 @@ export default function SurveyPageTeamLead({
   );
 
   // ---------- Category counts ----------
+  // const fetchCategoryCounts = useCallback(async () => {
+  //   try {
+  //     const categories = ["B2B", "B2H", "B2C"] as const;
+
+  //     const results = await Promise.all(
+  //       categories.map(async (category) => {
+  //         const params = new URLSearchParams();
+  //         params.set("page", "1");
+  //         params.set("limit", "1");
+  //         params.set("sortBy", "createdAt");
+  //         params.set("sortOrder", "desc");
+  //         params.set("category", category);
+
+  //         applyScope(params);
+
+  //         const cleanSearch = search.trim();
+  //         if (cleanSearch) {
+  //           params.set("search", cleanSearch);
+  //         }
+
+  //         const res = await fetch(`/api/survey?${params.toString()}`, {
+  //           method: "GET",
+  //           cache: "no-store",
+  //         });
+
+  //         if (!res.ok) {
+  //           throw new Error(`Failed to fetch ${category} count`);
+  //         }
+
+  //         const json = await res.json();
+
+  //         return {
+  //           category,
+  //           count: json.success ? Number(json.pagination?.totalCounts ?? json.pagination?.total) || 0 : 0,
+  //         };
+  //       })
+  //     );
+
+  //     setCategoryCounts({
+  //       B2B: results.find((r) => r.category === "B2B")?.count || 0,
+  //       B2H: results.find((r) => r.category === "B2H")?.count || 0,
+  //       B2C: results.find((r) => r.category === "B2C")?.count || 0,
+  //     });
+  //   } catch (error) {
+  //     console.error("Failed to fetch category counts:", error);
+  //   }
+  // }, [applyScope, search]);
+
   const fetchCategoryCounts = useCallback(async () => {
-    try {
-      const categories = ["B2B", "B2H", "B2C"] as const;
+  try {
+    const categories = ["B2B", "B2H", "B2C"] as const;
 
-      const results = await Promise.all(
-        categories.map(async (category) => {
-          const params = new URLSearchParams();
-          params.set("page", "1");
-          params.set("limit", "1");
-          params.set("sortBy", "createdAt");
-          params.set("sortOrder", "desc");
-          params.set("category", category);
+    const results = await Promise.all(
+      categories.map(async (category) => {
+        const params = new URLSearchParams();
 
-          applyScope(params);
+        params.set("page", "1");
+        params.set("limit", "1");
+        params.set("sortBy", "createdAt");
+        params.set("sortOrder", "desc");
+        params.set("category", category);
 
-          const cleanSearch = search.trim();
-          if (cleanSearch) {
-            params.set("search", cleanSearch);
-          }
+        applyScope(params);
 
-          const res = await fetch(`/api/survey?${params.toString()}`, {
-            method: "GET",
-            cache: "no-store",
-          });
+        if (dateFrom) {
+          params.set("dateFrom", dateFrom);
+        }
 
-          if (!res.ok) {
-            throw new Error(`Failed to fetch ${category} count`);
-          }
+        if (dateTo) {
+          params.set("dateTo", dateTo);
+        }
 
-          const json = await res.json();
+        const cleanSearch = search.trim();
 
-          return {
-            category,
-            count: json.success ? Number(json.pagination?.totalCounts ?? json.pagination?.total) || 0 : 0,
-          };
-        })
-      );
+        if (cleanSearch) {
+          params.set("search", cleanSearch);
+        }
 
-      setCategoryCounts({
-        B2B: results.find((r) => r.category === "B2B")?.count || 0,
-        B2H: results.find((r) => r.category === "B2H")?.count || 0,
-        B2C: results.find((r) => r.category === "B2C")?.count || 0,
-      });
-    } catch (error) {
-      console.error("Failed to fetch category counts:", error);
-    }
-  }, [applyScope, search]);
+        const res = await fetch(`/api/survey?${params.toString()}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch ${category} count`);
+        }
+
+        const json = await res.json();
+
+        return {
+          category,
+          count: json.success
+            ? Number(
+                json.pagination?.totalCounts ??
+                  json.pagination?.total
+              ) || 0
+            : 0,
+        };
+      })
+    );
+
+    setCategoryCounts({
+      B2B: results.find((r) => r.category === "B2B")?.count || 0,
+      B2H: results.find((r) => r.category === "B2H")?.count || 0,
+      B2C: results.find((r) => r.category === "B2C")?.count || 0,
+    });
+  } catch (error) {
+    console.error("Failed to fetch category counts:", error);
+  }
+}, [applyScope, search, dateFrom, dateTo]);
 
   // ---------- Fetch records ----------
-  const fetchData = useCallback(async () => {
-    const requestId = ++dataRequestId.current;
+//   const fetchData = useCallback(async () => {
+//     const requestId = ++dataRequestId.current;
 
-    try {
-      setLoading(true);
+//     try {
+//       setLoading(true);
 
-      const params = new URLSearchParams();
-      params.set("page", String(page));
-      params.set("limit", "20");
-      params.set("sortBy", sortBy);
-      params.set("sortOrder", sortOrder);
+//       const params = new URLSearchParams();
+//       params.set("page", String(page));
+//       params.set("limit", "20");
+//       params.set("sortBy", sortBy);
+//       params.set("sortOrder", sortOrder);
 
-      applyScope(params);
+//       applyScope(params);
 
-      if (activeTab !== "ALL") {
-        params.set("category", activeTab);
-      }
+//       if (activeTab !== "ALL") {
+//         params.set("category", activeTab);
+//       }
 
-      const cleanSearch = search.trim();
-      if (cleanSearch) {
-        params.set("search", cleanSearch);
-      }
+//       const cleanSearch = search.trim();
+//       if (cleanSearch) {
+//         params.set("search", cleanSearch);
+//       }
 
-      const res = await fetch(`/api/survey?${params.toString()}`, {
-        method: "GET",
-        cache: "no-store",
-      });
+//       const res = await fetch(`/api/survey?${params.toString()}`, {
+//         method: "GET",
+//         cache: "no-store",
+//       });
 
-      const json = await res.json();
+//       const json = await res.json();
 
-      if (requestId !== dataRequestId.current) return;
+//       if (requestId !== dataRequestId.current) return;
 
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || "Failed to fetch survey data");
-      }
+//       if (!res.ok || !json.success) {
+//         throw new Error(json.message || "Failed to fetch survey data");
+//       }
 
-      const pagination = json.pagination || {};
+//       const pagination = json.pagination || {};
 
-      setItems(Array.isArray(json.data) ? json.data : []);
+//       setItems(Array.isArray(json.data) ? json.data : []);
 
-// Number of saved survey rows
-setTotal(Number(pagination.total) || 0);
+// // Number of saved survey rows
+// setTotal(Number(pagination.total) || 0);
 
-// SUM of Counts field
-setTotalCounts(Number(pagination.totalCounts) || 0);
+// // SUM of Counts field
+// setTotalCounts(Number(pagination.totalCounts) || 0);
 
-setTotalPages(
-  Math.max(1, Number(pagination.totalPages) || 1)
-);
+// setTotalPages(
+//   Math.max(1, Number(pagination.totalPages) || 1)
+// );
 
-      // setItems(Array.isArray(json.data) ? json.data : []);
-      // setTotal(Number(pagination.total) || 0);
-      // setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
-    } catch (err) {
-      if (requestId !== dataRequestId.current) return;
+//       // setItems(Array.isArray(json.data) ? json.data : []);
+//       // setTotal(Number(pagination.total) || 0);
+//       // setTotalPages(Math.max(1, Number(pagination.totalPages) || 1));
+//     } catch (err) {
+//       if (requestId !== dataRequestId.current) return;
 
-      console.error("Survey fetch error:", err);
-      setItems([]);
-      setTotalPages(1);
-      setTotal(0);
-    } finally {
-      if (requestId === dataRequestId.current) {
-        setLoading(false);
-        setSearchLoading(false);
-      }
+//       console.error("Survey fetch error:", err);
+//       setItems([]);
+//       setTotalPages(1);
+//       setTotal(0);
+//     } finally {
+//       if (requestId === dataRequestId.current) {
+//         setLoading(false);
+//         setSearchLoading(false);
+//       }
+//     }
+//   }, [applyScope, activeTab, page, sortBy, sortOrder, search]);
+
+const fetchData = useCallback(async () => {
+  const requestId = ++dataRequestId.current;
+
+  try {
+    setLoading(true);
+
+    const params = new URLSearchParams();
+
+    params.set("page", String(page));
+    params.set("limit", "20");
+    params.set("sortBy", sortBy);
+    params.set("sortOrder", sortOrder);
+
+    applyScope(params);
+
+    if (activeTab !== "ALL") {
+      params.set("category", activeTab);
     }
-  }, [applyScope, activeTab, page, sortBy, sortOrder, search]);
+
+    const cleanSearch = search.trim();
+
+    if (cleanSearch) {
+      params.set("search", cleanSearch);
+    }
+
+    // DATE-WISE FILTER
+    if (dateFrom) {
+      params.set("dateFrom", dateFrom);
+    }
+
+    if (dateTo) {
+      params.set("dateTo", dateTo);
+    }
+
+    const res = await fetch(`/api/survey?${params.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    const json = await res.json();
+
+    if (requestId !== dataRequestId.current) return;
+
+    if (!res.ok || !json.success) {
+      throw new Error(
+        json.message || "Failed to fetch survey data"
+      );
+    }
+
+    const pagination = json.pagination || {};
+
+    setItems(Array.isArray(json.data) ? json.data : []);
+
+    setTotal(Number(pagination.total) || 0);
+
+    // SUM OF COUNTS
+    setTotalCounts(Number(pagination.totalCounts) || 0);
+
+    setTotalPages(
+      Math.max(1, Number(pagination.totalPages) || 1)
+    );
+  } catch (err) {
+    if (requestId !== dataRequestId.current) return;
+
+    console.error("Survey fetch error:", err);
+
+    setItems([]);
+    setTotalPages(1);
+    setTotal(0);
+    setTotalCounts(0);
+  } finally {
+    if (requestId === dataRequestId.current) {
+      setLoading(false);
+      setSearchLoading(false);
+    }
+  }
+}, [
+  applyScope,
+  activeTab,
+  page,
+  sortBy,
+  sortOrder,
+  search,
+  dateFrom,
+  dateTo,
+]);
 
   // ---------- Fetch team members (scoped to this team lead only) ----------
   const fetchTeamMembers = useCallback(async () => {
@@ -573,6 +725,13 @@ setTotalPages(
     // IMPORTANT:
     // Use exactly the same scope currently displayed on screen.
     applyScope(params);
+    if (dateFrom) {
+  params.set("dateFrom", dateFrom);
+}
+
+if (dateTo) {
+  params.set("dateTo", dateTo);
+}
 
     // Current category filter
     if (activeTab !== "ALL") {
@@ -1290,6 +1449,72 @@ setTotalPages(
             );
           })}
         </div>
+
+        {/* DATE-WISE FILTER */}
+<div className="px-4 py-4 bg-gray-50 border-b border-gray-200">
+  <div className="flex flex-wrap items-end gap-3">
+
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">
+        From Date
+      </label>
+
+      <input
+        type="date"
+        value={dateFrom}
+        max={dateTo || todayKey}
+        onChange={(e) => {
+          setDateFrom(e.target.value);
+          setPage(1);
+        }}
+        className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+      />
+    </div>
+
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">
+        To Date
+      </label>
+
+      <input
+        type="date"
+        value={dateTo}
+        min={dateFrom || undefined}
+        max={todayKey}
+        onChange={(e) => {
+          setDateTo(e.target.value);
+          setPage(1);
+        }}
+        className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+      />
+    </div>
+
+    {(dateFrom || dateTo) && (
+      <button
+        type="button"
+        onClick={() => {
+          setDateFrom("");
+          setDateTo("");
+          setPage(1);
+        }}
+        className="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+      >
+        Clear Date
+      </button>
+    )}
+
+    <div className="text-xs text-gray-500 pb-2">
+      {dateFrom && dateTo
+        ? `Showing data from ${dateFrom} to ${dateTo}`
+        : dateFrom
+        ? `Showing data from ${dateFrom}`
+        : dateTo
+        ? `Showing data until ${dateTo}`
+        : "Showing all dates"}
+    </div>
+
+  </div>
+</div>
 
         {/* Search + Sort */}
         <div className="p-4 flex flex-col sm:flex-row gap-3 border-b border-gray-100">
