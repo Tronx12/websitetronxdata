@@ -60,6 +60,6 @@ export function getRealtimeUrl() {
 
   return (
     process.env.NEXT_PUBLIC_DQA_WS_URL ||
-    "ws://localhost:4001"
+    "https://oe-websocket.onrender.com"
   );
 }

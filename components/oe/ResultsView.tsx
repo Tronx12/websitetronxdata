@@ -94,7 +94,7 @@ export default function ResultsView({
     try {
       const url =
         process.env.NEXT_PUBLIC_DQA_WS_URL ||
-        "ws://localhost:4001";
+        "https://oe-websocket.onrender.com";
 
       ws = new WebSocket(url);
 
