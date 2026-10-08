@@ -62,9 +62,9 @@ export default async function OEResultsPage() {
   // =====================================================
   return (
   <main className="min-h-screen bg-slate-50 p-4 md:p-6">
-    <div className="mx-auto w-full bg-red-500 max-w-3xl">
+    <div className="mx-auto w-full max-w-3xl">
 
-      <div className="mb-5 bg-red-500">
+      <div className="mb-5 flex justify-center flex-col">
         <h4 className="text-2xl font-bold text-slate-800">
           My Results
         </h4>
@@ -86,7 +86,7 @@ export default async function OEResultsPage() {
   //   <main className="min-h-screen bg-slate-50 p-4 md:p-6">
   //     <div className="mx-auto w-full max-w-7xl">
 
-  //       <div className="mb-5 ">
+  //       <div className="mb-5">
   //         <h4 className="text-2xl font-bold text-slate-800">
   //           My Results
   //         </h4>

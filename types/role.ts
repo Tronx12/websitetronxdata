@@ -142,6 +142,18 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: "BarChart3",
     roles: ["team-lead"],
   },
+    {
+    label: "OE Submit Panel",
+    path: "/team-lead/oe",
+    icon: "Send",
+    roles: ["team-lead"],
+  },
+  {
+    label: "OE Result Panel",
+    path: "/team-lead/oe/results",
+    icon: "Trophy",
+    roles: ["team-lead"],
+  },
   {
     label: "OE DQA Panel",
     path: "/team-lead/oe/dqa",
