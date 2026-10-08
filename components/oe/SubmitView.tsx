@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo,useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -28,6 +28,68 @@ export default function SubmitView({
   // =========================================================
 
   const name = memberName.trim();
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+  if (!name) return;
+
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+
+  const connect = () => {
+    if (stopped) return;
+
+    try {
+      const url =
+        process.env.NEXT_PUBLIC_DQA_WS_URL ||
+        "ws://localhost:4001";
+
+      ws = new WebSocket(url);
+
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("Submit realtime connected");
+
+        ws?.send(
+          JSON.stringify({
+            type: "identify",
+            role: "employee",
+            memberName: name,
+          })
+        );
+      };
+
+      ws.onclose = () => {
+        if (!stopped) {
+          reconnectTimer = setTimeout(connect, 2000);
+        }
+      };
+
+      ws.onerror = () => {
+        ws?.close();
+      };
+    } catch (error) {
+      console.error("Submit websocket error:", error);
+
+      reconnectTimer = setTimeout(connect, 2000);
+    }
+  };
+
+  connect();
+
+  return () => {
+    stopped = true;
+
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+    }
+
+    ws?.close();
+    wsRef.current = null;
+  };
+}, [name]);
 
   // =========================================================
   // STATE
@@ -167,6 +229,19 @@ export default function SubmitView({
         imageUrl,
         qualityResult: quality,
       });
+
+      const submittedAt = new Date().toISOString();
+
+wsRef.current?.send(
+  JSON.stringify({
+    type: "oe-submitted",
+    oeId: result?.id || "",
+    memberName: name,
+    pid: pid.trim(),
+    qNumber: qNo,
+    timestamp: submittedAt,
+  })
+);
 
       setMessage(
         `Submitted successfully${

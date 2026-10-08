@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo,   useRef,useState } from "react";
 import {
   CheckCircle2,
   Clock3,
@@ -62,6 +62,7 @@ export default function ResultsView({
   const [results, setResults] = useState<OERecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] =
@@ -77,6 +78,102 @@ export default function ResultsView({
   // AI human-style suggestions
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
   const [suggestionLoading, setSuggestionLoading] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+  const name = String(memberName || "").trim();
+
+  if (!name) return;
+
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+
+  const connect = () => {
+    if (stopped) return;
+
+    try {
+      const url =
+        process.env.NEXT_PUBLIC_DQA_WS_URL ||
+        "ws://localhost:4001";
+
+      ws = new WebSocket(url);
+
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("Result realtime connected");
+
+        ws?.send(
+          JSON.stringify({
+            type: "identify",
+            role: "employee",
+            memberName: name,
+          })
+        );
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+
+          if (
+            message.type === "oe-submitted" ||
+            message.type === "oe-status-changed" ||
+            message.type === "result-updated"
+          ) {
+            const eventMember =
+              String(message.memberName || "").trim().toLowerCase();
+
+            const currentMember = name.toLowerCase();
+
+            if (
+              !eventMember ||
+              eventMember === currentMember
+            ) {
+              // Immediately reload.
+              loadResults(false, true);
+            }
+          }
+        } catch (error) {
+          console.error(
+            "Result websocket message error:",
+            error
+          );
+        }
+      };
+
+      ws.onclose = () => {
+        if (!stopped) {
+          reconnectTimer = setTimeout(connect, 2000);
+        }
+      };
+
+      ws.onerror = () => {
+        ws?.close();
+      };
+    } catch (error) {
+      console.error(
+        "Result websocket connection error:",
+        error
+      );
+
+      reconnectTimer = setTimeout(connect, 2000);
+    }
+  };
+
+  connect();
+
+  return () => {
+    stopped = true;
+
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+    }
+
+    ws?.close();
+    wsRef.current = null;
+  };
+}, [memberName]);
 
   const isFetchingRef = useState<boolean>(false)[0];
   const fetchingRef = useState<{ inFlight: boolean }>({ inFlight: false })[0];

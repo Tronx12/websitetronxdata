@@ -1,7 +1,5 @@
 "use client";
 
-
-
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 import {
@@ -20,7 +18,7 @@ import {
 
   X,
 
-  Eye,
+  // Eye,
 
   Image as ImageIcon,
 
@@ -35,8 +33,6 @@ import {
 import { api } from "@/lib/api";
 
 import { StatusBadge } from "./StatusBadge";
-
-
 
 type OE = {
 
@@ -86,9 +82,11 @@ type OE = {
 
   oldOEId?: string;
 
+  dqaLockedBy?: string;
+
+dqaLockedAt?: string;
+
 };
-
-
 
 const PREDEFINED_REASONS = [
 
@@ -101,8 +99,6 @@ const PREDEFINED_REASONS = [
   "📋 Same topic already used by another person",
 
 ];
-
-
 
 export default function DqaView() {
 
@@ -150,14 +146,35 @@ export default function DqaView() {
 
   const lastPendingCount = useRef(-1);
 
-
   // Keeps visible data stable during background refresh.
 
   const refreshInFlightRef = useRef(false);
 
   const itemsRef = useRef<OE[]>([]);
 
+const wsRef = useRef<WebSocket | null>(null);
 
+const [wsConnected, setWsConnected] =
+
+  useState(false);
+
+const [oeLocks, setOeLocks] = useState<
+
+  Record<
+
+    string,
+
+    {
+
+      dqaName: string;
+
+      startedAt: string;
+
+    }
+
+  >
+
+>({});
 
   // ── helpers ──────────────────────────────────────────────
 
@@ -169,8 +186,6 @@ export default function DqaView() {
 
   };
 
-
-
   const parseTS = (ts?: string) => {
 
     if (!ts) return null;
@@ -180,9 +195,10 @@ export default function DqaView() {
     if (!isNaN(d.getTime())) return d;
 
     const m = String(ts).match(
+
       /^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2}):(\d{2})/
 
-      // /^(\d{1,2})**\/**(\d{1,2})**\/**(\d{4})[,\s]+(\d{1,2}):(\d{2}):(\d{2})/
+      // /^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2}):(\d{2})/
 
     );
 
@@ -197,8 +213,6 @@ export default function DqaView() {
     return null;
 
   };
-
-
 
   const formatTS = (ts?: string) => {
 
@@ -244,8 +258,6 @@ export default function DqaView() {
 
   };
 
-
-
   const waitingTime = (ts?: string) => {
 
     const d = parseTS(ts);
@@ -272,8 +284,6 @@ export default function DqaView() {
 
   };
 
-
-
   const waitClass = (ts?: string) => {
 
     const d = parseTS(ts);
@@ -289,8 +299,6 @@ export default function DqaView() {
     return "ok";
 
   };
-
-
 
   const priorityTag = (ts?: string) => {
 
@@ -336,8 +344,6 @@ export default function DqaView() {
 
   };
 
-
-
   const getQuestionText = (oe: OE) => {
 
     // New rows store the real question in Column T.
@@ -356,13 +362,9 @@ export default function DqaView() {
 
     ];
 
-
-
     for (const value of candidates) {
 
       const text = String(value ?? "").trim();
-
-
 
       // Q1/Q2/etc. are question numbers, not question text.
 
@@ -374,8 +376,6 @@ export default function DqaView() {
 
     }
 
-
-
     // Old rows created before Column T was added only have Q1 in Column E.
 
     // Q1's actual text is known from the existing survey question source.
@@ -386,13 +386,9 @@ export default function DqaView() {
 
     };
 
-
-
     return legacyQuestions[String(oe.qNumber || "").trim().toUpperCase()] || "";
 
   };
-
-
 
   const wcBadge = (cc: number) => {
 
@@ -409,8 +405,6 @@ export default function DqaView() {
     );
 
   };
-
-
 
   const sameStartAlert = (memberName: string, currentOE: string) => {
 
@@ -466,197 +460,277 @@ export default function DqaView() {
 
   };
 
-
-
   // ── load ─────────────────────────────────────────────────
 
-  // const load = useCallback(
-  //   async (silent = false) => {
-  //     if (!dqaName.trim()) {
-  //       setError("Please enter your DQA name.");
-  //       return;
-  //     }
+// const load = useCallback(
+//   async (silent = false, force = false) => {
+//     if (!dqaName.trim()) {
+//       setError("Please enter your DQA name.");
+//       return;
+//     }
 
-  //     // Prevent overlapping background refresh requests.
-  //     if (refreshInFlightRef.current) return;
-  //     refreshInFlightRef.current = true;
+//     // NEVER allow overlapping requests.
+//     // Even force/manual refresh should wait for the current request.
+//     if (refreshInFlightRef.current) {
+//       return;
+//     }
 
-  //     if (!silent) setLoading(true);
-  //     setError("");
+//     refreshInFlightRef.current = true;
 
-  //     try {
-  //       const d = await api<any>("getDQAData");
+//     // Only show loading UI for the initial/manual load.
+//     if (!silent) {
+//       setLoading(true);
+//     }
 
-  //       let oes: any[] = [];
-  //       if (Array.isArray(d)) oes = d;
-  //       else if (Array.isArray(d?.oes)) oes = d.oes;
-  //       else if (Array.isArray(d?.pendingOEs)) oes = d.pendingOEs;
-  //       else if (Array.isArray(d?.data)) oes = d.data;
-  //       else if (Array.isArray(d?.data?.oes)) oes = d.data.oes;
+//     setError("");
 
-  //       // Never flash the already-loaded DQA panel to empty during a
-  //       // temporary/failed background response.
-  //       if (silent && oes.length === 0 && itemsRef.current.length > 0) {
-  //         setLoaded(true);
-  //         refreshInFlightRef.current = false;
-  //         return;
-  //       }
+//     try {
+//       const d = await api<any>("getDQAData");
 
-  //       const nextItems = oes as OE[];
+//       let oes: any[] = [];
 
-  //       // Compare all fields that can affect the displayed DQA card.
-  //       const getSignature = (list: OE[]) =>
-  //         list
-  //           .map((o) =>
-  //             [
-  //               o.id ?? "",
-  //               o.rowIndex ?? "",
-  //               o.memberName ?? "",
-  //               o.pid ?? "",
-  //               o.qNumber ?? "",
-  //               o.question ?? "",
-  //               o.questionText ?? "",
-  //               o.questionTitle ?? "",
-  //               o.actualQuestion ?? "",
-  //               o.oeResponse ?? "",
-  //               o.status ?? "",
-  //               o.aiScore ?? "",
-  //               o.aiReason ?? "",
-  //               o.relScore ?? "",
-  //               o.relReason ?? "",
-  //               o.imageUrl ?? "",
-  //               o.dqaCorrection ?? "",
-  //               o.rejectReason ?? "",
-  //               o.dqaViewedTime ?? "",
-  //               o.timestamp ?? "",
-  //               o.approvedBy ?? "",
-  //               o.approvedTime ?? "",
-  //               o.oldOEId ?? "",
-  //             ].join("¦")
-  //           )
-  //           .sort()
-  //           .join("¶");
+//       if (Array.isArray(d)) {
+//         oes = d;
+//       } else if (Array.isArray(d?.oes)) {
+//         oes = d.oes;
+//       } else if (Array.isArray(d?.pendingOEs)) {
+//         oes = d.pendingOEs;
+//       } else if (Array.isArray(d?.data)) {
+//         oes = d.data;
+//       } else if (Array.isArray(d?.data?.oes)) {
+//         oes = d.data.oes;
+//       }
 
-  //       const previousSignature = getSignature(itemsRef.current);
-  //       const nextSignature = getSignature(nextItems);
+//       const nextItems = oes as OE[];
 
-  //       if (previousSignature !== nextSignature) {
-  //         itemsRef.current = nextItems;
-  //         setItems(nextItems);
-  //       }
+//       /*
+//        * IMPORTANT:
+//        *
+//        * Keep the current OE list visible while background
+//        * refresh is happening.
+//        *
+//        * If API returns an empty list during a SILENT refresh,
+//        * don't destroy the currently displayed data.
+//        */
+//       if (nextItems.length === 0 && itemsRef.current.length > 0) {
+//         if (force) {
+//           // Manual refresh explicitly accepts the API result.
+//           itemsRef.current = [];
+//           setItems([]);
+//         }
 
-  //       // Keep existing stats unless the response contains valid stats.
-  //       if (d?.stats && typeof d.stats === "object") {
-  //         setStats(d.stats);
-  //       }
+//         // Silent refresh: keep current data.
+//       } else {
+//         const getSignature = (list: OE[]) =>
+//           list
+//             .map((o) =>
+//               [
+//                 o.id ?? "",
+//                 o.rowIndex ?? "",
+//                 o.memberName ?? "",
+//                 o.pid ?? "",
+//                 o.qNumber ?? "",
+//                 o.question ?? "",
+//                 o.questionText ?? "",
+//                 o.questionTitle ?? "",
+//                 o.actualQuestion ?? "",
+//                 o.oeResponse ?? "",
+//                 o.status ?? "",
+//                 o.aiScore ?? "",
+//                 o.aiReason ?? "",
+//                 o.relScore ?? "",
+//                 o.relReason ?? "",
+//                 o.imageUrl ?? "",
+//                 o.dqaCorrection ?? "",
+//                 o.rejectReason ?? "",
+//                 o.dqaViewedTime ?? "",
+//                 o.timestamp ?? "",
+//                 o.approvedBy ?? "",
+//                 o.approvedTime ?? "",
+//                 o.oldOEId ?? "",
+//               ].join("¦")
+//             )
+//             .sort()
+//             .join("¶");
 
-  //       setLoaded(true);
+//         const previousSignature = getSignature(itemsRef.current);
+//         const nextSignature = getSignature(nextItems);
 
-  //       const pending = nextItems.filter(
-  //         (o) => o.status === "PENDING"
-  //       ).length;
+//         if (previousSignature !== nextSignature) {
+//           itemsRef.current = nextItems;
+//           setItems(nextItems);
+//         } else if (force) {
+//           // Manual refresh: sync state even if unchanged.
+//           itemsRef.current = nextItems;
+//           setItems(nextItems);
+//         }
+//       }
 
-  //       if (
-  //         lastPendingCount.current >= 0 &&
-  //         pending > lastPendingCount.current
-  //       ) {
-  //         const diff = pending - lastPendingCount.current;
-  //         showToast(
-  //           `🔔 ${diff} new OE${diff > 1 ? "s" : ""} received!`
-  //         );
-  //       }
+//       /*
+//        * Update stats independently.
+//        */
+//       if (d?.stats && typeof d.stats === "object") {
+//         setStats(d.stats);
+//       }
 
-  //       lastPendingCount.current = pending;
-  //     } catch (e: any) {
-  //       // Silent refresh failures do NOT clear the existing panel.
-  //       if (!silent) {
-  //         setError(e?.message || "Failed to load DQA data.");
-  //       }
-  //     } finally {
-  //       refreshInFlightRef.current = false;
-  //       if (!silent) setLoading(false);
-  //     }
-  //   },
-  //   [dqaName]
-  // );
+//       setLoaded(true);
 
-  const load = useCallback(
-  async (silent = false, force = false) => {
+//       /*
+//        * Calculate pending count from the NEW API response.
+//        */
+//       const pending = nextItems.filter(
+//         (o) => o.status === "PENDING"
+//       ).length;
+
+//       if (
+//         lastPendingCount.current >= 0 &&
+//         pending > lastPendingCount.current
+//       ) {
+//         const diff = pending - lastPendingCount.current;
+
+//         showToast(
+//           `🔔 ${diff} new OE${diff > 1 ? "s" : ""} received!`
+//         );
+//       }
+
+//       lastPendingCount.current = pending;
+
+//       /*
+//        * Only show toast for an actual manual refresh.
+//        */
+//       if (force) {
+//         showToast("🔄 DQA data refreshed");
+//       }
+//     } catch (e: any) {
+//       console.error("getDQAData failed:", e);
+
+//       /*
+//        * IMPORTANT:
+//        * Never clear existing OEs when API fails.
+//        */
+//       if (!silent || force) {
+//         setError(
+//           e?.message || "Failed to load DQA data."
+//         );
+//       }
+//     } finally {
+//       refreshInFlightRef.current = false;
+
+//       if (!silent) {
+//         setLoading(false);
+//       }
+//     }
+//   },
+//   [dqaName]
+// );
+
+const load = useCallback(
+  async (silent = false) => {
     if (!dqaName.trim()) {
       setError("Please enter your DQA name.");
       return;
     }
 
-    // Only block overlapping requests for automatic refresh.
-    if (!force && refreshInFlightRef.current) return;
+    // Never allow two getDQAData requests at the same time.
+    if (refreshInFlightRef.current) {
+      return;
+    }
 
     refreshInFlightRef.current = true;
 
-    if (!silent) setLoading(true);
+    // Only show the loader on the initial/manual load.
+    if (!silent) {
+      setLoading(true);
+    }
+
     setError("");
 
     try {
       const d = await api<any>("getDQAData");
 
-      let oes: any[] = [];
+      let oes: any[] | null = null;
 
-      if (Array.isArray(d)) oes = d;
-      else if (Array.isArray(d?.oes)) oes = d.oes;
-      else if (Array.isArray(d?.pendingOEs)) oes = d.pendingOEs;
-      else if (Array.isArray(d?.data)) oes = d.data;
-      else if (Array.isArray(d?.data?.oes)) oes = d.data.oes;
+      if (Array.isArray(d)) {
+        oes = d;
+      } else if (Array.isArray(d?.oes)) {
+        oes = d.oes;
+      } else if (Array.isArray(d?.pendingOEs)) {
+        oes = d.pendingOEs;
+      } else if (Array.isArray(d?.data)) {
+        oes = d.data;
+      } else if (Array.isArray(d?.data?.oes)) {
+        oes = d.data.oes;
+      }
 
       /*
        * IMPORTANT:
-       * Do not ignore an empty response during MANUAL refresh.
-       * The old code could make the refresh button appear broken.
+       * If the API response is not in a valid OE-array format,
+       * do NOT touch the currently displayed OEs.
        */
+      if (!Array.isArray(oes)) {
+        console.warn("getDQAData returned an invalid OE response:", d);
+        return;
+      }
+
       const nextItems = oes as OE[];
 
-      const getSignature = (list: OE[]) =>
-        list
-          .map((o) =>
-            [
-              o.id ?? "",
-              o.rowIndex ?? "",
-              o.memberName ?? "",
-              o.pid ?? "",
-              o.qNumber ?? "",
-              o.question ?? "",
-              o.questionText ?? "",
-              o.questionTitle ?? "",
-              o.actualQuestion ?? "",
-              o.oeResponse ?? "",
-              o.status ?? "",
-              o.aiScore ?? "",
-              o.aiReason ?? "",
-              o.relScore ?? "",
-              o.relReason ?? "",
-              o.imageUrl ?? "",
-              o.dqaCorrection ?? "",
-              o.rejectReason ?? "",
-              o.dqaViewedTime ?? "",
-              o.timestamp ?? "",
-              o.approvedBy ?? "",
-              o.approvedTime ?? "",
-              o.oldOEId ?? "",
-            ].join("¦")
-          )
-          .sort()
-          .join("¶");
+      /*
+       * IMPORTANT:
+       *
+       * Never clear existing OEs just because a background
+       * API request temporarily returns [].
+       *
+       * Existing data stays visible.
+       */
+      if (nextItems.length > 0) {
+        const getSignature = (list: OE[]) =>
+          list
+            .map((o) =>
+              [
+                o.id ?? "",
+                o.rowIndex ?? "",
+                o.memberName ?? "",
+                o.pid ?? "",
+                o.qNumber ?? "",
+                o.question ?? "",
+                o.questionText ?? "",
+                o.questionTitle ?? "",
+                o.actualQuestion ?? "",
+                o.oeResponse ?? "",
+                o.status ?? "",
+                o.aiScore ?? "",
+                o.aiReason ?? "",
+                o.relScore ?? "",
+                o.relReason ?? "",
+                o.imageUrl ?? "",
+                o.dqaCorrection ?? "",
+                o.rejectReason ?? "",
+                o.dqaViewedTime ?? "",
+                o.timestamp ?? "",
+                o.approvedBy ?? "",
+                o.approvedTime ?? "",
+                o.oldOEId ?? "",
+              ].join("¦")
+            )
+            .sort()
+            .join("¶");
 
-      const previousSignature = getSignature(itemsRef.current);
-      const nextSignature = getSignature(nextItems);
+        const previousSignature = getSignature(itemsRef.current);
+        const nextSignature = getSignature(nextItems);
 
-      if (previousSignature !== nextSignature) {
-        itemsRef.current = nextItems;
-        setItems(nextItems);
-      } else {
-        // Still make sure state is synced on manual refresh.
-        if (force) {
+        if (previousSignature !== nextSignature) {
           itemsRef.current = nextItems;
           setItems(nextItems);
         }
+      } else if (itemsRef.current.length === 0) {
+        /*
+         * Only show an empty list if there was no existing data.
+         *
+         * This prevents existing OEs from disappearing during
+         * a background refresh.
+         */
+        itemsRef.current = [];
+        setItems([]);
       }
 
       if (d?.stats && typeof d.stats === "object") {
@@ -665,7 +739,13 @@ export default function DqaView() {
 
       setLoaded(true);
 
-      const pending = nextItems.filter(
+      /*
+       * Use the displayed/current list for pending count.
+       */
+      const currentItems =
+        nextItems.length > 0 ? nextItems : itemsRef.current;
+
+      const pending = currentItems.filter(
         (o) => o.status === "PENDING"
       ).length;
 
@@ -681,19 +761,21 @@ export default function DqaView() {
       }
 
       lastPendingCount.current = pending;
-
-      // Show confirmation for manual refresh.
-      if (force) {
-        showToast("🔄 DQA data refreshed");
-      }
     } catch (e: any) {
-      if (!silent || force) {
-        setError(e?.message || "Failed to load DQA data.");
+      console.error("getDQAData failed:", e);
+
+      /*
+       * Keep existing OEs visible when refresh fails.
+       */
+      if (!silent) {
+        setError(
+          e?.message || "Failed to load DQA data."
+        );
       }
     } finally {
       refreshInFlightRef.current = false;
 
-      if (!silent || force) {
+      if (!silent) {
         setLoading(false);
       }
     }
@@ -701,33 +783,587 @@ export default function DqaView() {
   [dqaName]
 );
 
+//   const load = useCallback(
+
+//   async (silent = false, force = false) => {
+
+//     if (!dqaName.trim()) {
+
+//       setError("Please enter your DQA name.");
+
+//       return;
+
+//     }
+
+//     // Only block overlapping requests for automatic refresh.
+
+//     if (!force && refreshInFlightRef.current) return;
+
+//     refreshInFlightRef.current = true;
+
+//     if (!silent) setLoading(true);
+
+//     setError("");
+
+//     try {
+
+//       const d = await api<any>("getDQAData");
+
+//       let oes: any[] = [];
+
+//       if (Array.isArray(d)) oes = d;
+
+//       else if (Array.isArray(d?.oes)) oes = d.oes;
+
+//       else if (Array.isArray(d?.pendingOEs)) oes = d.pendingOEs;
+
+//       else if (Array.isArray(d?.data)) oes = d.data;
+
+//       else if (Array.isArray(d?.data?.oes)) oes = d.data.oes;
+
+//       /*
+
+//        * IMPORTANT:
+
+//        * Do not ignore an empty response during MANUAL refresh.
+
+//        * The old code could make the refresh button appear broken.
+
+//        */
+
+//       const nextItems = oes as OE[];
+
+//       const getSignature = (list: OE[]) =>
+
+//         list
+
+//           .map((o) =>
+
+//             [
+
+//               o.id ?? "",
+
+//               o.rowIndex ?? "",
+
+//               o.memberName ?? "",
+
+//               o.pid ?? "",
+
+//               o.qNumber ?? "",
+
+//               o.question ?? "",
+
+//               o.questionText ?? "",
+
+//               o.questionTitle ?? "",
+
+//               o.actualQuestion ?? "",
+
+//               o.oeResponse ?? "",
+
+//               o.status ?? "",
+
+//               o.aiScore ?? "",
+
+//               o.aiReason ?? "",
+
+//               o.relScore ?? "",
+
+//               o.relReason ?? "",
+
+//               o.imageUrl ?? "",
+
+//               o.dqaCorrection ?? "",
+
+//               o.rejectReason ?? "",
+
+//               o.dqaViewedTime ?? "",
+
+//               o.timestamp ?? "",
+
+//               o.approvedBy ?? "",
+
+//               o.approvedTime ?? "",
+
+//               o.oldOEId ?? "",
+
+//             ].join("¦")
+
+//           )
+
+//           .sort()
+
+//           .join("¶");
+
+//       const previousSignature = getSignature(itemsRef.current);
+
+//       const nextSignature = getSignature(nextItems);
+
+//       if (previousSignature !== nextSignature) {
+
+//         itemsRef.current = nextItems;
+
+//         setItems(nextItems);
+
+//       } else {
+
+//         // Still make sure state is synced on manual refresh.
+
+//         if (force) {
+
+//           itemsRef.current = nextItems;
+
+//           setItems(nextItems);
+
+//         }
+
+//       }
+
+//       if (d?.stats && typeof d.stats === "object") {
+
+//         setStats(d.stats);
+
+//       }
+
+//       setLoaded(true);
+
+//       const pending = nextItems.filter(
+
+//         (o) => o.status === "PENDING"
+
+//       ).length;
+
+//       if (
+
+//         lastPendingCount.current >= 0 &&
+
+//         pending > lastPendingCount.current
+
+//       ) {
+
+//         const diff = pending - lastPendingCount.current;
+
+//         showToast(
+
+//           `🔔 ${diff} new OE${diff > 1 ? "s" : ""} received!`
+
+//         );
+
+//       }
+
+//       lastPendingCount.current = pending;
+
+//       // Show confirmation for manual refresh.
+
+//       if (force) {
+
+//         showToast("🔄 DQA data refreshed");
+
+//       }
+
+//     } catch (e: any) {
+
+//       if (!silent || force) {
+
+//         setError(e?.message || "Failed to load DQA data.");
+
+//       }
+
+//     } finally {
+
+//       refreshInFlightRef.current = false;
+
+//       if (!silent || force) {
+
+//         setLoading(false);
+
+//       }
+
+//     }
+
+//   },
+
+//   [dqaName]
+
+// );
+
+useEffect(() => {
+
+  if (!dqaName.trim()) return;
+
+  let ws: WebSocket | null = null;
+
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  let stopped = false;
+
+  const connect = () => {
+
+    if (stopped) return;
+
+    try {
+
+      const url =
+
+        process.env.NEXT_PUBLIC_DQA_WS_URL ||
+
+        "ws://localhost:4001";
+
+      ws = new WebSocket(url);
+
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+
+        console.log("DQA realtime connected");
+
+        setWsConnected(true);
+
+        ws?.send(
+
+          JSON.stringify({
+
+            type: "identify",
+
+            role: "dqa",
+
+            memberName: dqaName.trim(),
+
+          })
+
+        );
+
+      };
+
+      ws.onmessage = (event) => {
+
+        try {
+
+          const message = JSON.parse(event.data);
+
+          // ================================================
+
+          // CURRENT LOCKS
+
+          // ================================================
+
+          if (message.type === "current-locks") {
+
+            const next: Record<
+
+              string,
+
+              {
+
+                dqaName: string;
+
+                startedAt: string;
+
+              }
+
+            > = {};
+
+            for (const lock of message.locks || []) {
+
+              next[String(lock.oeId)] = {
+
+                dqaName: lock.dqaName,
+
+                startedAt: lock.startedAt,
+
+              };
+
+            }
+
+            setOeLocks(next);
+
+            return;
+
+          }
+
+          // ================================================
+
+          // OE LOCKED
+
+          // ================================================
+
+          if (message.type === "oe-locked") {
+
+            const oeId = String(message.oeId);
+
+            setOeLocks((prev) => ({
+
+              ...prev,
+
+              [oeId]: {
+
+                dqaName: message.dqaName,
+
+                startedAt: message.startedAt,
+
+              },
+
+            }));
+
+            const currentUser =
+
+              dqaName.trim().toLowerCase();
+
+            const owner =
+
+              String(message.dqaName || "")
+
+                .trim()
+
+                .toLowerCase();
+
+            if (owner !== currentUser) {
+
+              showToast(
+
+                `🔒 ${message.dqaName} started working on this OE.`
+
+              );
+
+            }
+
+            return;
+
+          }
+
+          // ================================================
+
+          // OE UNLOCKED
+
+          // ================================================
+
+          if (message.type === "oe-unlocked") {
+
+            const oeId = String(message.oeId);
+
+            setOeLocks((prev) => {
+
+              const next = { ...prev };
+
+              delete next[oeId];
+
+              return next;
+
+            });
+
+            return;
+
+          }
+
+          // ================================================
+
+          // START RESULT
+
+          // ================================================
+
+          if (message.type === "oe-start-result") {
+            const oeId = String(message.oeId || "").trim();
+
+            if (message.success && oeId) {
+              setOeLocks((prev) => ({
+                ...prev,
+                [oeId]: {
+                  dqaName: String(message.dqaName || dqaName).trim(),
+                  startedAt: String(message.startedAt || new Date().toISOString()),
+                },
+              }));
+            }
+
+            // if (!message.success) {
+
+            //   const oeId = String(message.oeId || "");
+
+            //   setOeLocks((prev) => {
+
+            //     const next = { ...prev };
+
+            //     delete next[oeId];
+
+            //     return next;
+
+            //   });
+
+            //   showToast(
+
+            //     `🔒 ${message.lockedBy || "Another DQA"} is already working on this OE.`
+
+            //   );
+
+            //   load(true);
+
+            // }
+
+            if (!message.success) {
+  const oeId = String(message.oeId || "");
+
+  setOeLocks((prev) => {
+    const next = { ...prev };
+    delete next[oeId];
+    return next;
+  });
+
+  showToast(
+    `🔒 ${message.lockedBy || "Another DQA"} is already working on this OE.`
+  );
+
+  load(true);
+}
+
+return;
+
+            return;
+
+          }
+
+          // ================================================
+
+          // NEW OE SUBMITTED
+
+          // ================================================
+
+          if (message.type === "oe-submitted") {
+
+            load(true);
+
+            showToast(
+
+              `🔔 New OE submitted by ${message.memberName || "employee"}`
+
+            );
+
+            return;
+
+          }
+
+          // ================================================
+
+          // STATUS CHANGED
+
+          // ================================================
+
+          if (message.type === "oe-status-changed") {
+
+            load(true);
+
+            return;
+
+          }
+
+        } catch (error) {
+
+          console.error(
+
+            "DQA realtime message error:",
+
+            error
+
+          );
+
+        }
+
+      };
+
+      ws.onclose = () => {
+
+        setWsConnected(false);
+
+        if (!stopped) {
+
+          reconnectTimer = setTimeout(connect, 2000);
+
+        }
+
+      };
+
+      ws.onerror = () => {
+
+        setWsConnected(false);
+
+        ws?.close();
+
+      };
+
+    } catch (error) {
+
+      console.error("DQA websocket error:", error);
+
+      setWsConnected(false);
+
+      reconnectTimer = setTimeout(connect, 2000);
+
+    }
+
+  };
+
+  connect();
+
+  return () => {
+
+    stopped = true;
+
+    if (reconnectTimer) {
+
+      clearTimeout(reconnectTimer);
+
+    }
+
+    ws?.close();
+
+    wsRef.current = null;
+
+    setWsConnected(false);
+
+  };
+
+}, [dqaName, load]);
+
   // auto-refresh
-  useEffect(() => {
+
+//   useEffect(() => {
+
+//   if (!loaded) return;
+
+//   const refresh = () => {
+
+//     if (typingRef.current) return;
+
+//     if (refreshInFlightRef.current) return;
+
+//     load(false);
+
+//   };
+
+//   const t = setInterval(refresh, 4000);
+
+//   return () => clearInterval(t);
+
+// }, [loaded, load]);
+
+useEffect(() => {
   if (!loaded) return;
 
   const refresh = () => {
+    // Never refresh while DQA is typing.
     if (typingRef.current) return;
+
+    // Never start another request while one is already running.
     if (refreshInFlightRef.current) return;
 
-    load(true, false);
+    // Background refresh MUST be silent.
+    load(true);
   };
 
   const t = setInterval(refresh, 4000);
 
   return () => clearInterval(t);
 }, [loaded, load]);
-  // useEffect(() => {
-  //   if (!loaded) return;
 
-  //   const refresh = () => {
-  //     if (typingRef.current) return;
-  //     if (refreshInFlightRef.current) return;
-  //     load(true);
-  //   };
-
-  //   const t = setInterval(refresh, 4000);
-  //   return () => clearInterval(t);
-  // }, [loaded, load]);
+  
 
   // ── filters ──────────────────────────────────────────────
 
@@ -743,8 +1379,6 @@ export default function DqaView() {
 
   }, [items]);
 
-
-
   const empMatches = useMemo(() => {
 
     const v = search.trim().toLowerCase();
@@ -755,89 +1389,163 @@ export default function DqaView() {
 
   }, [search, employees]);
 
+  // const shown = useMemo(() => {
+
+  //   const today = new Date();
+
+  //   today.setHours(0, 0, 0, 0);
+
+  //   let list = items.filter((x) => {
+
+  //     const memberName = String(x?.memberName ?? "").trim();
+
+  //     const empMatch =
+
+  //       employee === "ALL" ||
+
+  //       memberName.toLowerCase() === employee.toLowerCase();
+
+  //     if (!empMatch) return false;
+
+  //     if (status === "PENDING") return x.status === "PENDING";
+
+  //     if (status === "APPROVED") return x.status === "APPROVED";
+
+  //     if (status === "REJECTED") return x.status === "REJECTED";
+
+  //     if (status === "TODAY") {
+
+  //       const d = parseTS(x.timestamp);
+
+  //       if (!d) return false;
+
+  //       d.setHours(0, 0, 0, 0);
+
+  //       return d.getTime() === today.getTime();
+
+  //     }
+
+  //     if (status === "APPROVED_TODAY") {
+
+  //       if (x.status !== "APPROVED" || !x.approvedTime) return false;
+
+  //       const a = parseTS(x.approvedTime);
+
+  //       if (!a) return false;
+
+  //       a.setHours(0, 0, 0, 0);
+
+  //       return a.getTime() === today.getTime();
+
+  //     }
+
+  //     return true;
+
+  //   });
+
+  //   if (status === "PENDING" || status === "TODAY") {
+
+  //     list = [...list].sort((a, b) => {
+
+  //       const da = parseTS(a.timestamp)?.getTime() || 0;
+
+  //       const db = parseTS(b.timestamp)?.getTime() || 0;
+
+  //       return da - db;
+
+  //     });
+
+  //   }
+
+  //   return list;
+
+  // }, [items, status, employee]);
+
+  // PID reference
 
 
   const shown = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-    const today = new Date();
+  const searchValue = search.trim().toLowerCase();
 
-    today.setHours(0, 0, 0, 0);
+  let list = items.filter((x) => {
+    const memberName = String(x?.memberName ?? "").trim();
 
+    const empMatch =
+      employee === "ALL" ||
+      memberName.toLowerCase() === employee.toLowerCase();
 
+    // When an employee is not explicitly selected,
+    // typing in search should also filter the cards.
+    const searchMatch =
+      !searchValue ||
+      memberName.toLowerCase().includes(searchValue);
 
-    let list = items.filter((x) => {
-
-      const memberName = String(x?.memberName ?? "").trim();
-
-      const empMatch =
-
-        employee === "ALL" ||
-
-        memberName.toLowerCase() === employee.toLowerCase();
-
-      if (!empMatch) return false;
-
-
-
-      if (status === "PENDING") return x.status === "PENDING";
-
-      if (status === "APPROVED") return x.status === "APPROVED";
-
-      if (status === "REJECTED") return x.status === "REJECTED";
-
-      if (status === "TODAY") {
-
-        const d = parseTS(x.timestamp);
-
-        if (!d) return false;
-
-        d.setHours(0, 0, 0, 0);
-
-        return d.getTime() === today.getTime();
-
-      }
-
-      if (status === "APPROVED_TODAY") {
-
-        if (x.status !== "APPROVED" || !x.approvedTime) return false;
-
-        const a = parseTS(x.approvedTime);
-
-        if (!a) return false;
-
-        a.setHours(0, 0, 0, 0);
-
-        return a.getTime() === today.getTime();
-
-      }
-
-      return true;
-
-    });
-
-
-
-    if (status === "PENDING" || status === "TODAY") {
-
-      list = [...list].sort((a, b) => {
-
-        const da = parseTS(a.timestamp)?.getTime() || 0;
-
-        const db = parseTS(b.timestamp)?.getTime() || 0;
-
-        return da - db;
-
-      });
-
+    if (!empMatch || !searchMatch) {
+      return false;
     }
 
-    return list;
+    if (status === "PENDING") {
+      return x.status === "PENDING";
+    }
 
-  }, [items, status, employee]);
+    if (status === "APPROVED") {
+      return x.status === "APPROVED";
+    }
 
+    if (status === "REJECTED") {
+      return x.status === "REJECTED";
+    }
 
+    if (status === "TODAY") {
+      const d = parseTS(x.timestamp);
 
-  // PID reference
+      if (!d) return false;
+
+      d.setHours(0, 0, 0, 0);
+
+      return d.getTime() === today.getTime();
+    }
+
+    if (status === "APPROVED_TODAY") {
+      if (
+        x.status !== "APPROVED" ||
+        !x.approvedTime
+      ) {
+        return false;
+      }
+
+      const a = parseTS(x.approvedTime);
+
+      if (!a) return false;
+
+      a.setHours(0, 0, 0, 0);
+
+      return a.getTime() === today.getTime();
+    }
+
+    return true;
+  });
+
+  if (
+    status === "PENDING" ||
+    status === "TODAY"
+  ) {
+    list = [...list].sort((a, b) => {
+      const da =
+        parseTS(a.timestamp)?.getTime() || 0;
+
+      const db =
+        parseTS(b.timestamp)?.getTime() || 0;
+
+      return da - db;
+    });
+  }
+
+  return list;
+}, [items, status, employee, search]);
 
   const pidApproved = useMemo(() => {
 
@@ -867,8 +1575,6 @@ export default function DqaView() {
 
   }, [items, pidRef]);
 
-
-
   // ── actions ──────────────────────────────────────────────
 
   const markViewing = (oe: OE) => {
@@ -883,9 +1589,12 @@ export default function DqaView() {
 
   };
 
-
-
   const approve = async (oe: OE) => {
+  if (!isLockedByMe(oe)) {
+    showToast("🔒 You must click Start Working before approving this OE.");
+    return;
+  }
+
 
     const correction =
 
@@ -894,18 +1603,31 @@ export default function DqaView() {
     setLoading(true);
 
     const now = new Date().toISOString();
+
     const updatedItems = itemsRef.current.map((item) =>
+
       item.rowIndex === oe.rowIndex
+
         ? {
+
             ...item,
+
             status: "APPROVED",
+
             approvedBy: dqaName.trim(),
+
             approvedTime: now,
+
             dqaCorrection: correction.trim() || item.dqaCorrection,
+
           }
+
         : item
+
     );
+
     itemsRef.current = updatedItems;
+
     setItems(updatedItems);
 
     try {
@@ -921,8 +1643,22 @@ export default function DqaView() {
       });
 
       showToast("✅ OE approved successfully!");
+      unlockOE(oe);
 
-      setTimeout(() => load(true), 600);
+if (wsRef.current?.readyState === WebSocket.OPEN) {
+  wsRef.current.send(
+    JSON.stringify({
+      type: "oe-status-changed",
+      oeId: oe.id,
+      memberName: oe.memberName,
+      status: "APPROVED",
+      approvedBy: dqaName.trim(),
+      timestamp: now,
+    })
+  );
+}
+
+      // setTimeout(() => load(true), 600);
 
     } catch (e: any) {
 
@@ -938,28 +1674,46 @@ export default function DqaView() {
 
   };
 
-
-
   const doReject = async (r: string) => {
 
     if (!reject || !r.trim()) return;
 
+    if (!isLockedByMe(reject)) {
+      showToast("🔒 You must click Start Working before rejecting this OE.");
+      setReject(null);
+      return;
+    }
+
     setLoading(true);
 
     const now = new Date().toISOString();
+
     const targetOE = reject;
+
     const updatedItems = itemsRef.current.map((item) =>
+
       item.rowIndex === targetOE.rowIndex
+
         ? {
+
             ...item,
+
             status: "REJECTED",
+
             approvedBy: dqaName.trim(),
+
             approvedTime: now,
+
             rejectReason: r.trim(),
+
           }
+
         : item
+
     );
+
     itemsRef.current = updatedItems;
+
     setItems(updatedItems);
 
     setReject(null);
@@ -982,7 +1736,20 @@ export default function DqaView() {
 
       showToast("❌ OE rejected — reason sent to employee");
 
-      setTimeout(() => load(true), 600);
+      unlockOE(targetOE);
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "oe-status-changed",
+          oeId: targetOE.id,
+          memberName: targetOE.memberName,
+          status: "REJECTED",
+          approvedBy: dqaName.trim(),
+          rejectReason: r.trim(),
+          timestamp: now,
+        }));
+      }
+
+      // setTimeout(() => load(true), 600);
 
     } catch (e: any) {
 
@@ -998,52 +1765,123 @@ export default function DqaView() {
 
   };
 
+  // const recall = async (oe: OE) => {
+
+  //   if (!confirm("Recall this decision?\nOE will go back to PENDING.")) return;
+
+  //   setLoading(true);
+
+  //   const updatedItems = itemsRef.current.map((item) =>
+
+  //     item.rowIndex === oe.rowIndex
+
+  //       ? {
+
+  //           ...item,
+
+  //           status: "PENDING",
+
+  //           approvedBy: "",
+
+  //           approvedTime: "",
+
+  //           rejectReason: "",
+
+  //           dqaCorrection: "",
+
+  //         }
+
+  //       : item
+
+  //   );
+
+  //   itemsRef.current = updatedItems;
+
+  //   setItems(updatedItems);
+
+  //   try {
+
+  //     await api("recallOE", { rowIndex: oe.rowIndex });
+
+  //     showToast("↩️ Recalled — OE is back to PENDING");
+
+  //     setTimeout(() => load(true), 600);
+
+  //   } catch (e: any) {
+
+  //     setError(e?.message || "Failed to recall.");
+
+  //     await load(false);
+
+  //   } finally {
+
+  //     setLoading(false);
+
+  //   }
+
+  // };
 
 
   const recall = async (oe: OE) => {
+  if (
+    oe.status !== "APPROVED" &&
+    oe.status !== "REJECTED"
+  ) {
+    return;
+  }
 
-    if (!confirm("Recall this decision?\nOE will go back to PENDING.")) return;
+  if (
+    !confirm(
+      "Recall this decision?\nOE will go back to PENDING."
+    )
+  ) {
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    const updatedItems = itemsRef.current.map((item) =>
-      item.rowIndex === oe.rowIndex
-        ? {
-            ...item,
-            status: "PENDING",
-            approvedBy: "",
-            approvedTime: "",
-            rejectReason: "",
-            dqaCorrection: "",
-          }
-        : item
-    );
-    itemsRef.current = updatedItems;
-    setItems(updatedItems);
+  const updatedItems = itemsRef.current.map((item) =>
+    item.rowIndex === oe.rowIndex
+      ? {
+          ...item,
+          status: "PENDING",
+          approvedBy: "",
+          approvedTime: "",
+          rejectReason: "",
+          dqaCorrection: "",
+        }
+      : item
+  );
 
-    try {
+  itemsRef.current = updatedItems;
+  setItems(updatedItems);
 
-      await api("recallOE", { rowIndex: oe.rowIndex });
+  try {
+    await api("recallOE", {
+      rowIndex: oe.rowIndex,
+    });
 
-      showToast("↩️ Recalled — OE is back to PENDING");
+    showToast("↩️ Recalled — OE is back to PENDING");
 
-      setTimeout(() => load(true), 600);
-
-    } catch (e: any) {
-
-      setError(e?.message || "Failed to recall.");
-
-      await load(false);
-
-    } finally {
-
-      setLoading(false);
-
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "oe-status-changed",
+          oeId: oe.id,
+          memberName: oe.memberName,
+          status: "PENDING",
+          timestamp: new Date().toISOString(),
+        })
+      );
     }
+  } catch (e: any) {
+    setError(e?.message || "Failed to recall.");
 
-  };
-
-
+    await load(false);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const loadSuggestions = async (oe: OE) => {
 
@@ -1054,8 +1892,6 @@ export default function DqaView() {
     try {
 
       const question = getQuestionText(oe);
-
-
 
       const res = await api<any>("rewriteOEAsHuman", {
 
@@ -1093,37 +1929,106 @@ export default function DqaView() {
 
   };
 
+const getOELock = (oe: OE) => {
+  const oeId = String(oe.id || "").trim();
+  return oeLocks[oeId] || null;
+};
+
+const isLockedByOther = (oe: OE) => {
+  const lock = getOELock(oe);
+  if (!lock) return false;
+  return lock.dqaName.trim().toLowerCase() !== dqaName.trim().toLowerCase();
+};
+
+const isLockedByMe = (oe: OE) => {
+  const lock = getOELock(oe);
+  if (!lock) return false;
+  return lock.dqaName.trim().toLowerCase() === dqaName.trim().toLowerCase();
+};
+
+// const startWorking = (oe: OE) => {
+//   const oeId = String(oe.id || "").trim();
+//   if (!oeId) { showToast("OE ID is missing."); return; }
+//   if (!dqaName.trim()) { showToast("Please enter your DQA name first."); return; }
+//   if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+//     showToast("Realtime connection is not available.");
+//     return;
+//   }
+//   const existing = oeLocks[oeId];
+//   if (existing && existing.dqaName.trim().toLowerCase() !== dqaName.trim().toLowerCase()) {
+//     showToast(`🔒 ${existing.dqaName} is already working on this OE.`);
+//     return;
+//   }
+//   wsRef.current.send(JSON.stringify({ type: "oe-start", oeId, dqaName: dqaName.trim() }));
+//   markViewing(oe);
+// };
 
 
-  // const openSheet = async (pid?: string) => {
+const startWorking = (oe: OE) => {
+  const oeId = String(oe.id || "").trim();
 
-  //   if (!pid) return;
+  if (!oeId) {
+    showToast("OE ID is missing.");
+    return;
+  }
 
-  //   try {
+  const currentDqa = dqaName.trim();
 
-  //     const url = await api<string>("https://docs.google.com/spreadsheets/d/1KOrf25AFVEanO5cD0ZlXLNGZ2e9pi7bRBUjFCMwVA5I", { pid });
+  if (!currentDqa) {
+    showToast("Please enter your DQA name first.");
+    return;
+  }
 
-  //     if (url) window.open(url, "_blank");
+  if (
+    !wsRef.current ||
+    wsRef.current.readyState !== WebSocket.OPEN
+  ) {
+    showToast("Realtime connection is not available.");
+    return;
+  }
 
-  //   } catch {
+  const existing = oeLocks[oeId];
 
-  //     alert("Could not open sheet — check if PID tab exists.");
+  if (
+    existing &&
+    existing.dqaName.trim().toLowerCase() !==
+      currentDqa.toLowerCase()
+  ) {
+    showToast(
+      `🔒 ${existing.dqaName} is already working on this OE.`
+    );
+    return;
+  }
 
-  //   }
+  // ONLY this action starts the lock.
+  wsRef.current.send(
+    JSON.stringify({
+      type: "oe-start",
+      oeId,
+      dqaName: currentDqa,
+    })
+  );
 
-  // };
+  // Viewing is separate from locking.
+  markViewing(oe);
+};
 
 
+const unlockOE = (oe: OE) => {
+  const oeId = String(oe.id || "").trim();
+  if (!oeId) return;
+  if (wsRef.current?.readyState === WebSocket.OPEN) {
+    wsRef.current.send(JSON.stringify({ type: "oe-unlock", oeId, dqaName: dqaName.trim() }));
+  }
+};
 
-  const openSheet = (pid?: string) => {
+const openSheet = (pid?: string) => {
 
   // Main Google Sheet
 
   const SHEET_ID = "154f6pemEnid-mgnv3CGEuC4pAv0XjlNIdcRpONb3KAo";
 
   const baseUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
-
-
 
   if (!pid?.trim()) {
 
@@ -1135,15 +2040,11 @@ export default function DqaView() {
 
   }
 
-
-
   // Open the sheet (you can later improve this to open specific PID tab)
 
   window.open(baseUrl, "_blank");
 
 };
-
-
 
   // ── dashboard numbers ────────────────────────────────────
 
@@ -1227,8 +2128,6 @@ export default function DqaView() {
 
   }, [stats, items]);
 
-
-
   // ── render ───────────────────────────────────────────────
 
   return (
@@ -1246,8 +2145,6 @@ export default function DqaView() {
         </div>
 
       )}
-
-
 
       {/* Header */}
 
@@ -1268,8 +2165,6 @@ export default function DqaView() {
         </p>
 
       </div>
-
-
 
       <div className="rounded-b-2xl border border-t-0 bg-white p-5 shadow-md">
 
@@ -1352,8 +2247,6 @@ export default function DqaView() {
               ))}
 
             </div>
-
-
 
             {/* Filters */}
 
@@ -1474,21 +2367,30 @@ export default function DqaView() {
               </button> */}
 
               <button
+
   type="button"
+
   className="btn-muted"
-  onClick={() => load(false, true)}
+
+  onClick={() => load(false)}
+
   disabled={loading}
+
   title="Refresh DQA data"
+
 >
+
   <RefreshCw
+
     size={16}
+
     className={loading ? "animate-spin" : ""}
+
   />
+
 </button>
 
             </div>
-
-
 
             {/* PID Reference Panel */}
 
@@ -1606,8 +2508,6 @@ export default function DqaView() {
 
             </div>
 
-
-
             {/* Count bar */}
 
             {shown.length > 0 && (
@@ -1648,52 +2548,77 @@ export default function DqaView() {
 
             )}
 
-
-
             {/* OE Cards */}
 
             <div className="space-y-4">
 
               {shown.map((oe, idx) => {
 
-                const isPending = oe.status === "PENDING";
+                // const isPending = oe.status === "PENDING";
 
-                const isApp = oe.status === "APPROVED";
+                // const isApp = oe.status === "APPROVED";
 
-                const isRej = oe.status === "REJECTED";
+                // const isRej = oe.status === "REJECTED";
 
-                const corr =
+                // const corr =
 
-                  corrections[oe.rowIndex!] ??
+                //   corrections[oe.rowIndex!] ??
 
-                  oe.dqaCorrection ??
+                //   oe.dqaCorrection ??
 
-                  "";
+                //   "";
 
-                const aiC =
+                // const aiC =
 
-                  Number(oe.aiScore) >= 65
+                //   Number(oe.aiScore) >= 65
 
-                    ? "text-green-700"
+                //     ? "text-green-700"
 
-                    : Number(oe.aiScore) >= 50
+                //     : Number(oe.aiScore) >= 50
 
-                    ? "text-orange-600"
+                //     ? "text-orange-600"
 
-                    : "text-red-600";
+                //     : "text-red-600";
 
-                const relC =
+                // const relC =
 
-                  Number(oe.relScore) >= 65
+                //   Number(oe.relScore) >= 65
 
-                    ? "text-green-700"
+                //     ? "text-green-700"
 
-                    : Number(oe.relScore) >= 50
+                //     : Number(oe.relScore) >= 50
 
-                    ? "text-orange-600"
+                //     ? "text-orange-600"
 
-                    : "text-red-600";
+                //     : "text-red-600";
 
+                  const isPending = oe.status === "PENDING";
+  const isApp = oe.status === "APPROVED";
+  const isRej = oe.status === "REJECTED";
+
+  // Realtime DQA lock state for this OE
+  const lock = getOELock(oe);
+  const lockedByOther = isLockedByOther(oe);
+  const lockedByMe = isLockedByMe(oe);
+
+  const corr =
+    corrections[oe.rowIndex!] ??
+    oe.dqaCorrection ??
+    "";
+
+  const aiC =
+    Number(oe.aiScore) >= 65
+      ? "text-green-700"
+      : Number(oe.aiScore) >= 50
+      ? "text-orange-600"
+      : "text-red-600";
+
+  const relC =
+    Number(oe.relScore) >= 65
+      ? "text-green-700"
+      : Number(oe.relScore) >= 50
+      ? "text-orange-600"
+      : "text-red-600";
 
 
                 return (
@@ -1701,20 +2626,7 @@ export default function DqaView() {
                   <div
 
                     key={oe.id ?? `${oe.rowIndex}-${idx}`}
-
-                    onMouseEnter={() => {
-
-                      if (isPending) markViewing(oe);
-
-                    }}
-
-                    onFocusCapture={() => {
-
-                      if (isPending) markViewing(oe);
-
-                    }}
-
-                    className={`rounded-xl border-2 p-4 ${
+className={`rounded-xl border-2 p-4 ${
 
                       isApp
 
@@ -1758,8 +2670,6 @@ export default function DqaView() {
 
                     </div>
 
-
-
                     {/* Timestamp + wait */}
 
                     <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -1800,8 +2710,6 @@ export default function DqaView() {
 
                     </div>
 
-
-
                     {/* Question */}
 
                     <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
@@ -1811,8 +2719,6 @@ export default function DqaView() {
                         ❓ Question {oe.qNumber ? `· ${oe.qNumber}` : ""}
 
                       </div>
-
-
 
                       {getQuestionText(oe) ? (
 
@@ -1837,8 +2743,6 @@ export default function DqaView() {
                       )}
 
                     </div>
-
-
 
                     {/* Scores */}
 
@@ -1920,8 +2824,6 @@ export default function DqaView() {
 
                     ) : null}
 
-
-
                     {/* Reject reason */}
 
                     {isRej && oe.rejectReason && (
@@ -1933,8 +2835,6 @@ export default function DqaView() {
                       </div>
 
                     )}
-
-
 
                     {/* Previous rejected version */}
 
@@ -1990,13 +2890,9 @@ export default function DqaView() {
 
                     )}
 
-
-
                     {/* Same start alert */}
 
                     {isPending && sameStartAlert(oe.memberName || "", oe.oeResponse || "")}
-
-
 
                     {/* DQA viewed */}
 
@@ -2009,8 +2905,6 @@ export default function DqaView() {
                       </div>
 
                     )}
-
-
 
                     {/* Image button */}
 
@@ -2040,8 +2934,6 @@ export default function DqaView() {
 
                     )}
 
-
-
                     {/* Original OE */}
 
                     <div className="mb-1 text-[11px] font-bold uppercase text-slate-500">
@@ -2062,11 +2954,32 @@ export default function DqaView() {
 
                     </div>
 
-
+                    {/* Realtime DQA lock */}
+                    {isPending && (
+                      <div className="mb-3">
+                        {!lock && (
+                          <button type="button" onClick={() => startWorking(oe)} disabled={!wsConnected} className="w-full rounded-lg bg-black px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
+                            {wsConnected ? "▶️ Start Working on this OE" : "🔌 Connecting realtime..."}
+                          </button>
+                        )}
+                        {lockedByOther && (
+                          <div className="rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-center">
+                            <div className="text-sm font-bold text-red-700">🔒 Currently Someone is working</div>
+                            {/* <div className="mt-1 text-xs text-red-600">{lock?.dqaName} is working on this OE</div>
+                            <div className="mt-1 text-[10px] text-slate-500">Other DQAs cannot edit, suggest, approve, or reject this OE.</div> */}
+                          </div>
+                        )}
+                        {lockedByMe && (
+                          <div className="rounded-lg border-2 border-green-300 bg-green-50 px-4 py-3">
+                            <div className="text-center text-sm font-bold text-green-700">🟢 You are working on this OE</div>
+                            {lock?.startedAt && <div className="mt-1 text-center text-[10px] text-slate-500">Started {formatTS(lock.startedAt)}</div>}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Pending actions */}
-
-                    {isPending && (
+                    {isPending && lockedByMe && (
 
                       <>
 
@@ -2130,8 +3043,6 @@ export default function DqaView() {
 
                         </div>
 
-
-
                         {/* Suggestions */}
 
                         <button
@@ -2165,8 +3076,6 @@ export default function DqaView() {
                           )}
 
                         </button>
-
-
 
                         {suggestions[oe.rowIndex!] && (
 
@@ -2216,8 +3125,6 @@ export default function DqaView() {
 
                         )}
 
-
-
                         <div className="flex flex-wrap gap-2">
 
                           <button
@@ -2265,8 +3172,6 @@ export default function DqaView() {
                       </>
 
                     )}
-
-
 
                     {/* Approved state */}
 
@@ -2325,8 +3230,6 @@ export default function DqaView() {
                       </div>
 
                     )}
-
-
 
                     {/* Rejected state */}
 
@@ -2402,8 +3305,6 @@ export default function DqaView() {
 
             </div>
 
-
-
             {!shown.length && (
 
               <div className="py-12 text-center text-slate-400">
@@ -2420,8 +3321,6 @@ export default function DqaView() {
 
         )}
 
-
-
         {error && (
 
           <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
@@ -2433,8 +3332,6 @@ export default function DqaView() {
         )}
 
       </div>
-
-
 
       {/* Reject Modal */}
 
@@ -2478,8 +3375,6 @@ export default function DqaView() {
 
             </p>
 
-
-
             <div className="space-y-2">
 
               {PREDEFINED_REASONS.map((r) => (
@@ -2501,8 +3396,6 @@ export default function DqaView() {
               ))}
 
             </div>
-
-
 
             <div className="mt-3">
 
@@ -2540,8 +3433,6 @@ export default function DqaView() {
 
             </div>
 
-
-
             <button
 
               className="mt-3 w-full rounded-lg bg-slate-100 py-2.5 text-sm text-slate-600"
@@ -2567,8 +3458,6 @@ export default function DqaView() {
         </div>
 
       )}
-
-
 
       {/* Image Modal */}
 
