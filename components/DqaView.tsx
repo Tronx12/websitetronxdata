@@ -3551,6 +3551,11 @@ import {
 import { api } from "@/lib/api";
 
 import { StatusBadge } from "./StatusBadge";
+// import { getRealtimeUrl } from "@/lib/realtime";
+import {
+  getRealtimeUrl,
+  type RealtimeEvent,
+} from "@/lib/realtime";
 
 type OE = {
 
@@ -3663,6 +3668,45 @@ export default function DqaView() {
   const typingRef = useRef(false);
 
   const lastPendingCount = useRef(-1);
+
+  const heartbeatTimerRef = useRef<
+  ReturnType<typeof setInterval> | null
+>(null);
+
+const activeLockIdsRef = useRef<Set<string>>(new Set());
+
+const stopLockHeartbeat = useCallback(() => {
+  if (heartbeatTimerRef.current) {
+    clearInterval(heartbeatTimerRef.current);
+    heartbeatTimerRef.current = null;
+  }
+}, []);
+
+const startLockHeartbeat = useCallback(() => {
+  stopLockHeartbeat();
+
+  heartbeatTimerRef.current = setInterval(() => {
+    const ws = wsRef.current;
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const dqa = dqaName.trim();
+
+    if (!dqa) return;
+
+    activeLockIdsRef.current.forEach((oeId) => {
+      ws.send(
+        JSON.stringify({
+          type: "oe-heartbeat",
+          oeId,
+          dqaName: dqa,
+        })
+      );
+    });
+  }, 20_000);
+}, [dqaName, stopLockHeartbeat]);
 
   // Keeps visible data stable during background refresh.
 
@@ -4303,209 +4347,6 @@ const load = useCallback(
   },
   [dqaName]
 );
-
-//   const load = useCallback(
-
-//   async (silent = false, force = false) => {
-
-//     if (!dqaName.trim()) {
-
-//       setError("Please enter your DQA name.");
-
-//       return;
-
-//     }
-
-//     // Only block overlapping requests for automatic refresh.
-
-//     if (!force && refreshInFlightRef.current) return;
-
-//     refreshInFlightRef.current = true;
-
-//     if (!silent) setLoading(true);
-
-//     setError("");
-
-//     try {
-
-//       const d = await api<any>("getDQAData");
-
-//       let oes: any[] = [];
-
-//       if (Array.isArray(d)) oes = d;
-
-//       else if (Array.isArray(d?.oes)) oes = d.oes;
-
-//       else if (Array.isArray(d?.pendingOEs)) oes = d.pendingOEs;
-
-//       else if (Array.isArray(d?.data)) oes = d.data;
-
-//       else if (Array.isArray(d?.data?.oes)) oes = d.data.oes;
-
-//       /*
-
-//        * IMPORTANT:
-
-//        * Do not ignore an empty response during MANUAL refresh.
-
-//        * The old code could make the refresh button appear broken.
-
-//        */
-
-//       const nextItems = oes as OE[];
-
-//       const getSignature = (list: OE[]) =>
-
-//         list
-
-//           .map((o) =>
-
-//             [
-
-//               o.id ?? "",
-
-//               o.rowIndex ?? "",
-
-//               o.memberName ?? "",
-
-//               o.pid ?? "",
-
-//               o.qNumber ?? "",
-
-//               o.question ?? "",
-
-//               o.questionText ?? "",
-
-//               o.questionTitle ?? "",
-
-//               o.actualQuestion ?? "",
-
-//               o.oeResponse ?? "",
-
-//               o.status ?? "",
-
-//               o.aiScore ?? "",
-
-//               o.aiReason ?? "",
-
-//               o.relScore ?? "",
-
-//               o.relReason ?? "",
-
-//               o.imageUrl ?? "",
-
-//               o.dqaCorrection ?? "",
-
-//               o.rejectReason ?? "",
-
-//               o.dqaViewedTime ?? "",
-
-//               o.timestamp ?? "",
-
-//               o.approvedBy ?? "",
-
-//               o.approvedTime ?? "",
-
-//               o.oldOEId ?? "",
-
-//             ].join("¦")
-
-//           )
-
-//           .sort()
-
-//           .join("¶");
-
-//       const previousSignature = getSignature(itemsRef.current);
-
-//       const nextSignature = getSignature(nextItems);
-
-//       if (previousSignature !== nextSignature) {
-
-//         itemsRef.current = nextItems;
-
-//         setItems(nextItems);
-
-//       } else {
-
-//         // Still make sure state is synced on manual refresh.
-
-//         if (force) {
-
-//           itemsRef.current = nextItems;
-
-//           setItems(nextItems);
-
-//         }
-
-//       }
-
-//       if (d?.stats && typeof d.stats === "object") {
-
-//         setStats(d.stats);
-
-//       }
-
-//       setLoaded(true);
-
-//       const pending = nextItems.filter(
-
-//         (o) => o.status === "PENDING"
-
-//       ).length;
-
-//       if (
-
-//         lastPendingCount.current >= 0 &&
-
-//         pending > lastPendingCount.current
-
-//       ) {
-
-//         const diff = pending - lastPendingCount.current;
-
-//         showToast(
-
-//           `🔔 ${diff} new OE${diff > 1 ? "s" : ""} received!`
-
-//         );
-
-//       }
-
-//       lastPendingCount.current = pending;
-
-//       // Show confirmation for manual refresh.
-
-//       if (force) {
-
-//         showToast("🔄 DQA data refreshed");
-
-//       }
-
-//     } catch (e: any) {
-
-//       if (!silent || force) {
-
-//         setError(e?.message || "Failed to load DQA data.");
-
-//       }
-
-//     } finally {
-
-//       refreshInFlightRef.current = false;
-
-//       if (!silent || force) {
-
-//         setLoading(false);
-
-//       }
-
-//     }
-
-//   },
-
-//   [dqaName]
-
 // );
 
 useEffect(() => {
@@ -4524,13 +4365,17 @@ useEffect(() => {
 
     try {
 
-      const url =
+      // const url =
 
-        process.env.NEXT_PUBLIC_DQA_WS_URL ||
+      //   process.env.NEXT_PUBLIC_DQA_WS_URL ||
 
-        "https://oe-websocket.onrender.com";
+      //   "https://oe-websocket.onrender.com";
 
-      ws = new WebSocket(url);
+      // ws = new WebSocket(url);
+
+      const url = getRealtimeUrl();
+
+ws = new WebSocket(url);
 
       wsRef.current = ws;
 
@@ -4913,78 +4758,6 @@ useEffect(() => {
 
   }, [search, employees]);
 
-  // const shown = useMemo(() => {
-
-  //   const today = new Date();
-
-  //   today.setHours(0, 0, 0, 0);
-
-  //   let list = items.filter((x) => {
-
-  //     const memberName = String(x?.memberName ?? "").trim();
-
-  //     const empMatch =
-
-  //       employee === "ALL" ||
-
-  //       memberName.toLowerCase() === employee.toLowerCase();
-
-  //     if (!empMatch) return false;
-
-  //     if (status === "PENDING") return x.status === "PENDING";
-
-  //     if (status === "APPROVED") return x.status === "APPROVED";
-
-  //     if (status === "REJECTED") return x.status === "REJECTED";
-
-  //     if (status === "TODAY") {
-
-  //       const d = parseTS(x.timestamp);
-
-  //       if (!d) return false;
-
-  //       d.setHours(0, 0, 0, 0);
-
-  //       return d.getTime() === today.getTime();
-
-  //     }
-
-  //     if (status === "APPROVED_TODAY") {
-
-  //       if (x.status !== "APPROVED" || !x.approvedTime) return false;
-
-  //       const a = parseTS(x.approvedTime);
-
-  //       if (!a) return false;
-
-  //       a.setHours(0, 0, 0, 0);
-
-  //       return a.getTime() === today.getTime();
-
-  //     }
-
-  //     return true;
-
-  //   });
-
-  //   if (status === "PENDING" || status === "TODAY") {
-
-  //     list = [...list].sort((a, b) => {
-
-  //       const da = parseTS(a.timestamp)?.getTime() || 0;
-
-  //       const db = parseTS(b.timestamp)?.getTime() || 0;
-
-  //       return da - db;
-
-  //     });
-
-  //   }
-
-  //   return list;
-
-  // }, [items, status, employee]);
-
   // PID reference
 
 
@@ -5136,13 +4909,13 @@ useEffect(() => {
       corrections[rowIndex] ?? oe.dqaCorrection ?? ""
     ).trim();
 
-    setLoading(true);
     setError("");
     mutationInFlightRef.current = true;
 
     try {
       await api("approveOE", {
         rowIndex,
+        oeId: oe.id,
         dqaName: dqa,
         correction,
       });
@@ -5159,18 +4932,6 @@ useEffect(() => {
 
       showToast("✅ OE approved and saved successfully!");
       unlockOE(oe);
-
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: "oe-status-changed",
-          oeId: oe.id,
-          memberName: oe.memberName,
-          status: "APPROVED",
-          approvedBy: dqa,
-          dqaCorrection: correction,
-          timestamp: new Date().toISOString(),
-        }));
-      }
     } catch (e: any) {
       mutationInFlightRef.current = false;
       setError(e?.message || "Failed to approve. Nothing was marked as saved.");
@@ -5178,7 +4939,6 @@ useEffect(() => {
       await load(false);
     } finally {
       mutationInFlightRef.current = false;
-      setLoading(false);
     }
   };
 
@@ -5201,13 +4961,13 @@ useEffect(() => {
     if (!dqa || !rejectReason) return;
 
     const targetOE = reject;
-    setLoading(true);
     setError("");
     mutationInFlightRef.current = true;
 
     try {
       await api("rejectOE", {
         rowIndex,
+        oeId: targetOE.id,
         dqaName: dqa,
         reason: rejectReason,
       });
@@ -5220,18 +4980,6 @@ useEffect(() => {
 
       showToast("❌ OE rejected and saved successfully!");
       unlockOE(targetOE);
-
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: "oe-status-changed",
-          oeId: targetOE.id,
-          memberName: targetOE.memberName,
-          status: "REJECTED",
-          approvedBy: dqa,
-          rejectReason,
-          timestamp: new Date().toISOString(),
-        }));
-      }
     } catch (e: any) {
       mutationInFlightRef.current = false;
       setError(e?.message || "Failed to reject. Nothing was marked as saved.");
@@ -5239,65 +4987,8 @@ useEffect(() => {
       await load(false);
     } finally {
       mutationInFlightRef.current = false;
-      setLoading(false);
     }
   };
-
-  // const recall = async (oe: OE) => {
-
-  //   if (!confirm("Recall this decision?\nOE will go back to PENDING.")) return;
-
-  //   setLoading(true);
-
-  //   const updatedItems = itemsRef.current.map((item) =>
-
-  //     item.rowIndex === oe.rowIndex
-
-  //       ? {
-
-  //           ...item,
-
-  //           status: "PENDING",
-
-  //           approvedBy: "",
-
-  //           approvedTime: "",
-
-  //           rejectReason: "",
-
-  //           dqaCorrection: "",
-
-  //         }
-
-  //       : item
-
-  //   );
-
-  //   itemsRef.current = updatedItems;
-
-  //   setItems(updatedItems);
-
-  //   try {
-
-  //     await api("recallOE", { rowIndex: oe.rowIndex });
-
-  //     showToast("↩️ Recalled — OE is back to PENDING");
-
-  //     setTimeout(() => load(true), 600);
-
-  //   } catch (e: any) {
-
-  //     setError(e?.message || "Failed to recall.");
-
-  //     await load(false);
-
-  //   } finally {
-
-  //     setLoading(false);
-
-  //   }
-
-  // };
 
 
   const recall = async (oe: OE) => {
@@ -5310,12 +5001,11 @@ useEffect(() => {
       return;
     }
 
-    setLoading(true);
     setError("");
     mutationInFlightRef.current = true;
 
     try {
-      await api("recallOE", { rowIndex });
+      await api("recallOE", { rowIndex, dqaName: dqaName.trim() });
 
       // Do not optimistically clear dqaCorrection. Let the backend decide what
       // recallOE persisted, then render that returned value.
@@ -5328,16 +5018,6 @@ useEffect(() => {
       });
 
       showToast("↩️ Recalled — OE is back to PENDING");
-
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: "oe-status-changed",
-          oeId: oe.id,
-          memberName: oe.memberName,
-          status: "PENDING",
-          timestamp: new Date().toISOString(),
-        }));
-      }
     } catch (e: any) {
       mutationInFlightRef.current = false;
       setError(e?.message || "Failed to recall. Nothing was changed locally.");
@@ -5345,7 +5025,6 @@ useEffect(() => {
       await load(false);
     } finally {
       mutationInFlightRef.current = false;
-      setLoading(false);
     }
   };
 
