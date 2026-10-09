@@ -1,6 +1,3 @@
-
-
-
 export type ApiResult<T = any> = T;
 
 export type ApiAction =
