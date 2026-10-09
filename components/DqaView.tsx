@@ -4829,14 +4829,14 @@ export default function DqaView() {
                                 Started {formatTS(lock.startedAt)}
                               </div>
                             )}
-                            <button
+                            {/* <button
                               type="button"
                               onClick={() => unlockOE(oe)}
                               disabled={busy}
                               className="mx-auto mt-2 flex items-center gap-1 rounded-md border border-green-400 bg-white px-3 py-1 text-[11px] font-bold text-green-800 hover:bg-green-100 disabled:opacity-50"
                             >
                               <Unlock size={12} /> Release without deciding
-                            </button>
+                            </button> */}
                           </div>
                         )}
                       </div>
