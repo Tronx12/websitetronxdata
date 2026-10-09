@@ -8,6 +8,7 @@ export type ApiAction =
   | "uploadImageToDrive"
   | "submitOE"
   | "getApprovedOEsByPID"
+  | "getAllApprovedOEs"
   | "getMyResults"
   | "getOEPerformance"
   | "getSurveyPerformance"

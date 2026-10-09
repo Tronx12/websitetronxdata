@@ -1,8 +1,788 @@
 
 
+// "use client";
+
+// import { useEffect, useMemo,useRef, useState } from "react";
+// import {
+//   ChevronDown,
+//   ChevronUp,
+//   ImagePlus,
+//   Lightbulb,
+//   Search,
+//   Send,
+//   Sparkles,
+//   X,
+// } from "lucide-react";
+
+// import { api } from "@/lib/api";
+
+// type SubmitViewProps = {
+//   memberName: string;
+// };
+
+// export default function SubmitView({
+//   memberName,
+// }: SubmitViewProps) {
+//   // =========================================================
+//   // USER
+//   // =========================================================
+
+//   const name = memberName.trim();
+//   const wsRef = useRef<WebSocket | null>(null);
+
+//   useEffect(() => {
+//   if (!name) return;
+
+//   let ws: WebSocket | null = null;
+//   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+//   let stopped = false;
+
+//   const connect = () => {
+//     if (stopped) return;
+
+//     try {
+//       const url =
+//         process.env.NEXT_PUBLIC_DQA_WS_URL ||
+//         "https://oe-websocket.onrender.com";
+
+//       ws = new WebSocket(url);
+
+//       wsRef.current = ws;
+
+//       ws.onopen = () => {
+//         console.log("Submit realtime connected");
+
+//         ws?.send(
+//           JSON.stringify({
+//             type: "identify",
+//             role: "employee",
+//             memberName: name,
+//           })
+//         );
+//       };
+
+//       ws.onclose = () => {
+//         if (!stopped) {
+//           reconnectTimer = setTimeout(connect, 2000);
+//         }
+//       };
+
+//       ws.onerror = () => {
+//         ws?.close();
+//       };
+//     } catch (error) {
+//       console.error("Submit websocket error:", error);
+
+//       reconnectTimer = setTimeout(connect, 2000);
+//     }
+//   };
+
+//   connect();
+
+//   return () => {
+//     stopped = true;
+
+//     if (reconnectTimer) {
+//       clearTimeout(reconnectTimer);
+//     }
+
+//     ws?.close();
+//     wsRef.current = null;
+//   };
+// }, [name]);
+
+//   // =========================================================
+//   // STATE
+//   // =========================================================
+
+//   const [pids, setPids] = useState<string[]>([]);
+
+//   const [pid, setPid] = useState("");
+//   const [qNo, setQNo] = useState("Q1");
+//   const [qText, setQText] = useState("");
+
+//   const [oe, setOe] = useState("");
+//   const [related, setRelated] = useState(false);
+//   const [image, setImage] = useState<string | null>(null);
+//   const [isDragging, setIsDragging] = useState(false);
+
+//   const [quality, setQuality] = useState<any>(null);
+//   const [checking, setChecking] = useState(false);
+//   const [message, setMessage] = useState("");
+
+//   const [showPID, setShowPID] = useState(false);
+//   const [approved, setApproved] = useState<any[]>([]);
+//   const [pidOpen, setPidOpen] = useState(false);
+
+//   // =========================================================
+//   // INITIAL DATA
+//   // =========================================================
+
+//   useEffect(() => {
+//     let active = true;
+
+//     api<any>("getInitialData")
+//       .then((data) => {
+//         if (!active) return;
+//         setPids(data?.pids || []);
+//       })
+//       .catch((error: any) => {
+//         if (!active) return;
+//         setMessage(
+//           error?.message || "Failed to load initial data."
+//         );
+//       });
+
+//     return () => {
+//       active = false;
+//     };
+//   }, []);
+
+//   // =========================================================
+//   // FILTER PID
+//   // =========================================================
+
+//   const filteredPids = useMemo(() => {
+//     const search = pid.toLowerCase().trim();
+
+//     return pids
+//       .filter((item) => item.toLowerCase().includes(search))
+//       .slice(0, 12);
+//   }, [pids, pid]);
+
+//   // =========================================================
+//   // CHECK QUALITY
+//   // =========================================================
+
+//   const check = async () => {
+//     setMessage("");
+
+//     if (!oe.trim() || !qNo || !qText.trim()) {
+//       setMessage("Enter the question and OE response first.");
+//       return;
+//     }
+
+//     setChecking(true);
+//     setQuality(null);
+
+//     try {
+//       const result = await api<any>("checkOEQuality", {
+//         oeResponse: oe.trim(),
+//         qNumber: qNo,
+//         qText: qText.trim(),
+//         isRelatedToPrevious: related,
+//         memberName: name,
+//       });
+
+//       setQuality(result);
+//     } catch (error: any) {
+//       setMessage(
+//         error?.message || "Unable to check OE quality."
+//       );
+//     } finally {
+//       setChecking(false);
+//     }
+//   };
+
+//   // =========================================================
+//   // SUBMIT
+//   // =========================================================
+
+//   const submit = async () => {
+//     setMessage("");
+
+//     if (!name) {
+//       setMessage("Unable to identify the logged-in user.");
+//       return;
+//     }
+
+//     if (!pid.trim() || !oe.trim() || !qText.trim()) {
+//       setMessage("Please complete PID, Question and OE.");
+//       return;
+//     }
+
+//     if (!quality) {
+//       setMessage("Please check the OE quality before submitting.");
+//       return;
+//     }
+
+//     setChecking(true);
+
+//     try {
+//       let imageUrl = "";
+
+//       if (image) {
+//         imageUrl = await api<string>("uploadImageToDrive", {
+//           base64Data: image,
+//           fileName: `oe-${Date.now()}.jpg`,
+//         });
+//       }
+
+//       const result = await api<any>("submitOE", {
+//         // Always use authenticated member name.
+//         memberName: name,
+//         pid: pid.trim(),
+//         qNumber: qNo,
+//         qText: qText.trim(),
+//         oeResponse: oe.trim(),
+//         isRelatedToPrevious: related,
+//         imageUrl,
+//         qualityResult: quality,
+//       });
+
+//       const submittedAt = new Date().toISOString();
+
+// wsRef.current?.send(
+//   JSON.stringify({
+//     type: "oe-submitted",
+//     oeId: result?.id || "",
+//     memberName: name,
+//     pid: pid.trim(),
+//     qNumber: qNo,
+//     timestamp: submittedAt,
+//   })
+// );
+
+//       setMessage(
+//         `Submitted successfully${
+//           result?.id ? ` — ID: ${result.id}` : ""
+//         }`
+//       );
+
+//       if (typeof window !== "undefined") {
+//         window.dispatchEvent(
+//           new CustomEvent("oe_submitted", {
+//             detail: { memberName: name },
+//           })
+//         );
+//       }
+
+//       // Reset response-specific fields.
+//       setOe("");
+//       setQuality(null);
+//       setImage(null);
+//       setRelated(false);
+//     } catch (error: any) {
+//       setMessage(error?.message || "Failed to submit OE.");
+//     } finally {
+//       setChecking(false);
+//     }
+//   };
+
+//   // =========================================================
+//   // APPROVED OE SEARCH
+//   // =========================================================
+
+//   const approvedSearch = async () => {
+//     setMessage("");
+
+//     if (!pid.trim()) {
+//       setMessage("Please enter a PID first.");
+//       return;
+//     }
+
+//     try {
+//       const result = await api<any[]>("getApprovedOEsByPID", {
+//         pid: pid.trim(),
+//       });
+
+//       setApproved(result || []);
+//     } catch (error: any) {
+//       setMessage(
+//         error?.message || "Failed to load approved OEs."
+//       );
+//     }
+//   };
+
+//   // =========================================================
+//   // IMAGE UPLOAD (click + drag & drop)
+//   // =========================================================
+
+//   const processImageFile = (file: File) => {
+//     if (!file.type.startsWith("image/")) {
+//       setMessage("Please select a valid image.");
+//       return;
+//     }
+
+//     const reader = new FileReader();
+
+//     reader.onload = () => {
+//       setImage(String(reader.result));
+//       setMessage("");
+//     };
+
+//     reader.onerror = () => {
+//       setMessage("Failed to read image.");
+//     };
+
+//     reader.readAsDataURL(file);
+//   };
+
+//   const handleImageChange = (
+//     event: React.ChangeEvent<HTMLInputElement>
+//   ) => {
+//     const file = event.target.files?.[0];
+//     if (!file) return;
+
+//     processImageFile(file);
+//     // allow selecting the same file again later
+//     event.target.value = "";
+//   };
+
+//   const handleDragOver = (event: React.DragEvent) => {
+//     event.preventDefault();
+//     event.stopPropagation();
+//     setIsDragging(true);
+//   };
+
+//   const handleDragLeave = (event: React.DragEvent) => {
+//     event.preventDefault();
+//     event.stopPropagation();
+//     setIsDragging(false);
+//   };
+
+//   const handleDrop = (event: React.DragEvent) => {
+//     event.preventDefault();
+//     event.stopPropagation();
+//     setIsDragging(false);
+
+//     const file = event.dataTransfer.files?.[0];
+//     if (!file) return;
+
+//     processImageFile(file);
+//   };
+
+//   // =========================================================
+//   // UI
+//   // =========================================================
+
+//   return (
+//     <div className="mx-auto w-full max-w-3xl">
+//       {/* HEADER */}
+//       <div className="rounded-t-2xl bg-black px-5 py-5 text-center text-white">
+//         <h3 className="text-xl font-bold">
+//           📋 Submit Open-End Response
+//         </h3>
+//         <p className="mt-1 text-xs opacity-85">
+//           Submit your response and check its quality
+//         </p>
+//       </div>
+
+//       <div className="card rounded-t-none">
+//         {/* =================================================
+//             USER NAME
+//         ================================================= */}
+//         <Field label="Your Name">
+//           <div className="relative">
+//             <input
+//               className="input cursor-not-allowed bg-slate-100 text-slate-600"
+//               value={name}
+//               disabled
+//               readOnly
+//               placeholder="Logged-in user"
+//             />
+
+//             <div className="mt-1 flex items-center justify-between">
+//               <p className="text-xs text-slate-400">
+//                 Name is linked to your account.
+//               </p>
+//               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+//                 🔒 Locked
+//               </span>
+//             </div>
+//           </div>
+//         </Field>
+
+//         {/* =================================================
+//             PID
+//         ================================================= */}
+//         <Field label="PID">
+//           <div className="relative">
+//             <input
+//               className="input"
+//               value={pid}
+//               placeholder="Search or type PID..."
+//               onFocus={() => setPidOpen(true)}
+//               onChange={(event) => {
+//                 setPid(event.target.value);
+//                 setPidOpen(true);
+//               }}
+//             />
+
+//             {pidOpen && filteredPids.length > 0 && (
+//               <Dropdown
+//                 items={filteredPids}
+//                 onSelect={(value) => {
+//                   setPid(value);
+//                   setPidOpen(false);
+//                 }}
+//               />
+//             )}
+//           </div>
+//         </Field>
+
+//         {/* =================================================
+//             QUESTION
+//         ================================================= */}
+//         <Field label="Question">
+//           <div className="flex gap-2">
+//             <select
+//               className="input w-24"
+//               value={qNo}
+//               onChange={(event) => {
+//                 setQNo(event.target.value);
+//                 setQuality(null);
+//               }}
+//             >
+//               {Array.from({ length: 20 }, (_, index) => (
+//                 <option key={index} value={`Q${index + 1}`}>
+//                   Q{index + 1}
+//                 </option>
+//               ))}
+//             </select>
+
+//             <input
+//               className="input"
+//               value={qText}
+//               onChange={(event) => {
+//                 setQText(event.target.value);
+//                 setQuality(null);
+//               }}
+//               placeholder="What do you enjoy most about working?"
+//             />
+//           </div>
+//         </Field>
+
+//         {/* =================================================
+//             RELATED
+//         ================================================= */}
+//         <label className="mb-4 flex cursor-pointer items-center gap-2 rounded-lg border border-blue-100 bg-slate-50 p-3 text-sm">
+//           <input
+//             type="checkbox"
+//             checked={related}
+//             onChange={(event) => setRelated(event.target.checked)}
+//           />
+//           <span>
+//             <b className="text-brand">Related to previous question</b>{" "}
+//             — my answer continues or relates to the previous question
+//           </span>
+//         </label>
+
+//         {/* =================================================
+//             TIPS
+//         ================================================= */}
+//         <div className="mb-4 rounded-lg border-l-4 border-brand bg-blue-50 p-3 text-sm">
+//           <b>
+//             <Lightbulb className="mr-1 inline" size={16} />
+//             Tips
+//           </b>
+//           <ul className="mt-1 list-disc pl-5 leading-7">
+//             <li>Write like you&apos;re talking to a friend</li>
+//             <li>Use a different starting phrase each time</li>
+//             <li>Focus on ONE main point</li>
+//             <li>Avoid bullet points or structured answers</li>
+//             <li>Make sure your answer matches the question</li>
+//           </ul>
+//         </div>
+
+//         {/* =================================================
+//             OE
+//         ================================================= */}
+//         <Field label={`OE Response (${oe.length} chars)`}>
+//           <textarea
+//             className="input h-32 resize-y"
+//             value={oe}
+//             onChange={(event) => {
+//               setOe(event.target.value);
+//               setQuality(null);
+//             }}
+//             placeholder="Write your open-ended response here..."
+//             spellCheck
+//           />
+//         </Field>
+
+//         {oe.length > 0 && (
+//           <div
+//             className={`mb-3 text-xs font-semibold ${
+//               oe.length >= 100 && oe.length <= 300
+//                 ? "text-success"
+//                 : "text-orange-600"
+//             }`}
+//           >
+//             {oe.length >= 100 && oe.length <= 300 ? "✓" : "⚠"}{" "}
+//             Recommended length: 100–300 characters
+//           </div>
+//         )}
+
+//         {/* =================================================
+//             SCREENSHOT (click + drop)
+//         ================================================= */}
+//         <div className="mb-4 flex gap-2">
+//           <label
+//             className={`btn-muted flex-1 cursor-pointer transition-colors ${
+//               isDragging
+//                 ? "border-brand bg-blue-50 ring-2 ring-brand/30"
+//                 : ""
+//             }`}
+//             onDragOver={handleDragOver}
+//             onDragEnter={handleDragOver}
+//             onDragLeave={handleDragLeave}
+//             onDrop={handleDrop}
+//           >
+//             <ImagePlus size={16} />
+//             {isDragging
+//               ? "Drop image here"
+//               : image
+//                 ? "Replace screenshot"
+//                 : "Attach screenshot"}
+
+//             <input
+//               hidden
+//               type="file"
+//               accept="image/*"
+//               onChange={handleImageChange}
+//             />
+//           </label>
+
+//           {image && (
+//             <button
+//               type="button"
+//               className="btn-muted"
+//               onClick={() => setImage(null)}
+//             >
+//               <X size={16} />
+//             </button>
+//           )}
+//         </div>
+
+//         {image && (
+//           <img
+//             src={image}
+//             alt="Screenshot preview"
+//             className="mb-4 max-h-36 rounded-lg border-2 border-brand object-contain"
+//           />
+//         )}
+
+//         {/* =================================================
+//             APPROVED OEs
+//         ================================================= */}
+//         <div className="mb-4 rounded-xl border-2 border-slate-200 bg-slate-50 p-3">
+//           <button
+//             type="button"
+//             className="flex w-full items-center justify-between text-sm font-bold text-brand"
+//             onClick={() => setShowPID((previous) => !previous)}
+//           >
+//             <span>
+//               <Search size={15} className="mr-1 inline" />
+//               Check Approved OEs for this PID
+//             </span>
+//             {showPID ? (
+//               <ChevronUp size={16} />
+//             ) : (
+//               <ChevronDown size={16} />
+//             )}
+//           </button>
+
+//           {showPID && (
+//             <div className="mt-3">
+//               <div className="flex gap-2">
+//                 <input
+//                   className="input"
+//                   value={pid}
+//                   onChange={(event) => setPid(event.target.value)}
+//                   placeholder="PID"
+//                 />
+//                 <button
+//                   type="button"
+//                   className="btn-primary"
+//                   onClick={approvedSearch}
+//                 >
+//                   <Search size={16} />
+//                 </button>
+//               </div>
+
+//               <div className="mt-2 max-h-52 space-y-2 overflow-auto">
+//                 {approved.length === 0 ? (
+//                   <p className="p-2 text-center text-xs text-slate-500">
+//                     No approved OEs found.
+//                   </p>
+//                 ) : (
+//                   approved.map((item, index) => (
+//                     <div
+//                       key={
+//                         item.id ||
+//                         item._id ||
+//                         `${item.qNumber}-${index}`
+//                       }
+//                       className="rounded-lg border border-green-200 bg-white p-3 text-sm"
+//                     >
+//                       <b className="text-brand">{item.qNumber}</b>
+//                       <p className="mt-1 text-green-800">
+//                         {item.approvedOE || item.oeResponse}
+//                       </p>
+//                     </div>
+//                   ))
+//                 )}
+//               </div>
+//             </div>
+//           )}
+//         </div>
+
+//         {/* =================================================
+//             QUALITY
+//         ================================================= */}
+//         {quality && <Quality data={quality} />}
+
+//         {/* =================================================
+//             MESSAGE
+//         ================================================= */}
+//         {message && (
+//           <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+//             {message}
+//           </div>
+//         )}
+
+//         {/* =================================================
+//             BUTTONS
+//         ================================================= */}
+//         <div className="flex gap-2">
+//           <button
+//             type="button"
+//             className="btn-muted flex-1"
+//             onClick={check}
+//             disabled={checking}
+//           >
+//             <Sparkles size={16} />
+//             {checking ? "Checking..." : "Check Quality"}
+//           </button>
+
+//           <button
+//             type="button"
+//             className="btn-primary flex-1"
+//             onClick={submit}
+//             disabled={checking || !quality}
+//           >
+//             <Send size={16} />
+//             {checking ? "Submitting..." : "Submit OE"}
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
+// /* =========================================================
+//    FIELD
+// ========================================================= */
+
+// function Field({
+//   label,
+//   children,
+// }: {
+//   label: string;
+//   children: React.ReactNode;
+// }) {
+//   return (
+//     <div className="field">
+//       <label className="label">{label}</label>
+//       {children}
+//     </div>
+//   );
+// }
+
+// /* =========================================================
+//    DROPDOWN
+// ========================================================= */
+
+// function Dropdown({
+//   items,
+//   onSelect,
+// }: {
+//   items: string[];
+//   onSelect: (value: string) => void;
+// }) {
+//   return (
+//     <div className="absolute z-30 mt-1 max-h-48 w-full overflow-auto rounded-lg border-2 border-brand bg-white shadow-lg">
+//       {items.map((item) => (
+//         <button
+//           type="button"
+//           key={item}
+//           className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-blue-50"
+//           onMouseDown={(event) => {
+//             event.preventDefault();
+//             onSelect(item);
+//           }}
+//         >
+//           {item}
+//         </button>
+//       ))}
+//     </div>
+//   );
+// }
+
+// /* =========================================================
+//    QUALITY
+// ========================================================= */
+
+// function Quality({ data }: { data: any }) {
+//   const humanScore = Number(data?.ai_score ?? data?.aiScore ?? 0);
+//   const relevancyScore = Number(
+//     data?.relevancy_score ?? data?.relScore ?? 0
+//   );
+//   const reason = data?.ai_reason || data?.aiReason || "";
+
+//   return (
+//     <div className="mb-4 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
+//       <div className="mb-3 font-bold">Quality check</div>
+
+//       <div className="grid grid-cols-2 gap-3">
+//         <Score label="Human" value={humanScore} />
+//         <Score label="Relevancy" value={relevancyScore} />
+//       </div>
+
+//       {reason && (
+//         <p className="mt-2 text-xs text-slate-600">{reason}</p>
+//       )}
+//     </div>
+//   );
+// }
+
+// /* =========================================================
+//    SCORE
+// ========================================================= */
+
+// function Score({
+//   label,
+//   value,
+// }: {
+//   label: string;
+//   value: number;
+// }) {
+//   return (
+//     <div className="rounded-lg bg-white p-3 text-center shadow-sm">
+//       <div className="text-[10px] font-bold uppercase text-slate-400">
+//         {label}
+//       </div>
+//       <div
+//         className={`text-2xl font-bold ${
+//           value >= 65
+//             ? "text-success"
+//             : value >= 50
+//               ? "text-orange-600"
+//               : "text-danger"
+//         }`}
+//       >
+//         {value}/100
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
 "use client";
 
-import { useEffect, useMemo,useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -20,76 +800,101 @@ type SubmitViewProps = {
   memberName: string;
 };
 
-export default function SubmitView({
-  memberName,
-}: SubmitViewProps) {
+// =========================================================
+// DUPLICATE CHECK HELPERS
+// =========================================================
+
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ") // drop punctuation
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Word-overlap similarity, 0..1
+const similarity = (a: string, b: string) => {
+  const A = new Set(a.split(" "));
+  const B = new Set(b.split(" "));
+  let common = 0;
+  A.forEach((w) => {
+    if (B.has(w)) common++;
+  });
+  const union = A.size + B.size - common;
+  return union ? common / union : 0;
+};
+
+// 1 = exact matches only, 0.85 = also very similar responses
+const SIMILARITY_THRESHOLD = 0.85;
+
+export default function SubmitView({ memberName }: SubmitViewProps) {
   // =========================================================
   // USER
   // =========================================================
 
   const name = memberName.trim();
   const wsRef = useRef<WebSocket | null>(null);
+  
 
   useEffect(() => {
-  if (!name) return;
+    if (!name) return;
 
-  let ws: WebSocket | null = null;
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  let stopped = false;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let stopped = false;
 
-  const connect = () => {
-    if (stopped) return;
+    const connect = () => {
+      if (stopped) return;
 
-    try {
-      const url =
-        process.env.NEXT_PUBLIC_DQA_WS_URL ||
-        "https://oe-websocket.onrender.com";
+      try {
+        // https:// -> wss://   http:// -> ws://
+        const url = (
+          process.env.NEXT_PUBLIC_DQA_WS_URL ||
+          "wss://oe-websocket.onrender.com"
+        ).replace(/^http/, "ws");
 
-      ws = new WebSocket(url);
+        ws = new WebSocket(url);
+        wsRef.current = ws;
 
-      wsRef.current = ws;
+        ws.onopen = () => {
+          console.log("Submit realtime connected");
 
-      ws.onopen = () => {
-        console.log("Submit realtime connected");
+          ws?.send(
+            JSON.stringify({
+              type: "identify",
+              role: "employee",
+              memberName: name,
+            })
+          );
+        };
 
-        ws?.send(
-          JSON.stringify({
-            type: "identify",
-            role: "employee",
-            memberName: name,
-          })
-        );
-      };
+        ws.onclose = () => {
+          if (!stopped) {
+            reconnectTimer = setTimeout(connect, 2000);
+          }
+        };
 
-      ws.onclose = () => {
-        if (!stopped) {
-          reconnectTimer = setTimeout(connect, 2000);
-        }
-      };
+        ws.onerror = () => {
+          ws?.close();
+        };
+      } catch (error) {
+        console.error("Submit websocket error:", error);
+        reconnectTimer = setTimeout(connect, 2000);
+      }
+    };
 
-      ws.onerror = () => {
-        ws?.close();
-      };
-    } catch (error) {
-      console.error("Submit websocket error:", error);
+    connect();
 
-      reconnectTimer = setTimeout(connect, 2000);
-    }
-  };
+    return () => {
+      stopped = true;
 
-  connect();
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
 
-  return () => {
-    stopped = true;
-
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-    }
-
-    ws?.close();
-    wsRef.current = null;
-  };
-}, [name]);
+      ws?.close();
+      wsRef.current = null;
+    };
+  }, [name]);
 
   // =========================================================
   // STATE
@@ -112,6 +917,8 @@ export default function SubmitView({
 
   const [showPID, setShowPID] = useState(false);
   const [approved, setApproved] = useState<any[]>([]);
+  // All approved responses across every PID, used for global duplicate detection.
+  const [allApproved, setAllApproved] = useState<any[]>([]);
   const [pidOpen, setPidOpen] = useState(false);
 
   // =========================================================
@@ -128,9 +935,57 @@ export default function SubmitView({
       })
       .catch((error: any) => {
         if (!active) return;
-        setMessage(
-          error?.message || "Failed to load initial data."
-        );
+        setMessage(error?.message || "Failed to load initial data.");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // =========================================================
+  // AUTO-LOAD APPROVED OEs WHEN PID CHANGES
+  // =========================================================
+
+  useEffect(() => {
+    const p = pid.trim();
+
+    if (!p) {
+      setApproved([]);
+      return;
+    }
+
+    let active = true;
+
+    const timer = setTimeout(async () => {
+      try {
+        const result = await api<any[]>("getApprovedOEsByPID", { pid: p });
+        if (active) setApproved(Array.isArray(result) ? result : []);
+      } catch {
+        if (active) setApproved([]);
+      }
+    }, 400); // debounce while the user types the PID
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [pid]);
+
+  // =========================================================
+  // LOAD APPROVED OEs ACROSS ALL PIDs FOR GLOBAL DUPLICATE CHECK
+  // =========================================================
+
+  useEffect(() => {
+    let active = true;
+
+    api<any[]>("getAllApprovedOEs")
+      .then((result) => {
+        if (active) setAllApproved(Array.isArray(result) ? result : []);
+      })
+      .catch((error: any) => {
+        console.error("Failed to load approved OEs for global duplicate check:", error);
+        if (active) setAllApproved([]);
       });
 
     return () => {
@@ -149,6 +1004,29 @@ export default function SubmitView({
       .filter((item) => item.toLowerCase().includes(search))
       .slice(0, 12);
   }, [pids, pid]);
+
+  // =========================================================
+  // DUPLICATE ("RESPONSE ALREADY TAKEN") CHECK
+  // =========================================================
+
+  const duplicate = useMemo(() => {
+    const current = normalize(oe);
+    if (current.length < 10) return null; // ignore very short text
+
+    for (const item of allApproved) {
+      const existing = normalize(
+        String(item.approvedOE || item.oeResponse || "")
+      );
+      if (!existing) continue;
+
+      if (existing === current) return { item, exact: true };
+      if (similarity(current, existing) >= SIMILARITY_THRESHOLD) {
+        return { item, exact: false };
+      }
+    }
+
+    return null;
+  }, [oe, allApproved]);
 
   // =========================================================
   // CHECK QUALITY
@@ -176,9 +1054,7 @@ export default function SubmitView({
 
       setQuality(result);
     } catch (error: any) {
-      setMessage(
-        error?.message || "Unable to check OE quality."
-      );
+      setMessage(error?.message || "Unable to check OE quality.");
     } finally {
       setChecking(false);
     }
@@ -206,6 +1082,13 @@ export default function SubmitView({
       return;
     }
 
+    if (duplicate) {
+      setMessage(
+        "This response is already taken. Please write a different response."
+      );
+      return;
+    }
+
     setChecking(true);
 
     try {
@@ -218,35 +1101,69 @@ export default function SubmitView({
         });
       }
 
+      // const result = await api<any>("submitOE", {
+      //   // Always use authenticated member name.
+      //   memberName: name,
+      //   pid: pid.trim(),
+      //   qNumber: qNo,
+      //   qText: qText.trim(),
+      //   oeResponse: oe.trim(),
+      //   isRelatedToPrevious: related,
+      //   imageUrl,
+      //   qualityResult: quality,
+      // });
+
       const result = await api<any>("submitOE", {
-        // Always use authenticated member name.
-        memberName: name,
-        pid: pid.trim(),
-        qNumber: qNo,
-        qText: qText.trim(),
-        oeResponse: oe.trim(),
-        isRelatedToPrevious: related,
-        imageUrl,
-        qualityResult: quality,
-      });
+  memberName: name,
+  pid: pid.trim(),
+  qNumber: qNo,
+  qText: qText.trim(),
+  oeResponse: oe.trim(),
+  isRelatedToPrevious: related,
+  imageUrl,
+  qualityResult: quality,
+});
 
-      const submittedAt = new Date().toISOString();
+if (result?.duplicate) {
+  setMessage(
+    result.message ||
+    "X->This response is already taken. Please write a different response."
+  );
 
-wsRef.current?.send(
-  JSON.stringify({
-    type: "oe-submitted",
-    oeId: result?.id || "",
-    memberName: name,
+  return;
+}
+
+      // The submission already succeeded. A realtime failure must never
+      // turn it into an error (that would cause duplicate resubmits).
+      try {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(
+            JSON.stringify({
+              type: "oe-submitted",
+              oeId: result?.id || "",
+              memberName: name,
+              pid: pid.trim(),
+              qNumber: qNo,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        }
+      } catch (wsError) {
+        console.warn("Realtime notify failed:", wsError);
+      }
+
+
+      setAllApproved((prev) => [
+  ...prev,
+  {
+    id: result?.id || "",
     pid: pid.trim(),
-    qNumber: qNo,
-    timestamp: submittedAt,
-  })
-);
+    approvedOE: oe.trim(),
+  },
+]);
 
       setMessage(
-        `Submitted successfully${
-          result?.id ? ` — ID: ${result.id}` : ""
-        }`
+        `Submitted successfully${result?.id ? ` — ID: ${result.id}` : ""}`
       );
 
       if (typeof window !== "undefined") {
@@ -288,9 +1205,7 @@ wsRef.current?.send(
 
       setApproved(result || []);
     } catch (error: any) {
-      setMessage(
-        error?.message || "Failed to load approved OEs."
-      );
+      setMessage(error?.message || "Failed to load approved OEs.");
     }
   };
 
@@ -318,9 +1233,7 @@ wsRef.current?.send(
     reader.readAsDataURL(file);
   };
 
-  const handleImageChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -360,18 +1273,14 @@ wsRef.current?.send(
     <div className="mx-auto w-full max-w-3xl">
       {/* HEADER */}
       <div className="rounded-t-2xl bg-black px-5 py-5 text-center text-white">
-        <h3 className="text-xl font-bold">
-          📋 Submit Open-End Response
-        </h3>
+        <h3 className="text-xl font-bold">📋 Submit Open-End Response</h3>
         <p className="mt-1 text-xs opacity-85">
           Submit your response and check its quality
         </p>
       </div>
 
       <div className="card rounded-t-none">
-        {/* =================================================
-            USER NAME
-        ================================================= */}
+        {/* USER NAME */}
         <Field label="Your Name">
           <div className="relative">
             <input
@@ -393,9 +1302,7 @@ wsRef.current?.send(
           </div>
         </Field>
 
-        {/* =================================================
-            PID
-        ================================================= */}
+        {/* PID */}
         <Field label="PID">
           <div className="relative">
             <input
@@ -403,6 +1310,7 @@ wsRef.current?.send(
               value={pid}
               placeholder="Search or type PID..."
               onFocus={() => setPidOpen(true)}
+              onBlur={() => setTimeout(() => setPidOpen(false), 150)}
               onChange={(event) => {
                 setPid(event.target.value);
                 setPidOpen(true);
@@ -421,9 +1329,7 @@ wsRef.current?.send(
           </div>
         </Field>
 
-        {/* =================================================
-            QUESTION
-        ================================================= */}
+        {/* QUESTION */}
         <Field label="Question">
           <div className="flex gap-2">
             <select
@@ -453,24 +1359,23 @@ wsRef.current?.send(
           </div>
         </Field>
 
-        {/* =================================================
-            RELATED
-        ================================================= */}
+        {/* RELATED */}
         <label className="mb-4 flex cursor-pointer items-center gap-2 rounded-lg border border-blue-100 bg-slate-50 p-3 text-sm">
           <input
             type="checkbox"
             checked={related}
-            onChange={(event) => setRelated(event.target.checked)}
+            onChange={(event) => {
+              setRelated(event.target.checked);
+              setQuality(null);
+            }}
           />
           <span>
-            <b className="text-brand">Related to previous question</b>{" "}
-            — my answer continues or relates to the previous question
+            <b className="text-brand">Related to previous question</b> — my
+            answer continues or relates to the previous question
           </span>
         </label>
 
-        {/* =================================================
-            TIPS
-        ================================================= */}
+        {/* TIPS */}
         <div className="mb-4 rounded-lg border-l-4 border-brand bg-blue-50 p-3 text-sm">
           <b>
             <Lightbulb className="mr-1 inline" size={16} />
@@ -485,12 +1390,12 @@ wsRef.current?.send(
           </ul>
         </div>
 
-        {/* =================================================
-            OE
-        ================================================= */}
+        {/* OE */}
         <Field label={`OE Response (${oe.length} chars)`}>
           <textarea
-            className="input h-32 resize-y"
+            className={`input h-32 resize-y ${
+              duplicate ? "border-red-400 ring-2 ring-red-100" : ""
+            }`}
             value={oe}
             onChange={(event) => {
               setOe(event.target.value);
@@ -509,20 +1414,31 @@ wsRef.current?.send(
                 : "text-orange-600"
             }`}
           >
-            {oe.length >= 100 && oe.length <= 300 ? "✓" : "⚠"}{" "}
-            Recommended length: 100–300 characters
+            {oe.length >= 100 && oe.length <= 300 ? "✓" : "⚠"} Recommended
+            length: 100–300 characters
           </div>
         )}
 
-        {/* =================================================
-            SCREENSHOT (click + drop)
-        ================================================= */}
+        {/* RESPONSE ALREADY TAKEN */}
+        {duplicate && (
+          <div className="mb-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            🚫 <b>This response is already taken</b>
+            {duplicate.item.pid ? ` — PID ${duplicate.item.pid}` : ""}
+            {duplicate.item.qNumber ? `, ${duplicate.item.qNumber}` : ""}
+            {duplicate.exact ? "." : " (very similar)."} This response matches an
+            approved response under {duplicate.item.pid && pid.trim() &&
+            String(duplicate.item.pid).trim().toLowerCase() !== pid.trim().toLowerCase()
+              ? "a different PID"
+              : "an approved PID"}.
+            Please write a different response.
+          </div>
+        )}
+
+        {/* SCREENSHOT (click + drop) */}
         <div className="mb-4 flex gap-2">
           <label
             className={`btn-muted flex-1 cursor-pointer transition-colors ${
-              isDragging
-                ? "border-brand bg-blue-50 ring-2 ring-brand/30"
-                : ""
+              isDragging ? "border-brand bg-blue-50 ring-2 ring-brand/30" : ""
             }`}
             onDragOver={handleDragOver}
             onDragEnter={handleDragOver}
@@ -563,9 +1479,7 @@ wsRef.current?.send(
           />
         )}
 
-        {/* =================================================
-            APPROVED OEs
-        ================================================= */}
+        {/* APPROVED OEs */}
         <div className="mb-4 rounded-xl border-2 border-slate-200 bg-slate-50 p-3">
           <button
             type="button"
@@ -576,11 +1490,7 @@ wsRef.current?.send(
               <Search size={15} className="mr-1 inline" />
               Check Approved OEs for this PID
             </span>
-            {showPID ? (
-              <ChevronUp size={16} />
-            ) : (
-              <ChevronDown size={16} />
-            )}
+            {showPID ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
 
           {showPID && (
@@ -609,11 +1519,7 @@ wsRef.current?.send(
                 ) : (
                   approved.map((item, index) => (
                     <div
-                      key={
-                        item.id ||
-                        item._id ||
-                        `${item.qNumber}-${index}`
-                      }
+                      key={item.id || item._id || `${item.qNumber}-${index}`}
                       className="rounded-lg border border-green-200 bg-white p-3 text-sm"
                     >
                       <b className="text-brand">{item.qNumber}</b>
@@ -628,23 +1534,17 @@ wsRef.current?.send(
           )}
         </div>
 
-        {/* =================================================
-            QUALITY
-        ================================================= */}
+        {/* QUALITY */}
         {quality && <Quality data={quality} />}
 
-        {/* =================================================
-            MESSAGE
-        ================================================= */}
+        {/* MESSAGE */}
         {message && (
           <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
             {message}
           </div>
         )}
 
-        {/* =================================================
-            BUTTONS
-        ================================================= */}
+        {/* BUTTONS */}
         <div className="flex gap-2">
           <button
             type="button"
@@ -660,7 +1560,7 @@ wsRef.current?.send(
             type="button"
             className="btn-primary flex-1"
             onClick={submit}
-            disabled={checking || !quality}
+            disabled={checking || !quality || !!duplicate}
           >
             <Send size={16} />
             {checking ? "Submitting..." : "Submit OE"}
@@ -726,9 +1626,7 @@ function Dropdown({
 
 function Quality({ data }: { data: any }) {
   const humanScore = Number(data?.ai_score ?? data?.aiScore ?? 0);
-  const relevancyScore = Number(
-    data?.relevancy_score ?? data?.relScore ?? 0
-  );
+  const relevancyScore = Number(data?.relevancy_score ?? data?.relScore ?? 0);
   const reason = data?.ai_reason || data?.aiReason || "";
 
   return (
@@ -740,9 +1638,7 @@ function Quality({ data }: { data: any }) {
         <Score label="Relevancy" value={relevancyScore} />
       </div>
 
-      {reason && (
-        <p className="mt-2 text-xs text-slate-600">{reason}</p>
-      )}
+      {reason && <p className="mt-2 text-xs text-slate-600">{reason}</p>}
     </div>
   );
 }
@@ -751,13 +1647,7 @@ function Quality({ data }: { data: any }) {
    SCORE
 ========================================================= */
 
-function Score({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
+function Score({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg bg-white p-3 text-center shadow-sm">
       <div className="text-[10px] font-bold uppercase text-slate-400">
