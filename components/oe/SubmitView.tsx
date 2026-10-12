@@ -55,8 +55,9 @@ export default function SubmitView({ memberName }: SubmitViewProps) {
 
   const name = memberName.trim();
   const wsRef = useRef<WebSocket | null>(null);
-  const MIN_HUMAN_SCORE = 50;
-  
+  const MIN_HUMAN_SCORE = 25;
+  const MIN_RELEVANCY_SCORE = 60;
+
 
   useEffect(() => {
     if (!name) return;
@@ -252,10 +253,18 @@ export default function SubmitView({ memberName }: SubmitViewProps) {
   }, [oe, allApproved]);
 
   const humanScore = Number(
-  quality?.ai_score ?? quality?.aiScore ?? 0
+    quality?.ai_score ?? quality?.aiScore ?? 0
+  );
+
+  const relevancyScore = Number(
+  quality?.relevancy_score ?? quality?.relScore ?? 0
 );
 
-const lowHumanScore = quality && humanScore <= MIN_HUMAN_SCORE;
+const invalidScore =
+  quality &&
+  (humanScore <= MIN_HUMAN_SCORE || relevancyScore <= MIN_RELEVANCY_SCORE);
+
+  // const lowHumanScore = quality && humanScore <= MIN_HUMAN_SCORE;
 
   // =========================================================
   // CHECK QUALITY
@@ -311,13 +320,18 @@ const lowHumanScore = quality && humanScore <= MIN_HUMAN_SCORE;
       return;
     }
 
-    const currentHumanScore = Number(
+   const currentHumanScore = Number(
   quality?.ai_score ?? quality?.aiScore ?? 0
 );
 
-if (currentHumanScore <= 50) {
+const currentRelevancyScore = Number(
+  quality?.relevancy_score ?? quality?.relScore ?? 0
+);
+
+if (currentHumanScore <= 25 || currentRelevancyScore <= 60) {
   setMessage(
-    `Your score is very low (${currentHumanScore}/100). Please improve your response before submitting.`
+    `Submission requires Human score > 25 and Relevancy score > 60. ` +
+    `Current scores: Human ${currentHumanScore}/100, Relevancy ${currentRelevancyScore}/100.`
   );
   return;
 }
@@ -354,24 +368,24 @@ if (currentHumanScore <= 50) {
       // });
 
       const result = await api<any>("submitOE", {
-  memberName: name,
-  pid: pid.trim(),
-  qNumber: qNo,
-  qText: qText.trim(),
-  oeResponse: oe.trim(),
-  isRelatedToPrevious: related,
-  imageUrl,
-  qualityResult: quality,
-});
+        memberName: name,
+        pid: pid.trim(),
+        qNumber: qNo,
+        qText: qText.trim(),
+        oeResponse: oe.trim(),
+        isRelatedToPrevious: related,
+        imageUrl,
+        qualityResult: quality,
+      });
 
-if (result?.duplicate) {
-  setMessage(
-    result.message ||
-    "X->This response is already taken. Please write a different response."
-  );
+      if (result?.duplicate) {
+        setMessage(
+          result.message ||
+          "X->This response is already taken. Please write a different response."
+        );
 
-  return;
-}
+        return;
+      }
 
       // The submission already succeeded. A realtime failure must never
       // turn it into an error (that would cause duplicate resubmits).
@@ -394,13 +408,13 @@ if (result?.duplicate) {
 
 
       setAllApproved((prev) => [
-  ...prev,
-  {
-    id: result?.id || "",
-    pid: pid.trim(),
-    approvedOE: oe.trim(),
-  },
-]);
+        ...prev,
+        {
+          id: result?.id || "",
+          pid: pid.trim(),
+          approvedOE: oe.trim(),
+        },
+      ]);
 
       setMessage(
         `Submitted successfully${result?.id ? ` — ID: ${result.id}` : ""}`
@@ -633,9 +647,8 @@ if (result?.duplicate) {
         {/* OE */}
         <Field label={`OE Response (${oe.length} chars)`}>
           <textarea
-            className={`input h-32 resize-y ${
-              duplicate ? "border-red-400 ring-2 ring-red-100" : ""
-            }`}
+            className={`input h-32 resize-y ${duplicate ? "border-red-400 ring-2 ring-red-100" : ""
+              }`}
             value={oe}
             onChange={(event) => {
               setOe(event.target.value);
@@ -648,11 +661,10 @@ if (result?.duplicate) {
 
         {oe.length > 0 && (
           <div
-            className={`mb-3 text-xs font-semibold ${
-              oe.length >= 100 && oe.length <= 300
+            className={`mb-3 text-xs font-semibold ${oe.length >= 100 && oe.length <= 300
                 ? "text-success"
                 : "text-orange-600"
-            }`}
+              }`}
           >
             {oe.length >= 100 && oe.length <= 300 ? "✓" : "⚠"} Recommended
             length: 100–300 characters
@@ -667,7 +679,7 @@ if (result?.duplicate) {
             {duplicate.item.qNumber ? `, ${duplicate.item.qNumber}` : ""}
             {duplicate.exact ? "." : " (very similar)."} This response matches an
             approved response under {duplicate.item.pid && pid.trim() &&
-            String(duplicate.item.pid).trim().toLowerCase() !== pid.trim().toLowerCase()
+              String(duplicate.item.pid).trim().toLowerCase() !== pid.trim().toLowerCase()
               ? "a different PID"
               : "an approved PID"}.
             Please write a different response.
@@ -677,9 +689,8 @@ if (result?.duplicate) {
         {/* SCREENSHOT (click + drop) */}
         <div className="mb-4 flex gap-2">
           <label
-            className={`btn-muted flex-1 cursor-pointer transition-colors ${
-              isDragging ? "border-brand bg-blue-50 ring-2 ring-brand/30" : ""
-            }`}
+            className={`btn-muted flex-1 cursor-pointer transition-colors ${isDragging ? "border-brand bg-blue-50 ring-2 ring-brand/30" : ""
+              }`}
             onDragOver={handleDragOver}
             onDragEnter={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -801,12 +812,13 @@ if (result?.duplicate) {
             className="btn-primary flex-1"
             onClick={submit}
             disabled={
-  checking ||
-  !quality ||
-  !!duplicate ||
-  lowHumanScore
-}
-            // disabled={checking || !quality || !!duplicate}
+              checking ||
+              !quality ||
+              !!duplicate ||
+               invalidScore
+              // lowHumanScore
+            }
+          // disabled={checking || !quality || !!duplicate}
           >
             <Send size={16} />
             {checking ? "Submitting..." : "Submit OE"}
@@ -887,10 +899,10 @@ function Quality({ data }: { data: any }) {
       {reason && <p className="mt-2 text-xs text-slate-600">{reason}</p>}
 
       {humanScore <= 50 && (
-  <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">
-    ⚠️ Your score is very low. Please improve your response before submitting.
-  </div>
-)}
+        <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">
+          ⚠️ Your score is very low. Please improve your response before submitting.
+        </div>
+      )}
     </div>
   );
 }
@@ -906,13 +918,12 @@ function Score({ label, value }: { label: string; value: number }) {
         {label}
       </div>
       <div
-        className={`text-2xl font-bold ${
-          value >= 65
+        className={`text-2xl font-bold ${value >= 65
             ? "text-success"
             : value >= 50
               ? "text-orange-600"
               : "text-danger"
-        }`}
+          }`}
       >
         {value}/100
       </div>
