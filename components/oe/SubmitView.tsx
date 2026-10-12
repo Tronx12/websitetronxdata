@@ -262,7 +262,7 @@ export default function SubmitView({ memberName }: SubmitViewProps) {
 
 const invalidScore =
   quality &&
-  (humanScore <= MIN_HUMAN_SCORE || relevancyScore <= MIN_RELEVANCY_SCORE);
+  (humanScore <= MIN_HUMAN_SCORE || relevancyScore < MIN_RELEVANCY_SCORE);
 
   // const lowHumanScore = quality && humanScore <= MIN_HUMAN_SCORE;
 
@@ -328,7 +328,7 @@ const currentRelevancyScore = Number(
   quality?.relevancy_score ?? quality?.relScore ?? 0
 );
 
-if (currentHumanScore <= 25 || currentRelevancyScore <= 60) {
+if (currentHumanScore <= 25 || currentRelevancyScore < 60) {
   setMessage(
     `Submission requires Human score > 25 and Relevancy score > 60. ` +
     `Current scores: Human ${currentHumanScore}/100, Relevancy ${currentRelevancyScore}/100.`
@@ -898,7 +898,7 @@ function Quality({ data }: { data: any }) {
 
       {reason && <p className="mt-2 text-xs text-slate-600">{reason}</p>}
 
-      {humanScore <= 50 && (
+      {humanScore <25 && (
         <div className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">
           ⚠️ Your score is very low. Please improve your response before submitting.
         </div>
