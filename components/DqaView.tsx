@@ -3428,6 +3428,7 @@
 
 "use client";
 
+import "@/lib/forceIST";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText,

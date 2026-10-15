@@ -3,6 +3,7 @@
 
 "use client";
 
+import "@/lib/forceIST";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 

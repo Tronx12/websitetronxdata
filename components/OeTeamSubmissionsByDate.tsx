@@ -1,5 +1,6 @@
 "use client";
 
+import "@/lib/forceIST";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Calendar,

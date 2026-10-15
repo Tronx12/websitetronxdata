@@ -995,6 +995,8 @@
 
 "use client";
 
+import "@/lib/forceIST";
+import { toISTDateKey } from "@/lib/ist";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Chart as ChartJS,
@@ -1067,7 +1069,7 @@ type SurveyRecord = {
 };
 
 export default function SurveyPerformancePage() {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => toISTDateKey().slice(0, 7));
   const [summary, setSummary] = useState<Summary>({
     firstTarget: 0,
     secondTarget: 0,

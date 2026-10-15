@@ -3,6 +3,7 @@
 
 "use client";
 
+import "@/lib/forceIST";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
