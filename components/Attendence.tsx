@@ -402,7 +402,7 @@ export default function AttendencePage({ currentUserId }: Props) {
           <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-2 text-purple-900 font-semibold">
               <span className="px-2 py-0.5 bg-purple-600 text-white text-xs rounded uppercase">Night Shift</span>
-              <span>9:30 PM - 6:30 AM</span>
+              <span>9:30 PM - 6:00 AM</span>
             </div>
             <ul className="text-xs text-purple-800 space-y-1">
               <li>• <strong>Login:</strong> 9:30 PM to 10:10 PM</li>

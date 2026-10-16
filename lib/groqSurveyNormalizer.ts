@@ -3984,6 +3984,21 @@ function parseHeader(line: string): {
  *   21425 jgreefjday00srj United States 76.250.239.112 Completed
  */
 
+function isInvalidRespondentId(id?: string): boolean {
+  if (!id) return true;
+  const clean = id.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (
+    !clean ||
+    clean === "ip" ||
+    clean === "ipaddress" ||
+    clean === "address" ||
+    clean === "na" ||
+    clean === "none" ||
+    clean === "null" ||
+    clean === "undefined"
+  );
+}
+
 function parseRespondentLine(line: string): {
   respondentId?: string;
   country?: string;
@@ -3991,6 +4006,12 @@ function parseRespondentLine(line: string): {
   status?: string;
 } {
   const text = line.trim();
+
+  // If this line is a standard IP field (e.g. "IP: 1.2.3.4" or "IP Address - 1.2.3.4")
+  if (/^(ip\s*address|ip)\s*[-:]/i.test(text)) {
+    const ipMatch = text.match(/\b(\d{1,3}(?:\.\d{1,3}){3})\b/);
+    return ipMatch ? { ip: cleanValue(ipMatch[1]) } : {};
+  }
 
   // IP pattern
   const ipMatch = text.match(
@@ -4019,9 +4040,21 @@ function parseRespondentLine(line: string): {
     respondentId = quoted[1].trim();
     country = quoted[2].trim() || undefined;
   } else {
+    // Strip leading "IP Address" or "IP" prefix if any remains
+    const strippedBefore = beforeIp
+      .replace(/^(ip\s*address|ip)\s*[-:]*/i, "")
+      .trim();
+
+    if (!strippedBefore) {
+      return {
+        ip: cleanValue(ip),
+        status: cleanValue(status),
+      };
+    }
+
     // Try: leading number + token as id, rest country
     // e.g. 78014 rfderday00srj United States
-    const parts = beforeIp.split(/\s+/).filter(Boolean);
+    const parts = strippedBefore.split(/\s+/).filter(Boolean);
 
     if (parts.length >= 2) {
       // Skip optional leading numeric project code
@@ -4037,9 +4070,19 @@ function parseRespondentLine(line: string): {
     }
   }
 
+  if (isInvalidRespondentId(respondentId)) {
+    respondentId = undefined;
+  }
+
+  const cleanCountry = cleanValue(country);
+  const finalCountry =
+    cleanCountry && !/^(address|[-:]+)$/i.test(cleanCountry)
+      ? cleanCountry
+      : undefined;
+
   return {
     respondentId: cleanValue(respondentId),
-    country: cleanValue(country),
+    country: finalCountry,
     ip: cleanValue(ip),
     status: cleanValue(status),
   };
@@ -4160,15 +4203,26 @@ function parseBlock(block: string): Record<string, any> {
     }
 
     // Respondent / status line (contains IP)
+    // Only parse as respondent/status line if it is NOT a standard field start (e.g. "IP Address - ...", "IP: ...")
     if (/\b\d{1,3}(?:\.\d{1,3}){3}\b/.test(trimmed)) {
-      const resp = parseRespondentLine(trimmed);
-      if (resp.respondentId || resp.ip) {
-        flushCurrent();
-        if (resp.respondentId) raw.respondentId = resp.respondentId;
-        if (resp.country) raw.country = resp.country;
-        if (resp.ip) raw.ip = resp.ip;
-        if (resp.status) raw.status = resp.status;
-        continue;
+      const fieldCheck = isFieldStart(trimmed);
+      const isIpField =
+        fieldCheck &&
+        (normalizeLabel(fieldCheck.key) === "ip" ||
+          normalizeLabel(fieldCheck.key) === "ip address");
+
+      if (!isIpField) {
+        const resp = parseRespondentLine(trimmed);
+        if (resp.respondentId || resp.ip) {
+          flushCurrent();
+          if (resp.respondentId && !isInvalidRespondentId(resp.respondentId)) {
+            raw.respondentId = resp.respondentId;
+          }
+          if (resp.country && !raw.country) raw.country = resp.country;
+          if (resp.ip) raw.ip = resp.ip;
+          if (resp.status && !raw.status) raw.status = resp.status;
+          continue;
+        }
       }
     }
 
@@ -4339,7 +4393,12 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
     ["TNX Project ID", record?.tnxProjectId],
     ["Parent ID", record?.parentId],
     ["Child ID", record?.childId],
-    ["Respondent ID", record?.respondentId],
+    [
+      "Respondent ID",
+      isInvalidRespondentId(record?.respondentId)
+        ? undefined
+        : record?.respondentId,
+    ],
     ["Country", record?.country],
     ["IP Address", record?.ip],
     ["Status", record?.status],
@@ -4352,6 +4411,10 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
       data[key] = cleaned;
     }
   }
+
+  const validRespondentId = isInvalidRespondentId(record?.respondentId)
+    ? undefined
+    : cleanValue(record?.respondentId);
 
   return {
     category,
@@ -4405,7 +4468,7 @@ function normalizeRecord(record: any): NormalizedSurveyRecord {
     tnxProjectId: cleanValue(record?.tnxProjectId),
     parentId: cleanValue(record?.parentId),
     childId: cleanValue(record?.childId),
-    respondentId: cleanValue(record?.respondentId),
+    respondentId: validRespondentId,
 
     ip: cleanValue(record?.ip),
     status: cleanValue(record?.status),

@@ -1811,7 +1811,7 @@ else {
         ])
       );
 
-      const respondentId = firstNonEmpty(
+      let respondentId = firstNonEmpty(
         findDynamicValue(data, [
           "Respondent ID",
           "RespondentId",
@@ -1821,6 +1821,15 @@ else {
         item.respondentId,
         item.respondent_id
       );
+
+      if (
+        respondentId &&
+        /^(ip|ip\s*address|address|n\/?a|none|null|undefined|-)$/i.test(
+          String(respondentId).trim()
+        )
+      ) {
+        respondentId = "";
+      }
 
       const tnxProjectId = firstNonEmpty(
         findDynamicValue(data, [

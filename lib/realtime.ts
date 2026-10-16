@@ -74,82 +74,82 @@ export type RealtimeLock = {
 
 export type RealtimeEvent =
   | {
-      type: "oe-submitted";
-      oeId?: string;
-      memberName?: string;
-      pid?: string;
-      qNumber?: string;
-      timestamp?: string;
-    }
+    type: "oe-submitted";
+    oeId?: string;
+    memberName?: string;
+    pid?: string;
+    qNumber?: string;
+    timestamp?: string;
+  }
 
   | {
-      type: "oe-status-changed";
-      oeId?: string;
-      status?: string;
-      memberName?: string;
-      approvedBy?: string;
-      approvedTime?: string;
-      rejectReason?: string;
-      dqaCorrection?: string;
-      timestamp?: string;
-    }
+    type: "oe-status-changed";
+    oeId?: string;
+    status?: string;
+    memberName?: string;
+    approvedBy?: string;
+    approvedTime?: string;
+    rejectReason?: string;
+    dqaCorrection?: string;
+    timestamp?: string;
+  }
 
   | {
-      type: "result-updated";
-      oeId?: string;
-      memberName?: string;
-      status?: string;
-      timestamp?: string;
-    }
+    type: "result-updated";
+    oeId?: string;
+    memberName?: string;
+    status?: string;
+    timestamp?: string;
+  }
 
   | {
-      type: "oe-locked";
-      oeId: string;
-      dqaName: string;
-      startedAt: string;
-      expiresAt: number;
-    }
+    type: "oe-locked";
+    oeId: string;
+    dqaName: string;
+    startedAt: string;
+    expiresAt: number;
+  }
 
   | {
-      type: "oe-unlocked";
-      oeId: string;
-      dqaName?: string;
-      reason?: string;
-    }
+    type: "oe-unlocked";
+    oeId: string;
+    dqaName?: string;
+    reason?: string;
+  }
 
   | {
-      type: "current-locks";
-      locks: RealtimeLock[];
-    }
+    type: "current-locks";
+    locks: RealtimeLock[];
+  }
 
   | {
-      type: "oe-start-result";
-      success: boolean;
-      oeId?: string;
-      dqaName?: string;
-      lockedBy?: string;
-      startedAt?: string;
-      expiresAt?: number;
-      message?: string;
-    }
+    type: "oe-start-result";
+    success: boolean;
+    oeId?: string;
+    dqaName?: string;
+    lockedBy?: string;
+    startedAt?: string;
+    expiresAt?: number;
+    message?: string;
+  }
 
   | {
-      type: "oe-heartbeat-result";
-      success: boolean;
-      oeId?: string;
-      expiresAt?: number;
-      message?: string;
-    }
+    type: "oe-heartbeat-result";
+    success: boolean;
+    oeId?: string;
+    expiresAt?: number;
+    message?: string;
+  }
 
   | {
-      type: "oe-lock-expired";
-      oeId: string;
-    }
+    type: "oe-lock-expired";
+    oeId: string;
+  }
 
   | {
-      type: "error";
-      message?: string;
-    };
+    type: "error";
+    message?: string;
+  };
 
 export function getRealtimeUrl(): string {
   if (typeof window === "undefined") {

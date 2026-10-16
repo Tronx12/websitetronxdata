@@ -1430,7 +1430,7 @@ export async function GET(
         ])
       );
 
-      const respondentId = firstNonEmpty(
+      let respondentId = firstNonEmpty(
         findDynamicValue(data, [
           "Respondent ID",
           "RespondentId",
@@ -1440,6 +1440,15 @@ export async function GET(
         item.respondentId,
         item.respondent_id
       );
+
+      if (
+        respondentId &&
+        /^(ip|ip\s*address|address|n\/?a|none|null|undefined|-)$/i.test(
+          String(respondentId).trim()
+        )
+      ) {
+        respondentId = "";
+      }
 
       const tnxProjectId = firstNonEmpty(
         findDynamicValue(data, [
@@ -1653,16 +1662,24 @@ export async function GET(
             "Household Income per month",
           ]),
 
-          "Respondent ID": firstNonEmpty(
-            findDynamicValue(data, [
-              "Respondent ID",
-              "RespondentId",
-              "RespondentID",
-              "respondent_id",
-            ]),
-            item.respondentId,
-            item.respondent_id
-          ),
+          "Respondent ID": (() => {
+            const rid = firstNonEmpty(
+              findDynamicValue(data, [
+                "Respondent ID",
+                "RespondentId",
+                "RespondentID",
+                "respondent_id",
+              ]),
+              item.respondentId,
+              item.respondent_id
+            );
+            return rid &&
+              !/^(ip|ip\s*address|address|n\/?a|none|null|undefined|-)$/i.test(
+                String(rid).trim()
+              )
+              ? rid
+              : "";
+          })(),
 
           "PID": item.pid,
           "Supplier ID": item.supplierId,
