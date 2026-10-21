@@ -1,6 +1,4 @@
 
-
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -18,6 +16,8 @@ import {
   CheckSquare,
   Square,
   FileSpreadsheet,
+    Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface UserData {
@@ -152,6 +152,26 @@ export default function AttendancePage() {
   const [sortBy, setSortBy] = useState<
     "employee" | "role"
   >("employee");
+
+
+
+  const [editingRecord, setEditingRecord] =
+  useState<AttendanceRecord | null>(null);
+
+const [isSaving, setIsSaving] =
+  useState(false);
+
+const [isDeleting, setIsDeleting] =
+  useState<string | null>(null);
+
+const [editForm, setEditForm] = useState({
+  loggingTime: "",
+  logoutTime: "",
+  lunchStart: "",
+  lunchEnd: "",
+  status: "present",
+  remarks: "",
+});
 
   // ============================================================
   // FETCH ATTENDANCE
@@ -577,6 +597,281 @@ export default function AttendancePage() {
 
       setShowDownloadPanel(true);
     };
+
+    // ============================================================
+// EDIT ATTENDANCE
+// ============================================================
+
+const toDateTimeLocal = (
+  value?: string
+) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, "0");
+  const day = String(
+    date.getDate()
+  ).padStart(2, "0");
+  const hours = String(
+    date.getHours()
+  ).padStart(2, "0");
+  const minutes = String(
+    date.getMinutes()
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const openEditModal = (
+  record: AttendanceRecord
+) => {
+  setEditingRecord(record);
+
+  setEditForm({
+    loggingTime: toDateTimeLocal(
+      record.loggingTime
+    ),
+    logoutTime: toDateTimeLocal(
+      record.logoutTime
+    ),
+    lunchStart: toDateTimeLocal(
+      record.lunchStart
+    ),
+    lunchEnd: toDateTimeLocal(
+      record.lunchEnd
+    ),
+    status:
+      record.status || "present",
+    remarks:
+      record.remarks || "",
+  });
+};
+
+const closeEditModal = () => {
+  if (isSaving) return;
+
+  setEditingRecord(null);
+
+  setEditForm({
+    loggingTime: "",
+    logoutTime: "",
+    lunchStart: "",
+    lunchEnd: "",
+    status: "present",
+    remarks: "",
+  });
+};
+
+const updateEditField = (
+  field: keyof typeof editForm,
+  value: string
+) => {
+  setEditForm((current) => ({
+    ...current,
+    [field]: value,
+  }));
+};
+
+const saveAttendance = async () => {
+  if (!editingRecord) return;
+
+  try {
+    setIsSaving(true);
+
+    const response = await fetch(
+      `/api/attendence/${editingRecord._id}`,
+      {
+       method: "PUT",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          loggingTime:
+            editForm.loggingTime
+              ? new Date(
+                  editForm.loggingTime
+                ).toISOString()
+              : null,
+
+          logoutTime:
+            editForm.logoutTime
+              ? new Date(
+                  editForm.logoutTime
+                ).toISOString()
+              : null,
+
+          lunchStart:
+            editForm.lunchStart
+              ? new Date(
+                  editForm.lunchStart
+                ).toISOString()
+              : null,
+
+          lunchEnd:
+            editForm.lunchEnd
+              ? new Date(
+                  editForm.lunchEnd
+                ).toISOString()
+              : null,
+
+          status:
+            editForm.status,
+
+          remarks:
+            editForm.remarks,
+        }),
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          data?.error ||
+          "Failed to update attendance"
+      );
+    }
+
+    // Update local state immediately
+    setRecords((current) =>
+      current.map((record) =>
+        record._id ===
+        editingRecord._id
+          ? {
+              ...record,
+              loggingTime:
+                editForm.loggingTime
+                  ? new Date(
+                      editForm.loggingTime
+                    ).toISOString()
+                  : undefined,
+
+              logoutTime:
+                editForm.logoutTime
+                  ? new Date(
+                      editForm.logoutTime
+                    ).toISOString()
+                  : undefined,
+
+              lunchStart:
+                editForm.lunchStart
+                  ? new Date(
+                      editForm.lunchStart
+                    ).toISOString()
+                  : undefined,
+
+              lunchEnd:
+                editForm.lunchEnd
+                  ? new Date(
+                      editForm.lunchEnd
+                    ).toISOString()
+                  : undefined,
+
+              status:
+                editForm.status as
+                  | "present"
+                  | "absent"
+                  | "half-day"
+                  | "office-off",
+
+              remarks:
+                editForm.remarks,
+            }
+          : record
+      )
+    );
+
+    closeEditModal();
+
+    alert(
+      "Attendance updated successfully."
+    );
+  } catch (error: any) {
+    console.error(
+      "Update attendance error:",
+      error
+    );
+
+    alert(
+      error?.message ||
+        "Failed to update attendance"
+    );
+  } finally {
+    setIsSaving(false);
+  }
+};
+
+// ============================================================
+// DELETE ATTENDANCE
+// ============================================================
+
+const deleteAttendance = async (
+  record: AttendanceRecord
+) => {
+  const confirmed = window.confirm(
+    `Are you sure you want to delete attendance for ${formatDate(
+      record.date
+    )}?\n\nThis action cannot be undone.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    setIsDeleting(record._id);
+
+    const response = await fetch(
+      `/api/attendence/${record._id}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          data?.error ||
+          "Failed to delete attendance"
+      );
+    }
+
+    setRecords((current) =>
+      current.filter(
+        (item) =>
+          item._id !== record._id
+      )
+    );
+
+    alert(
+      "Attendance deleted successfully."
+    );
+  } catch (error: any) {
+    console.error(
+      "Delete attendance error:",
+      error
+    );
+
+    alert(
+      error?.message ||
+        "Failed to delete attendance"
+    );
+  } finally {
+    setIsDeleting(null);
+  }
+};
 
   // ============================================================
   // UI
@@ -1014,6 +1309,7 @@ export default function AttendancePage() {
                                 "Late",
                                 "Lunch",
                                 "Remarks",
+                                 "Actions",
                               ].map(
                                 (
                                   heading
@@ -1104,6 +1400,44 @@ export default function AttendancePage() {
                                     {record.remarks ||
                                       "—"}
                                   </td>
+
+                                  <td className="px-4 py-3">
+  <div className="flex items-center gap-2">
+
+    <button
+      type="button"
+      onClick={() =>
+        openEditModal(record)
+      }
+      disabled={
+        isDeleting === record._id
+      }
+      className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition disabled:opacity-50"
+      title="Edit attendance"
+    >
+      <Pencil className="w-4 h-4" />
+    </button>
+
+    <button
+      type="button"
+      onClick={() =>
+        deleteAttendance(record)
+      }
+      disabled={
+        isDeleting === record._id
+      }
+      className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+      title="Delete attendance"
+    >
+      {isDeleting === record._id ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <Trash2 className="w-4 h-4" />
+      )}
+    </button>
+
+  </div>
+</td>
 
                                 </tr>
 
@@ -1557,6 +1891,242 @@ export default function AttendancePage() {
           </div>
 
         )}
+
+
+        {/* ======================================================
+    EDIT ATTENDANCE MODAL
+====================================================== */}
+
+{editingRecord && (
+  <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
+
+    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+
+      {/* HEADER */}
+
+      <div className="px-6 py-4 border-b flex items-center justify-between">
+
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">
+            Edit Attendance
+          </h2>
+
+          <p className="text-sm text-slate-500 mt-1">
+            {editingRecord.userId?.name}
+            {" · "}
+            {formatDate(
+              editingRecord.date
+            )}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={closeEditModal}
+          disabled={isSaving}
+          className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+      </div>
+
+      {/* BODY */}
+
+      <div className="p-6">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+          {/* LOGIN */}
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Login Time
+            </label>
+
+            <input
+              type="datetime-local"
+              value={
+                editForm.loggingTime
+              }
+              onChange={(e) =>
+                updateEditField(
+                  "loggingTime",
+                  e.target.value
+                )
+              }
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* LOGOUT */}
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Logout Time
+            </label>
+
+            <input
+              type="datetime-local"
+              value={
+                editForm.logoutTime
+              }
+              onChange={(e) =>
+                updateEditField(
+                  "logoutTime",
+                  e.target.value
+                )
+              }
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* LUNCH START */}
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Lunch Start
+            </label>
+
+            <input
+              type="datetime-local"
+              value={
+                editForm.lunchStart
+              }
+              onChange={(e) =>
+                updateEditField(
+                  "lunchStart",
+                  e.target.value
+                )
+              }
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* LUNCH END */}
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Lunch End
+            </label>
+
+            <input
+              type="datetime-local"
+              value={
+                editForm.lunchEnd
+              }
+              onChange={(e) =>
+                updateEditField(
+                  "lunchEnd",
+                  e.target.value
+                )
+              }
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* STATUS */}
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Status
+            </label>
+
+            <select
+              value={
+                editForm.status
+              }
+              onChange={(e) =>
+                updateEditField(
+                  "status",
+                  e.target.value
+                )
+              }
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="present">
+                Present
+              </option>
+
+              <option value="absent">
+                Absent
+              </option>
+
+              <option value="half-day">
+                Half Day
+              </option>
+
+              <option value="office-off">
+                Office Off
+              </option>
+            </select>
+          </div>
+
+          {/* REMARKS */}
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Remarks
+            </label>
+
+            <input
+              type="text"
+              value={
+                editForm.remarks
+              }
+              onChange={(e) =>
+                updateEditField(
+                  "remarks",
+                  e.target.value
+                )
+              }
+              placeholder="Enter remarks..."
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* FOOTER */}
+
+      <div className="px-6 py-4 border-t bg-slate-50 flex justify-end gap-3">
+
+        <button
+          type="button"
+          onClick={closeEditModal}
+          disabled={isSaving}
+          className="px-5 py-2.5 border border-slate-300 rounded-lg font-medium text-slate-700 hover:bg-white disabled:opacity-50"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={
+            saveAttendance
+          }
+          disabled={isSaving}
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold disabled:opacity-60"
+        >
+
+          {isSaving && (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          )}
+
+          {isSaving
+            ? "Saving..."
+            : "Save Changes"}
+
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+)}
 
       </div>
     </div>

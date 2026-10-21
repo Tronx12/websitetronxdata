@@ -11,64 +11,14 @@ import {
 } from "@/lib/shiftValidation";
 import { resolveAttendanceDay } from "@/lib/attendanceRules";
 
-// Attendance dates are stored as date-only values.
-// Always normalize them to UTC midnight so a browser sending
-// "2026-10-01T00:00:00.000Z" cannot become September 30 on the server.
-// function normalizeAttendanceDate(value?: string | Date | null, fallback = new Date()): Date {
-//   const raw =
-//     value instanceof Date
-//       ? value.toISOString().slice(0, 10)
-//       : value
-//         ? String(value).slice(0, 10)
-//         : fallback.toISOString().slice(0, 10);
 
-//   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-//   if (!match) {
-//     const d = new Date(fallback);
-//     d.setUTCHours(0, 0, 0, 0);
-//     return d;
-//   }
-
-//   return new Date(
-//     Date.UTC(
-//       Number(match[1]),
-//       Number(match[2]) - 1,
-//       Number(match[3])
-//     )
-//   );
-// }
 
 import {
   attendanceDateToUTC,
   getAttendanceDateString,
 } from "@/lib/attendanceTimezone";
 
-// function normalizeAttendanceDate(
-//   value?: string | Date | null,
-//   fallback = new Date()
-// ): Date {
-//   // Date-only value coming from API:
-//   // YYYY-MM-DD
-//   if (typeof value === "string") {
-//     const raw = value.slice(0, 10);
 
-//     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-//       return attendanceDateToUTC(raw);
-//     }
-//   }
-
-//   // Date object = calculate its calendar date in IST.
-//   if (value instanceof Date) {
-//     return attendanceDateToUTC(
-//       getAttendanceDateString(value)
-//     );
-//   }
-
-//   // No value = current IST attendance date.
-//   return attendanceDateToUTC(
-//     getAttendanceDateString(fallback)
-//   );
-// }
 
 function normalizeAttendanceDate(
   value?: string | Date | null,
