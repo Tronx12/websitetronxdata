@@ -77,7 +77,8 @@ export async function GET(req: NextRequest) {
       const newAccessToken = createAccessToken(
         user._id.toString(),
         user.role,
-        user.email
+        user.email,
+        user.name || ""
       );
       const newRefreshToken = createRefreshToken(user._id.toString());
 

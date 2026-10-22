@@ -69,13 +69,15 @@ function getSecret(name: SecretName): string {
 export function createAccessToken(
   userId: string,
   role: string,
-  email: string
+  email: string,
+  name: string = ""
 ) {
   return jwt.sign(
     {
       userId,
       role,
       email,
+      name,
       type: "access",
     },
     getSecret("JWT_ACCESS_SECRET"),
@@ -107,6 +109,7 @@ export function verifyAccessToken(token: string) {
     userId: string;
     role: string;
     email: string;
+    name:string;
     type: "access";
   };
 

@@ -255,10 +255,19 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
 
 
   // Day-wise browsing
-
   const [days, setDays] = useState<DaySummary[]>([]);
-
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [attendanceMap, setAttendanceMap] = useState<
+    Record<
+      string,
+      {
+        status: string;
+        remarks?: string;
+        weeklyOff?: boolean;
+        holiday?: boolean;
+      }
+    >
+  >({});
 
   const [viewMonth, setViewMonth] = useState(() => {
     // Build the month anchor using Date.UTC so no browser/VPN local-timezone
@@ -269,92 +278,7 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
 
 
 
-  // const fetchCategoryCounts = useCallback(async () => {
-
-  //   try {
-
-  //     const categories = ["B2B", "B2H", "B2C"] as const;
-
-
-
-  //     const results = await Promise.all(
-
-  //       categories.map(async (category) => {
-
-  //         const params = new URLSearchParams({
-
-  //           page: "1",
-
-  //           limit: "1",
-
-  //           sortBy: "createdAt",
-
-  //           sortOrder: "desc",
-
-  //           createdBy: userId,
-
-  //           category,
-
-  //         });
-
-
-
-  //         if (search.trim()) {
-
-  //           params.set("search", search.trim());
-
-  //         }
-
-
-
-  //         const res = await fetch(`/api/survey?${params.toString()}`);
-
-
-
-  //         if (!res.ok) {
-
-  //           throw new Error(`Failed to fetch ${category} count`);
-
-  //         }
-
-
-
-  //         const json = await res.json();
-
-
-
-  //         return {
-
-  //           category,
-
-  //           count: json.success ? json.pagination?.total || 0 : 0,
-
-  //         };
-
-  //       })
-
-  //     );
-
-
-
-  //     setCategoryCounts({
-
-  //       B2B: results.find((r) => r.category === "B2B")?.count || 0,
-
-  //       B2H: results.find((r) => r.category === "B2H")?.count || 0,
-
-  //       B2C: results.find((r) => r.category === "B2C")?.count || 0,
-
-  //     });
-
-  //   } catch (error) {
-
-  //     console.error("Failed to fetch category counts:", error);
-
-  //   }
-
-  // }, [userId, search]);
-
+  
 
 
   const fetchCategoryCounts = useCallback(async () => {
@@ -486,16 +410,37 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
 
 
       setDays(json.success ? json.data : []);
-
     } catch (err) {
-
       console.error("Failed to fetch days:", err);
-
       setDays([]);
-
     }
-
   }, [userId, activeTab, search]);
+
+  const fetchAttendance = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const y = viewMonth.getFullYear();
+      const m = String(viewMonth.getMonth() + 1).padStart(2, "0");
+      const monthStr = `${y}-${m}`;
+
+      const params = new URLSearchParams({
+        month: monthStr,
+        userId,
+        tzOffset: getTzOffset(),
+        details: "true",
+      });
+
+      const res = await fetch(
+        `/api/survey/attendance-summary?${params.toString()}`
+      );
+      const json = await res.json();
+      if (json.success && json.data) {
+        setAttendanceMap(json.data[userId] || {});
+      }
+    } catch (err) {
+      console.error("Failed to fetch attendance summary:", err);
+    }
+  }, [userId, viewMonth]);
 
 
 
@@ -637,14 +582,11 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
 
 
   useEffect(() => {
-
     fetchData();
-
     fetchCategoryCounts();
-
     fetchDays();
-
-  }, [fetchData, fetchCategoryCounts, fetchDays]);
+    fetchAttendance();
+  }, [fetchData, fetchCategoryCounts, fetchDays, fetchAttendance]);
 
 
 
@@ -1956,133 +1898,266 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
                 })} */}
 
                 {calendarCells.map((cell, i) => {
+                  if (!cell) return <div key={`blank-${i}`} />;
 
-  if (!cell) return <div key={`blank-${i}`} />;
+                  const active = selectedDate === cell.key;
+                  const isToday = cell.key === todayKey;
+                  const hasData = cell.count > 0;
+                  const isPastOrToday = cell.key <= todayKey;
 
+                  const att = attendanceMap[cell.key];
+                  const rawStatus = (att?.status || "").toLowerCase().trim();
+                  const isWeeklyOff = Boolean(
+                    att?.weeklyOff ||
+                      rawStatus === "weekly-off" ||
+                      rawStatus === "worked-on-weekly-off"
+                  );
+                  const isHoliday = Boolean(
+                    att?.holiday ||
+                      rawStatus === "holiday" ||
+                      rawStatus === "festival" ||
+                      rawStatus === "worked-on-holiday"
+                  );
+                  const isLeave = rawStatus === "leave";
+                  const isHalfDay =
+                    rawStatus === "half-day" || rawStatus === "half_day";
+                  const isPresent =
+                    rawStatus === "present" ||
+                    rawStatus === "worked-on-weekly-off" ||
+                    rawStatus === "worked-on-holiday";
+                  const isAbsent = rawStatus === "absent";
+                  const notSubmitted =
+                    !hasData &&
+                    isPastOrToday &&
+                    !isWeeklyOff &&
+                    !isHoliday &&
+                    !isLeave &&
+                    !isPresent &&
+                    !isHalfDay;
 
+                  // Determine badge label and kind
+                  let badgeType:
+                    | "holiday"
+                    | "weeklyOff"
+                    | "leave"
+                    | "halfDay"
+                    | "present"
+                    | "absent"
+                    | "notSubmitted"
+                    | "none" = "none";
+                  let badgeLabel = "";
 
-  const active = selectedDate === cell.key;
+                  if (isHoliday) {
+                    badgeType = "holiday";
+                    if (att?.remarks) {
+                      badgeLabel = att.remarks.replace(
+                        /^(Holiday|Festival):\s*/i,
+                        ""
+                      );
+                    } else {
+                      badgeLabel =
+                        rawStatus === "festival" ? "Festival" : "Holiday";
+                    }
+                  } else if (isWeeklyOff) {
+                    badgeType = "weeklyOff";
+                    badgeLabel = "Weekly Off";
+                  } else if (isLeave) {
+                    badgeType = "leave";
+                    badgeLabel = "Leave";
+                  } else if (isHalfDay) {
+                    badgeType = "halfDay";
+                    badgeLabel = "Half Day";
+                  } else if (isPresent) {
+                    badgeType = "present";
+                    badgeLabel = "Present";
+                  } else if (isAbsent) {
+                    badgeType = "absent";
+                    badgeLabel = "Absent";
+                  } else if (notSubmitted) {
+                    badgeType = "notSubmitted";
+                    badgeLabel = "Not submitted";
+                  }
 
-  const isToday = cell.key === todayKey;
+                  // Determine container background styling
+                  let cellBgClass =
+                    "bg-white border-gray-100 text-gray-400 cursor-default";
 
-  const hasData = cell.count > 0;
+                  if (active) {
+                    cellBgClass =
+                      "bg-blue-600 border-blue-600 text-white shadow-sm";
+                  } else if (hasData) {
+                    cellBgClass =
+                      "bg-blue-50/70 border-blue-200 text-gray-900 hover:bg-blue-100/70";
+                  } else if (isHoliday) {
+                    cellBgClass =
+                      "bg-purple-50/70 border-purple-200 text-purple-950 hover:bg-purple-100/70";
+                  } else if (isWeeklyOff) {
+                    cellBgClass =
+                      "bg-slate-100/70 border-slate-200 text-slate-800 hover:bg-slate-200/60";
+                  } else if (isLeave) {
+                    cellBgClass =
+                      "bg-amber-50/70 border-amber-200 text-amber-950 hover:bg-amber-100/70";
+                  } else if (isHalfDay) {
+                    cellBgClass =
+                      "bg-orange-50/70 border-orange-200 text-orange-950 hover:bg-orange-100/70";
+                  } else if (isPresent) {
+                    cellBgClass =
+                      "bg-emerald-50/70 border-emerald-200 text-emerald-950 hover:bg-emerald-100/70";
+                  } else if (isAbsent || notSubmitted) {
+                    cellBgClass =
+                      "bg-red-50/70 border-red-200 text-red-950 hover:bg-red-100/70";
+                  }
 
-  const isPastOrToday = cell.key <= todayKey; // "YYYY-MM-DD" strings compare correctly
+                  return (
+                    <button
+                      key={cell.key}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(active ? null : cell.key);
+                        setPage(1);
+                      }}
+                      className={`min-h-[72px] rounded-lg border p-1.5 text-left flex flex-col justify-between transition-all ${cellBgClass} ${
+                        isToday && !active ? "ring-2 ring-blue-500 ring-offset-1" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span
+                          className={`text-xs font-semibold ${
+                            active
+                              ? "text-white"
+                              : isToday
+                              ? "text-blue-700 font-bold"
+                              : "text-gray-800"
+                          }`}
+                        >
+                          {cell.day}
+                        </span>
 
-  const notSubmitted = !hasData && isPastOrToday;
+                        {hasData && (
+                          <span
+                            className={`text-[11px] font-bold rounded-full px-1.5 py-0.2 shadow-xs ${
+                              active
+                                ? "bg-white text-blue-700"
+                                : "bg-blue-600 text-white"
+                            }`}
+                            title={`${cell.count} surveys submitted`}
+                          >
+                            {cell.count}
+                          </span>
+                        )}
+                      </div>
 
-
-
-  return (
-
-    <button
-
-      key={cell.key}
-
-      type="button"
-
-      onClick={() => {
-
-        setSelectedDate(active ? null : cell.key);
-
-        setPage(1);
-
-      }}
-
-      className={`h-16 rounded-lg border p-1.5 text-left flex flex-col justify-between transition-colors ${
-
-        active
-
-          ? "bg-blue-600 border-blue-600 text-white"
-
-          : hasData
-
-          ? "bg-blue-50 border-blue-100 text-gray-800 hover:bg-blue-100"
-
-          : notSubmitted
-
-          ? "bg-red-50 border-red-100 text-gray-800 cursor-default"
-
-          : "bg-white border-gray-100 text-gray-400 cursor-default"
-
-      } ${isToday && !active ? "ring-2 ring-blue-400" : ""}`}
-
-    >
-
-      <span className="text-xs font-medium">{cell.day}</span>
-
-
-
-      {hasData && (
-
-        <span
-
-          className={`self-end text-xs font-semibold rounded-full px-1.5 ${
-
-            active ? "bg-white text-blue-700" : "bg-blue-600 text-white"
-
-          }`}
-
-        >
-
-          {cell.count}
-
-        </span>
-
-      )}
-
-
-
-      {notSubmitted && !active && (
-
-        <span className="text-[10px] leading-tight font-medium text-red-600">
-
-          Not submitted
-
-        </span>
-
-      )}
-
-    </button>
-
-  );
-
-})}
-
+                      <div className="w-full mt-1">
+                        {badgeLabel && (
+                          <span
+                            title={
+                              att?.remarks
+                                ? `${badgeLabel} • ${att.remarks}`
+                                : badgeLabel
+                            }
+                            className={`block w-full truncate text-[10px] leading-tight text-center rounded px-1 py-0.5 font-medium ${
+                              active
+                                ? "bg-white/20 text-white"
+                                : badgeType === "holiday"
+                                ? "bg-purple-100 text-purple-800 border border-purple-200 font-semibold"
+                                : badgeType === "weeklyOff"
+                                ? "bg-slate-200/80 text-slate-700 border border-slate-300 font-semibold"
+                                : badgeType === "leave"
+                                ? "bg-amber-100 text-amber-800 border border-amber-200 font-semibold"
+                                : badgeType === "halfDay"
+                                ? "bg-orange-100 text-orange-800 border border-orange-200 font-semibold"
+                                : badgeType === "present"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold"
+                                : badgeType === "absent"
+                                ? "bg-red-100 text-red-700 border border-red-200 font-semibold"
+                                : "text-red-600 font-medium"
+                            }`}
+                          >
+                            {badgeLabel}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
+              {/* Attendance & Survey Legend */}
+              <div className="mt-3 pt-2.5 border-t border-gray-100 flex flex-wrap items-center justify-between gap-y-2 gap-x-4 text-[11px] text-gray-600">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                    <span>Surveys Submitted</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                    <span>Weekly Off</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                    <span>Holiday / Festival</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span>Present</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <span>Leave / Half Day</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span>Absent</span>
+                  </div>
+                </div>
+              </div>
             </div>
-
           </div>
-
         </div>
 
-
-
         {selectedDate && (
+          <div className="px-4 py-2.5 bg-blue-50 text-sm text-blue-900 border-b border-blue-100 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              Showing {total} records for{" "}
+              <strong>
+                {parseLocalDate(selectedDate).toLocaleDateString("en-GB", {
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </strong>
+            </div>
 
-          <div className="px-4 py-2 bg-blue-50 text-sm text-blue-800 border-b border-blue-100">
-
-            Showing {total} records for{" "}
-
-            <strong>
-
-              {parseLocalDate(selectedDate).toLocaleDateString("en-GB", {
-
-                weekday: "long",
-
-                day: "2-digit",
-
-                month: "long",
-
-                year: "numeric",
-
-              })}
-
-            </strong>
-
+            {attendanceMap[selectedDate] && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-gray-600 font-medium">Attendance:</span>
+                <span
+                  className={`px-2 py-0.5 rounded-md font-semibold uppercase tracking-wider text-[11px] ${
+                    attendanceMap[selectedDate].holiday ||
+                    attendanceMap[selectedDate].status === "holiday" ||
+                    attendanceMap[selectedDate].status === "festival"
+                      ? "bg-purple-100 text-purple-800 border border-purple-200"
+                      : attendanceMap[selectedDate].weeklyOff ||
+                        attendanceMap[selectedDate].status === "weekly-off"
+                      ? "bg-slate-200 text-slate-800 border border-slate-300"
+                      : attendanceMap[selectedDate].status === "present"
+                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                      : attendanceMap[selectedDate].status === "absent"
+                      ? "bg-red-100 text-red-800 border border-red-200"
+                      : "bg-amber-100 text-amber-800 border border-amber-200"
+                  }`}
+                >
+                  {attendanceMap[selectedDate].status}
+                </span>
+                {attendanceMap[selectedDate].remarks && (
+                  <span className="text-gray-600 italic">
+                    ({attendanceMap[selectedDate].remarks})
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-
         )}
 
 

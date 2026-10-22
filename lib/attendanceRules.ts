@@ -143,7 +143,9 @@ export async function resolveAttendanceDay({
    * WEEKLY OFF CHECKS
    * --------------------------------------------------
    */
-  const dayName = DAYS[date.getDay()];
+  const dayIndex =
+    typeof date.getUTCDay === "function" ? date.getUTCDay() : date.getDay();
+  const dayName = DAYS[dayIndex];
 
   const activeDateFilter = {
     effectiveFrom: { $lte: date },
@@ -204,14 +206,19 @@ export async function resolveAttendanceDay({
   } else {
     // Fallback to legacy OfficeSettings
     const settings = await OfficeSettings.findOne().lean();
+    const isSunday = dayIndex === 0;
+    const isSaturday = dayIndex === 6;
     if (settings) {
-      const isSunday = date.getDay() === 0;
-      const isSaturday = date.getDay() === 6;
       if (
         (isSunday && settings.sundayOff) ||
         (isSaturday && settings.saturdayOff) ||
         ((isSunday || isSaturday) && settings.weekendOff)
       ) {
+        weeklyOff = true;
+      }
+    } else {
+      // Default: Sunday is weekly off
+      if (isSunday) {
         weeklyOff = true;
       }
     }

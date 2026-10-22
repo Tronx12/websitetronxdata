@@ -3349,13 +3349,27 @@ export async function DELETE(req: NextRequest) {
     const ownerId = survey.createdBy ? String(survey.createdBy) : "";
 
     if (!canDeleteAny && ownerId !== String(authenticatedUserId)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "You can only delete your own survey records",
-        },
-        { status: 403 }
-      );
+      let isTeamMember = false;
+      if (role === "teamlead" && ownerId && mongoose.Types.ObjectId.isValid(ownerId)) {
+        const team = await Team.findOne({
+          teamLead: authenticatedUserId,
+          members: new mongoose.Types.ObjectId(ownerId),
+          isActive: true,
+        }).select("_id").lean();
+        if (team) {
+          isTeamMember = true;
+        }
+      }
+
+      if (!isTeamMember) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "You can only delete your own or your team members' survey records",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const deletedId = survey._id.toString();

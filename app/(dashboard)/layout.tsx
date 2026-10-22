@@ -14,7 +14,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <DashboardShell role={user.role} email={user.email}>
+    <DashboardShell role={user.role} email={user.email} name={user.name || ""}>
       {children}
     </DashboardShell>
   );

@@ -35,20 +35,39 @@ export async function GET(req: NextRequest) {
     await connectDB();
 
     const { searchParams } = new URL(req.url);
-    const shift = (searchParams.get("shift") as "day" | "night") || "day";
-    const dateParam = searchParams.get("date"); // optional YYYY-MM-DD override
+    const shiftParam = searchParams.get("shift");
+    const shift =
+      shiftParam === "day" || shiftParam === "night" ? shiftParam : "all";
+    const dateParam = searchParams.get("date"); // optional YYYY-MM-DD
+    const fromParam = searchParams.get("from"); // optional YYYY-MM-DD range start
+    const toParam = searchParams.get("to"); // optional YYYY-MM-DD range end
+    const userIdParam = searchParams.get("userId");
 
-    // ── Use UTC midnight dates, consistent with the attendance system ──
-    const targetDateString = dateParam || getAttendanceDateString(new Date());
-    const targetDate = attendanceDateToUTC(targetDateString);
-    const nextDate = new Date(targetDate);
-    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+    // Compute list of date strings to process
+    const datesToProcess: string[] = [];
+    if (fromParam && toParam && /^\d{4}-\d{2}-\d{2}$/.test(fromParam) && /^\d{4}-\d{2}-\d{2}$/.test(toParam)) {
+      const cur = new Date(`${fromParam}T00:00:00.000Z`);
+      const end = new Date(`${toParam}T00:00:00.000Z`);
+      while (cur <= end) {
+        datesToProcess.push(cur.toISOString().slice(0, 10));
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+    } else {
+      datesToProcess.push(dateParam || getAttendanceDateString(new Date()));
+    }
 
-    // Query all users for the shift
-    const users = await Auth.find({
-      workingShift: shift,
-      isActive: { $ne: false },
-    }).select("_id name email workingShift");
+    // Query users
+    const userQuery: any = { isActive: { $ne: false } };
+    if (shift !== "all") {
+      userQuery.workingShift = shift;
+    }
+    if (userIdParam && mongoose.Types.ObjectId.isValid(userIdParam)) {
+      userQuery._id = new mongoose.Types.ObjectId(userIdParam);
+    }
+
+    const users = await Auth.find(userQuery).select(
+      "_id name email workingShift"
+    );
 
     if (users.length === 0) {
       return NextResponse.json({
@@ -62,106 +81,118 @@ export async function GET(req: NextRequest) {
     let markedHolidayCount = 0;
     let markedWeeklyOffCount = 0;
 
-    for (const user of users) {
-      // Find existing attendance record for this user and date
-      const existing = await Attendance.findOne({
-        userId: user._id,
-        date: { $gte: targetDate, $lt: nextDate },
-      });
+    for (const targetDateString of datesToProcess) {
+      const targetDate = attendanceDateToUTC(targetDateString);
+      const nextDate = new Date(targetDate);
+      nextDate.setUTCDate(nextDate.getUTCDate() + 1);
 
-      // If user has already logged in, do not overwrite
-      if (existing?.loggingTime) {
-        continue;
-      }
-
-      // Check Holiday / Weekly-off rule resolution for this user on this date
-      const dayResolution = await resolveAttendanceDay({
-        userId: user._id.toString(),
-        date: targetDate,
-      });
-
-      // ── HOLIDAY / FESTIVAL / SPECIAL ──
-      // Map the office-off type to the correct attendance status
-      if (dayResolution.holiday) {
-        const holidayType = dayResolution.holidayType || "holiday";
-        // Use "festival" status for festivals, "holiday" for others
-        const attendanceStatus = holidayType === "festival" ? "festival" : "holiday";
-
-        if (!existing) {
-          await Attendance.create({
-            userId: user._id,
-            date: targetDate,
-            shiftDate: targetDate,
-            status: attendanceStatus,
-            holiday: true,
-            holidayId: dayResolution.holidayId
-              ? new mongoose.Types.ObjectId(dayResolution.holidayId)
-              : null,
-            remarks: `${holidayType === "festival" ? "Festival" : "Holiday"}: ${dayResolution.holidayTitle || "Office Off"}`,
-          });
-        } else if (existing.status !== attendanceStatus && existing.status !== "worked-on-holiday") {
-          existing.status = attendanceStatus;
-          existing.holiday = true;
-          existing.holidayId = dayResolution.holidayId
-            ? new mongoose.Types.ObjectId(dayResolution.holidayId)
-            : null;
-          existing.remarks = `${holidayType === "festival" ? "Festival" : "Holiday"}: ${dayResolution.holidayTitle || "Office Off"}`;
-          await existing.save();
-        }
-        markedHolidayCount++;
-        continue;
-      }
-
-      // ── WEEKLY OFF ──
-      if (dayResolution.weeklyOff) {
-        if (!existing) {
-          await Attendance.create({
-            userId: user._id,
-            date: targetDate,
-            shiftDate: targetDate,
-            status: "weekly-off",
-            weeklyOff: true,
-            remarks: "Scheduled weekly off",
-          });
-        } else if (existing.status !== "weekly-off" && existing.status !== "worked-on-weekly-off") {
-          existing.status = "weekly-off";
-          existing.weeklyOff = true;
-          existing.remarks = "Scheduled weekly off";
-          await existing.save();
-        }
-        markedWeeklyOffCount++;
-        continue;
-      }
-
-      // ── WORKING DAY — no login recorded → mark absent ──
-      if (!existing) {
-        await Attendance.create({
+      for (const user of users) {
+        // Find existing attendance record for this user and date
+        const existing = await Attendance.findOne({
           userId: user._id,
-          date: targetDate,
-          shiftDate: targetDate,
-          status: "absent",
-          isLate: false,
-          remarks: `Auto-marked absent: No login recorded 1hr post shift end (${shift} shift)`,
+          date: { $gte: targetDate, $lt: nextDate },
         });
-      } else if (existing.status !== "absent") {
-        existing.status = "absent";
-        existing.remarks = existing.remarks
-          ? `${existing.remarks} | Auto-marked absent`
-          : `Auto-marked absent: No login recorded 1hr post shift end (${shift} shift)`;
-        await existing.save();
+
+        // If user has already logged in, do not overwrite
+        if (existing?.loggingTime) {
+          continue;
+        }
+
+        // Check Holiday / Weekly-off rule resolution for this user on this date
+        const dayResolution = await resolveAttendanceDay({
+          userId: user._id.toString(),
+          date: targetDate,
+        });
+
+        // ── HOLIDAY / FESTIVAL / SPECIAL ──
+        if (dayResolution.holiday) {
+          const holidayType = dayResolution.holidayType || "holiday";
+          const attendanceStatus =
+            holidayType === "festival" ? "festival" : "holiday";
+
+          if (!existing) {
+            await Attendance.create({
+              userId: user._id,
+              date: targetDate,
+              shiftDate: targetDate,
+              status: attendanceStatus,
+              holiday: true,
+              holidayId: dayResolution.holidayId
+                ? new mongoose.Types.ObjectId(dayResolution.holidayId)
+                : null,
+              remarks: `${holidayType === "festival" ? "Festival" : "Holiday"}: ${dayResolution.holidayTitle || "Office Off"}`,
+            });
+          } else if (
+            existing.status !== attendanceStatus &&
+            existing.status !== "worked-on-holiday"
+          ) {
+            existing.status = attendanceStatus;
+            existing.holiday = true;
+            existing.holidayId = dayResolution.holidayId
+              ? new mongoose.Types.ObjectId(dayResolution.holidayId)
+              : null;
+            existing.remarks = `${holidayType === "festival" ? "Festival" : "Holiday"}: ${dayResolution.holidayTitle || "Office Off"}`;
+            await existing.save();
+          }
+          markedHolidayCount++;
+          continue;
+        }
+
+        // ── WEEKLY OFF ──
+        if (dayResolution.weeklyOff) {
+          if (!existing) {
+            await Attendance.create({
+              userId: user._id,
+              date: targetDate,
+              shiftDate: targetDate,
+              status: "weekly-off",
+              weeklyOff: true,
+              remarks: "Scheduled weekly off",
+            });
+          } else if (
+            existing.status !== "weekly-off" &&
+            existing.status !== "worked-on-weekly-off"
+          ) {
+            existing.status = "weekly-off";
+            existing.weeklyOff = true;
+            existing.remarks = "Scheduled weekly off";
+            await existing.save();
+          }
+          markedWeeklyOffCount++;
+          continue;
+        }
+
+        // ── WORKING DAY — no login recorded → mark absent ──
+        const userShift = user.workingShift || "day";
+        if (!existing) {
+          await Attendance.create({
+            userId: user._id,
+            date: targetDate,
+            shiftDate: targetDate,
+            status: "absent",
+            isLate: false,
+            remarks: `Auto-marked absent: No login recorded 1hr post shift end (${userShift} shift)`,
+          });
+        } else if (existing.status !== "absent") {
+          existing.status = "absent";
+          existing.remarks = existing.remarks
+            ? `${existing.remarks} | Auto-marked absent`
+            : `Auto-marked absent: No login recorded 1hr post shift end (${userShift} shift)`;
+          await existing.save();
+        }
+        markedAbsentCount++;
       }
-      markedAbsentCount++;
     }
 
     return NextResponse.json({
       success: true,
       shift,
-      date: targetDateString,
+      datesProcessed: datesToProcess.length,
       totalShiftEmployees: users.length,
       markedAbsentCount,
       markedHolidayCount,
       markedWeeklyOffCount,
-      message: `Processed ${shift} shift attendance. Marked ${markedAbsentCount} absent, ${markedHolidayCount} holidays, ${markedWeeklyOffCount} weekly offs.`,
+      message: `Processed ${shift} shift attendance for ${datesToProcess.length} date(s). Marked ${markedAbsentCount} absent, ${markedHolidayCount} holidays, ${markedWeeklyOffCount} weekly offs.`,
     });
   } catch (error: any) {
     console.error("Cron mark-absent error:", error);

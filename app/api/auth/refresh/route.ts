@@ -152,7 +152,7 @@ async function refreshSession(req: NextRequest) {
         email: user.email,
         role: user.role,
       },
-      access: createAccessToken(id, user.role, user.email),
+      access: createAccessToken(id, user.role, user.email, user.name || ""),
       refresh: createRefreshToken(id),
     };
   } catch {

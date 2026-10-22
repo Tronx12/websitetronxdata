@@ -5,30 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SIDEBAR_ITEMS, UserRole } from "../types/role";
 
-// import {
-//   ChevronLeft,
-//   ChevronRight,
-//   LogOut,
-//   Menu,
-//   X,
-//   LayoutDashboard,
-//   CalendarCheck,
-//   CalendarPlus,
-//   UserCircle,
-//   FileSpreadsheet,
-//   Users,
-//   BarChart3,
-//   Settings,
-//   UsersRound,
-//   Network,
-//   CalendarCog,
-//   Database,
-//   ScrollText,
-//   CalendarOff,
-//   ClipboardList,
-//   BadgeCheck,
-//   Home,
-// } from "lucide-react";
+
 
 import {
   ChevronLeft,
@@ -78,6 +55,7 @@ import {
 interface SidebarProps {
   role: UserRole;
   email: string;
+  name?: string;
   isCollapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
 }
@@ -145,6 +123,7 @@ const iconMap = {
 export function Sidebar({
   role,
   email,
+  name,
   isCollapsed,
   onCollapsedChange,
 }: SidebarProps) {
@@ -310,10 +289,9 @@ export function Sidebar({
       <aside
         className={`fixed left-0 top-0 h-screen bg-gray-900 text-white transition-all duration-300 flex flex-col z-50
           ${isCollapsed ? "w-16" : "w-64"}
-          ${
-            isMobileOpen
-              ? "translate-x-0"
-              : "-translate-x-full md:translate-x-0"
+          ${isMobileOpen
+            ? "translate-x-0"
+            : "-translate-x-full md:translate-x-0"
           }
         `}
       >
@@ -323,16 +301,15 @@ export function Sidebar({
 
         <div className="flex items-center justify-between h-16 px-3 border-b border-gray-700 flex-shrink-0">
           {!isCollapsed && (
-                <a className="brand " href="#top" aria-label="Tronx home">
-  <img src="/2.svg" alt="Tronx" className="bg-white rounded-lg w-36 h-12 flex items-center" />
-</a>
+            <a className="brand " href="#top" aria-label="Tronx home">
+              <img src="/2.svg" alt="Tronx" className="bg-white rounded-lg w-36 h-12 flex items-center" />
+            </a>
           )}
 
           <button
             onClick={toggleSidebar}
-            className={`p-1.5 rounded-lg hover:bg-gray-700 transition-colors ${
-              isCollapsed ? "mx-auto" : ""
-            } hidden md:block`}
+            className={`p-1.5 rounded-lg hover:bg-gray-700 transition-colors ${isCollapsed ? "mx-auto" : ""
+              } hidden md:block`}
             aria-label={
               isCollapsed
                 ? "Expand sidebar"
@@ -362,11 +339,10 @@ export function Sidebar({
                 key={item.path}
                 href={item.path}
                 onClick={() => setIsMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  isActive
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${isActive
                     ? "bg-blue-600 text-white"
                     : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                } ${isCollapsed ? "justify-center" : ""}`}
+                  } ${isCollapsed ? "justify-center" : ""}`}
                 title={
                   isCollapsed ? item.label : undefined
                 }
@@ -392,32 +368,39 @@ export function Sidebar({
         <div className="border-t border-gray-700 pt-3 pb-4 px-2 space-y-2 flex-shrink-0">
           {!isCollapsed && (
             <div className="bg-gray-800 rounded-lg px-3 py-2 text-xs text-gray-400">
-              <div className="truncate">
+              <div className="truncate mt-1">
+                Name:{" "}
+                <span className="text-white">
+                  {name}
+                </span>
+              </div>
+               <div className="truncate mt-1">
+                Email:{" "}
+                <span className="text-white">
+                  {email}
+                </span>
+              </div>
+
+              <div className="truncate mt-1">
                 Role:{" "}
                 <span className="text-white capitalize">
                   {role.replace("-", " ")}
                 </span>
               </div>
 
-              <div className="truncate mt-1">
-                Email:{" "}
-                <span className="text-white">
-                  {email}
-                </span>
-              </div>
+             
+              
             </div>
           )}
 
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-gray-300 hover:bg-red-600 hover:text-white ${
-              isCollapsed ? "justify-center" : ""
-            } ${
-              isLoggingOut
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-gray-300 hover:bg-red-600 hover:text-white ${isCollapsed ? "justify-center" : ""
+              } ${isLoggingOut
                 ? "opacity-50 cursor-not-allowed"
                 : ""
-            }`}
+              }`}
             title={isCollapsed ? "Logout" : undefined}
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />

@@ -153,6 +153,10 @@ export default function SurveyPageAdmin({
   const [editSaving, setEditSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Bulk selection & deletion
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   // Messages & Export
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -522,88 +526,251 @@ export default function SurveyPageAdmin({
     setActiveTab("ALL");
     setSearch("");
     setExpandedDates(new Set());
+    setSelectedIds(new Set());
   };
 
-  // const openPerson = (person: PersonSummary) => {
-  //   setSelectedPerson(person);
-  //   setViewMode("PERSON_DATA");
-  //   setPage(1);
-  //   setActiveTab("ALL");
-  //   setSearch("");
-  //   setExpandedDates(new Set());
-  // };
-
   const openPerson = (person: PersonSummary) => {
-  setSelectedPerson(person);
-  setViewMode("PERSON_DATA");
-  setPage(1);
-  setActiveTab("ALL");
-  setSearch("");
-  setDateFrom("");
-  setDateTo("");
-  setExpandedDates(new Set());
-};
+    setSelectedPerson(person);
+    setViewMode("PERSON_DATA");
+    setPage(1);
+    setActiveTab("ALL");
+    setSearch("");
+    setDateFrom("");
+    setDateTo("");
+    setExpandedDates(new Set());
+    setSelectedIds(new Set());
+  };
 
   const goBackToTeams = () => {
     setSelectedTeam(null);
     setSelectedPerson(null);
     setViewMode("TEAMS");
+    setSelectedIds(new Set());
   };
 
   const goBackToMembers = () => {
     setSelectedPerson(null);
     setViewMode("TEAM_MEMBERS");
+    setSelectedIds(new Set());
   };
 
   // ---------- Export ----------
+  // const handleExport = async () => {
+  //   try {
+  //     if (!selectedTeam) {
+  //       alert("Please select a team first.");
+  //       return;
+  //     }
+
+  //     setExporting(true);
+
+  //     const params = new URLSearchParams();
+
+  //     if (activeTab !== "ALL") {
+  //       params.set("category", activeTab);
+  //     }
+
+  //     params.set("teamId", selectedTeam._id);
+
+  //     const res = await fetch(`/api/survey/export?${params.toString()}`, {
+  //       method: "GET",
+  //       cache: "no-store",
+  //     });
+
+  //     if (!res.ok) {
+  //       const errorText = await res.text();
+  //       console.error("Admin/HR export error:", errorText);
+  //       throw new Error("Export failed");
+  //     }
+
+  //     const blob = await res.blob();
+  //     const url = window.URL.createObjectURL(blob);
+  //     const a = document.createElement("a");
+  //     a.href = url;
+  //     a.download = `survey-${selectedTeam.name.replace(
+  //       /[^a-zA-Z0-9-_]/g,
+  //       "-"
+  //     )}-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
+
+  //     document.body.appendChild(a);
+  //     a.click();
+  //     a.remove();
+  //     window.URL.revokeObjectURL(url);
+  //   } catch (error) {
+  //     console.error(error);
+  //     alert("Failed to download Excel");
+  //   } finally {
+  //     setExporting(false);
+  //   }
+  // };
+
   const handleExport = async () => {
-    try {
-      if (!selectedTeam) {
-        alert("Please select a team first.");
-        return;
-      }
+  try {
+    if (!selectedTeam) {
+      alert("Please select a team first.");
+      return;
+    }
 
-      setExporting(true);
+    setExporting(true);
 
-      const params = new URLSearchParams();
+    const params = new URLSearchParams();
 
-      if (activeTab !== "ALL") {
-        params.set("category", activeTab);
-      }
+    // ---------------------------------------------------
+    // Category
+    // ---------------------------------------------------
+    if (activeTab !== "ALL") {
+      params.set("category", activeTab);
+    }
 
-      params.set("teamId", selectedTeam._id);
+    // ---------------------------------------------------
+    // Selected team
+    // ---------------------------------------------------
+    params.set("teamId", selectedTeam._id);
 
-      const res = await fetch(`/api/survey/export?${params.toString()}`, {
+    // ---------------------------------------------------
+    // IMPORTANT:
+    // If we are inside a specific user's page,
+    // export ONLY that user's records.
+    // ---------------------------------------------------
+    if (selectedPerson?._id) {
+      params.set("createdBy", selectedPerson._id);
+    }
+
+    // ---------------------------------------------------
+    // Search
+    // ---------------------------------------------------
+    if (search.trim()) {
+      params.set("search", search.trim());
+    }
+
+    // ---------------------------------------------------
+    // Date range
+    // ---------------------------------------------------
+    if (dateFrom) {
+      params.set("startDate", dateFrom);
+    }
+
+    if (dateTo) {
+      params.set("endDate", dateTo);
+    }
+
+    // ---------------------------------------------------
+    // Timezone
+    // ---------------------------------------------------
+    params.set(
+      "tzOffset",
+      String(new Date().getTimezoneOffset())
+    );
+
+    console.log("====================================");
+    console.log("EXPORT PARAMS");
+    console.log("Team:", selectedTeam._id);
+    console.log(
+      "Person:",
+      selectedPerson?._id || "ALL TEAM"
+    );
+    console.log("Search:", search);
+    console.log("Category:", activeTab);
+    console.log("From:", dateFrom);
+    console.log("To:", dateTo);
+    console.log(
+      "URL:",
+      `/api/survey/export?${params.toString()}`
+    );
+    console.log("====================================");
+
+    const res = await fetch(
+      `/api/survey/export?${params.toString()}`,
+      {
         method: "GET",
         cache: "no-store",
-      });
+      }
+    );
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Admin/HR export error:", errorText);
-        throw new Error("Export failed");
+    if (!res.ok) {
+      const errorText = await res.text();
+
+      console.error(
+        "Admin/HR export error:",
+        errorText
+      );
+
+      let message = "Export failed";
+
+      try {
+        const errorJson = JSON.parse(errorText);
+
+        if (errorJson?.message) {
+          message = errorJson.message;
+        }
+      } catch {
+        // Response was not JSON
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `survey-${selectedTeam.name.replace(
-        /[^a-zA-Z0-9-_]/g,
-        "-"
-      )}-${activeTab.toLowerCase()}-${Date.now()}.xlsx`;
-
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to download Excel");
-    } finally {
-      setExporting(false);
+      throw new Error(message);
     }
-  };
+
+    const blob = await res.blob();
+
+    const url =
+      window.URL.createObjectURL(blob);
+
+    const a =
+      document.createElement("a");
+
+    a.href = url;
+
+    // ---------------------------------------------------
+    // Better filename
+    // ---------------------------------------------------
+
+    const teamName =
+      selectedTeam.name
+        .replace(/[^a-zA-Z0-9-_]/g, "-");
+
+    const personName =
+      selectedPerson?.name
+        ? `-${selectedPerson.name.replace(
+            /[^a-zA-Z0-9-_]/g,
+            "-"
+          )}`
+        : "";
+
+    const searchName =
+      search.trim()
+        ? `-search-${search
+            .trim()
+            .replace(/[^a-zA-Z0-9-_]/g, "-")
+            .slice(0, 50)}`
+        : "";
+
+    a.download =
+      `survey-${teamName}${personName}-${activeTab.toLowerCase()}${searchName}-${Date.now()}.xlsx`;
+
+    document.body.appendChild(a);
+
+    a.click();
+
+    a.remove();
+
+    window.URL.revokeObjectURL(url);
+
+  } catch (error) {
+    console.error(
+      "Excel export failed:",
+      error
+    );
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Failed to download Excel"
+    );
+
+  } finally {
+    setExporting(false);
+  }
+};
 
   const handleWorkReport = async (range: "weekly" | "monthly") => {
     try {
@@ -679,11 +846,17 @@ export default function SurveyPageAdmin({
       const res = await fetch(`/api/survey/${id}`, { method: "DELETE" });
       const json = await res.json();
       if (json.success) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         if (viewLayout === "DATE_GROUPED") {
           fetchGroupedData();
         } else {
           fetchData();
         }
+        fetchCategoryCounts();
         setMessage({ type: "success", text: "Record deleted successfully" });
       } else {
         setMessage({ type: "error", text: json.message || "Delete failed" });
@@ -692,6 +865,101 @@ export default function SurveyPageAdmin({
       setMessage({ type: "error", text: err.message || "Delete failed" });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ---------- Bulk Selection & Delete ----------
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = items.map((i) => i._id);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectGroup = (groupItems: SurveyItem[]) => {
+    const groupIds = groupItems.map((i) => i._id);
+    const allSelected =
+      groupIds.length > 0 && groupIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        groupIds.forEach((id) => next.delete(id));
+      } else {
+        groupIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete ${count} selected survey record${
+          count > 1 ? "s" : ""
+        }? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setBulkDeleting(true);
+      const res = await fetch("/api/survey/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSelectedIds(new Set());
+        if (viewLayout === "DATE_GROUPED") {
+          fetchGroupedData();
+        } else {
+          fetchData();
+        }
+        fetchCategoryCounts();
+        setMessage({
+          type: "success",
+          text:
+            json.message ||
+            `Successfully deleted ${count} survey record${
+              count > 1 ? "s" : ""
+            }`,
+        });
+      } else {
+        setMessage({
+          type: "error",
+          text: json.message || "Bulk delete failed",
+        });
+      }
+    } catch (err: any) {
+      setMessage({
+        type: "error",
+        text: err?.message || "Bulk delete failed",
+      });
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -718,6 +986,7 @@ export default function SurveyPageAdmin({
 
   // ---------- Record Card ----------
   const renderRecordCard = (item: SurveyItem, indented = false) => {
+    const isSelected = selectedIds.has(item._id);
     const hasHeader =
       item.accountType || item.projectNo || item.description;
     const hasMeta =
@@ -726,14 +995,27 @@ export default function SurveyPageAdmin({
     return (
       <div
         key={item._id}
-        className={`px-4 py-4 hover:bg-gray-50 ${indented ? "pl-16 bg-gray-50/50" : ""
-          }`}
+        className={`px-4 py-4 transition-colors ${
+          isSelected
+            ? "bg-blue-50/80 border-l-4 border-l-blue-600 pl-3"
+            : indented
+            ? "pl-16 bg-gray-50/50 hover:bg-gray-50"
+            : "hover:bg-gray-50"
+        }`}
       >
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => toggleSelect(item._id)}
+              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer shrink-0"
+              aria-label={`Select survey record ${item._id}`}
+            />
             <span
-              className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${CATEGORY_BADGE_CLASS[item.category]
-                }`}
+              className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                CATEGORY_BADGE_CLASS[item.category]
+              }`}
             >
               {item.category}
             </span>
@@ -865,18 +1147,34 @@ export default function SurveyPageAdmin({
             Monthly Report
           </button>
           {viewMode === "PERSON_DATA" && (
-            <button
-              onClick={handleExport}
-              disabled={exporting || total === 0}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 text-sm"
-            >
-              {exporting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
+            <>
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg disabled:opacity-50 text-sm font-semibold shadow-sm transition"
+                >
+                  {bulkDeleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Delete Selected ({selectedIds.size})
+                </button>
               )}
-              Download Excel
-            </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting || total === 0}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 text-sm"
+              >
+                {exporting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Download Excel
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -1270,7 +1568,7 @@ export default function SurveyPageAdmin({
             </div>
 
           {/* </div> */}
-          <div className="relative flex-1">
+          {/* <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -1282,9 +1580,9 @@ export default function SurveyPageAdmin({
               }}
               className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             />
-          </div>
+          </div> */}
 
-          {viewLayout === "FLAT" && (
+          {/* {viewLayout === "FLAT" && (
             <div className="flex gap-2">
               <select
                 value={sortBy}
@@ -1306,10 +1604,10 @@ export default function SurveyPageAdmin({
                 <option value="asc">Oldest first</option>
               </select>
             </div>
-          )}
+          )} */}
 
           {/* Layout toggle */}
-          <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden self-start">
+          {/* <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden self-start">
             <button
               onClick={() => setViewLayout("DATE_GROUPED")}
               className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition ${viewLayout === "DATE_GROUPED"
@@ -1330,8 +1628,70 @@ export default function SurveyPageAdmin({
               <List className="w-3.5 h-3.5" />
               Flat List
             </button>
-          </div>
+          </div> */}
         </div>
+
+          {/* Selection and Bulk Action Bar */}
+          {items.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-slate-50 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={
+                      items.length > 0 &&
+                      items.every((i) => selectedIds.has(i._id))
+                    }
+                    ref={(el) => {
+                      if (el) {
+                        const some = items.some((i) => selectedIds.has(i._id));
+                        const all = items.every((i) => selectedIds.has(i._id));
+                        el.indeterminate = some && !all;
+                      }
+                    }}
+                    onChange={toggleSelectAllVisible}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span>
+                    {items.length > 0 && items.every((i) => selectedIds.has(i._id))
+                      ? "Deselect all visible"
+                      : `Select all visible (${items.length})`}
+                  </span>
+                </label>
+
+                {selectedIds.size > 0 && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                    {selectedIds.size} selected
+                  </span>
+                )}
+              </div>
+
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    className="px-2.5 py-1 text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded hover:bg-white transition"
+                  >
+                    Clear selection
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                  >
+                    {bulkDeleting ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    Delete Selected ({selectedIds.size})
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Records */}
       <div>
@@ -1347,13 +1707,41 @@ export default function SurveyPageAdmin({
           <div className="divide-y divide-gray-100">
             {dateGroups.map((group) => {
               const isOpen = expandedDates.has(group.date);
+              const groupIds = group.items.map((i) => i._id);
+              const isGroupAllSelected =
+                groupIds.length > 0 &&
+                groupIds.every((id) => selectedIds.has(id));
+              const isGroupSomeSelected =
+                groupIds.some((id) => selectedIds.has(id)) &&
+                !isGroupAllSelected;
+
               return (
                 <div key={group.date}>
-                  <button
+                  <div
                     onClick={() => toggleDate(group.date)}
-                    className="w-full text-left px-5 py-4 hover:bg-blue-50 transition flex items-center justify-between gap-4"
+                    className="w-full text-left px-5 py-4 hover:bg-blue-50 transition flex items-center justify-between gap-4 cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-3">
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center justify-center p-0.5"
+                        title={
+                          isGroupAllSelected
+                            ? `Deselect all ${group.items.length} records in ${group.dayLabel}`
+                            : `Select all ${group.items.length} records in ${group.dayLabel}`
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isGroupAllSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = isGroupSomeSelected;
+                          }}
+                          onChange={() => toggleSelectGroup(group.items)}
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer shrink-0"
+                          aria-label={`Select all records for ${group.dayLabel}`}
+                        />
+                      </div>
                       <div
                         className={`w-11 h-11 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${group.dayLabel === "Today"
                             ? "bg-emerald-100 text-emerald-700"
@@ -1362,8 +1750,6 @@ export default function SurveyPageAdmin({
                               : "bg-indigo-100 text-indigo-700"
                           }`}
                       >
-                        {/* {new Date(group.date + "T00:00:00").getDate()} */}
-
                         {group.totalSubmit}
                       </div>
                       <div>
@@ -1393,7 +1779,7 @@ export default function SurveyPageAdmin({
                           }`}
                       />
                     </div>
-                  </button>
+                  </div>
 
                   {isOpen && (
                     <div className="bg-gray-50 border-t border-gray-100 divide-y divide-gray-100">
@@ -1422,14 +1808,20 @@ export default function SurveyPageAdmin({
           <div className="flex gap-2">
             <button
               disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
+              onClick={() => {
+                setPage((p) => p - 1);
+                setSelectedIds(new Set());
+              }}
               className="px-3 py-1 border rounded disabled:opacity-40 text-sm"
             >
               Previous
             </button>
             <button
               disabled={page === totalPages}
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => {
+                setPage((p) => p + 1);
+                setSelectedIds(new Set());
+              }}
               className="px-3 py-1 border rounded disabled:opacity-40 text-sm"
             >
               Next

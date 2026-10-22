@@ -156,6 +156,10 @@ const [dateTo, setDateTo] = useState("");
   const [editForm, setEditForm] = useState<Partial<SurveyItem>>({});
   const [editSaving, setEditSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Bulk selection & deletion
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   /* ==================================================
      SEARCH
   ================================================== */
@@ -926,6 +930,11 @@ if (dateTo) {
       const json = await res.json();
 
       if (json.success) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         refreshAll();
         setMessage({ type: "success", text: "Record deleted successfully" });
       } else {
@@ -935,6 +944,81 @@ if (dateTo) {
       setMessage({ type: "error", text: err.message || "Delete failed" });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ---------- Bulk Selection & Delete ----------
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = items.map((i) => i._id);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete ${count} selected survey record${
+          count > 1 ? "s" : ""
+        }? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setBulkDeleting(true);
+      const res = await fetch("/api/survey/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSelectedIds(new Set());
+        refreshAll();
+        setMessage({
+          type: "success",
+          text:
+            json.message ||
+            `Successfully deleted ${count} survey record${
+              count > 1 ? "s" : ""
+            }`,
+        });
+      } else {
+        setMessage({
+          type: "error",
+          text: json.message || "Bulk delete failed",
+        });
+      }
+    } catch (err: any) {
+      setMessage({
+        type: "error",
+        text: err?.message || "Bulk delete failed",
+      });
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -999,15 +1083,30 @@ if (dateTo) {
 
   // ---------- Record card ----------
   const renderRecordCard = (item: SurveyItem) => {
+    const isSelected = selectedIds.has(item._id);
     const hasHeader = item.accountType || item.projectNo || item.description;
     const hasMeta =
       item.pid || item.supplierId || item.country || item.ip || item.status;
     const submitter = getSubmitterInfo(item);
 
     return (
-      <div key={item._id} className="px-4 py-4 hover:bg-gray-50">
+      <div
+        key={item._id}
+        className={`px-4 py-4 transition-colors ${
+          isSelected
+            ? "bg-blue-50/80 border-l-4 border-l-blue-600 pl-3"
+            : "hover:bg-gray-50"
+        }`}
+      >
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => toggleSelect(item._id)}
+              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer shrink-0"
+              aria-label={`Select record ${item._id}`}
+            />
             <span
               className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${CATEGORY_BADGE_CLASS[item.category]}`}
             >
@@ -1158,6 +1257,20 @@ if (dateTo) {
               title={`Exports: ${exportLabel}`}
               className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
             > */}
+            {selectedIds.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg disabled:opacity-50 text-sm font-semibold shadow-sm transition"
+              >
+                {bulkDeleting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Delete Selected ({selectedIds.size})
+              </button>
+            )}
             <button
               onClick={handleExport}
               disabled={exporting || total === 0 || searchPending || loading}
@@ -1190,8 +1303,7 @@ if (dateTo) {
             setSelectedMember(null);
             setPage(1);
             setActiveTab("ALL");
-            // setSearchInput(search);
-            // setSearch(search);
+            setSelectedIds(new Set());
           }}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${mainTab === "MY_DATA"
               ? "border-blue-600 text-blue-600"
@@ -1207,6 +1319,7 @@ if (dateTo) {
             setSelectedMember(null);
             setPage(1);
             setActiveTab("ALL");
+            setSelectedIds(new Set());
             setSearchInput(search);
             setSearch(search);
           }}
@@ -1362,6 +1475,7 @@ if (dateTo) {
 
                 setSelectedMember(member);
                 setPage(1);
+                setSelectedIds(new Set());
               }}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white min-w-[220px]"
             >
@@ -1381,6 +1495,7 @@ if (dateTo) {
                 onClick={() => {
                   setSelectedMember(null);
                   setPage(1);
+                  setSelectedIds(new Set());
                 }}
                 className="text-sm text-blue-600 hover:underline"
               >
@@ -1429,6 +1544,7 @@ if (dateTo) {
                 onClick={() => {
                   setActiveTab(tab);
                   setPage(1);
+                  setSelectedIds(new Set());
                 }}
                 className={`px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab
                     ? "border-blue-600 text-blue-600"
@@ -1466,6 +1582,7 @@ if (dateTo) {
         onChange={(e) => {
           setDateFrom(e.target.value);
           setPage(1);
+          setSelectedIds(new Set());
         }}
         className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
       />
@@ -1484,6 +1601,7 @@ if (dateTo) {
         onChange={(e) => {
           setDateTo(e.target.value);
           setPage(1);
+          setSelectedIds(new Set());
         }}
         className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
       />
@@ -1496,6 +1614,7 @@ if (dateTo) {
           setDateFrom("");
           setDateTo("");
           setPage(1);
+          setSelectedIds(new Set());
         }}
         className="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
       >
@@ -1619,6 +1738,68 @@ if (dateTo) {
         </div>
 
 
+        {/* Selection and Bulk Action Bar */}
+        {items.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-slate-50 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={
+                    items.length > 0 &&
+                    items.every((i) => selectedIds.has(i._id))
+                  }
+                  ref={(el) => {
+                    if (el) {
+                      const some = items.some((i) => selectedIds.has(i._id));
+                      const all = items.every((i) => selectedIds.has(i._id));
+                      el.indeterminate = some && !all;
+                    }
+                  }}
+                  onChange={toggleSelectAllVisible}
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                />
+                <span>
+                  {items.length > 0 && items.every((i) => selectedIds.has(i._id))
+                    ? "Deselect all visible"
+                    : `Select all visible (${items.length})`}
+                </span>
+              </label>
+
+              {selectedIds.size > 0 && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                  {selectedIds.size} selected
+                </span>
+              )}
+            </div>
+
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="px-2.5 py-1 text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded hover:bg-white transition"
+                >
+                  Clear selection
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                >
+                  {bulkDeleting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )}
+                  Delete Selected ({selectedIds.size})
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Records */}
         <div>
           {loading ? (
@@ -1646,14 +1827,20 @@ if (dateTo) {
             <div className="flex gap-2">
               <button
                 disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => {
+                  setPage((p) => p - 1);
+                  setSelectedIds(new Set());
+                }}
                 className="px-3 py-1 border rounded disabled:opacity-40"
               >
                 Previous
               </button>
               <button
                 disabled={page === totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => {
+                  setPage((p) => p + 1);
+                  setSelectedIds(new Set());
+                }}
                 className="px-3 py-1 border rounded disabled:opacity-40"
               >
                 Next

@@ -17,6 +17,7 @@ interface AttendanceRecord {
   lunchStart?: string;
   lunchEnd?: string;
   loginLocationAddress?: string;
+  remarks?: string;
 }
 
 interface ModalRecord {
@@ -31,6 +32,7 @@ interface ModalRecord {
   isLate: boolean;
   lateByMinutes: number | string;
   loginLocationAddress: string;
+  remarks: string;
 }
 
 interface UserInfo {
@@ -195,6 +197,7 @@ export default function TeamLeadAttendancePage() {
       "Lunch Start": formatTime(r.lunchStart),
       "Lunch End": formatTime(r.lunchEnd),
       Location: r.loginLocationAddress || "",
+      Remarks: r.remarks || "",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -229,6 +232,7 @@ export default function TeamLeadAttendancePage() {
       isLate: !!record.isLate,
       lateByMinutes: record.lateByMinutes || 0,
       loginLocationAddress: record.loginLocationAddress || "",
+      remarks:record.remarks||""
     });
     setModalOpen(true);
   };
@@ -248,6 +252,8 @@ export default function TeamLeadAttendancePage() {
       isLate: false,
       lateByMinutes: 0,
       loginLocationAddress: "",
+      remarks: "",
+
     });
     setModalOpen(true);
   };
@@ -282,6 +288,7 @@ export default function TeamLeadAttendancePage() {
         isLate: modalRecord.isLate,
         lateByMinutes: Number(modalRecord.lateByMinutes) || 0,
         loginLocationAddress: modalRecord.loginLocationAddress,
+         remarks: modalRecord.remarks?.trim() || "",
       };
 
       let res: Response;
@@ -525,6 +532,7 @@ export default function TeamLeadAttendancePage() {
                               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Late</th>
                               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Lunch</th>
                               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Location</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Remarks</th>
                               <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                             </tr>
                           </thead>
@@ -565,6 +573,9 @@ export default function TeamLeadAttendancePage() {
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600 max-w-[180px] truncate">
                                   {record.loginLocationAddress || "—"}
+                                </td>
+                                 <td className="px-4 py-3 text-sm text-gray-600 max-w-[180px] truncate">
+                                  {record.remarks || "—"}
                                 </td>
                                 <td className="px-4 py-3 text-right whitespace-nowrap">
                                   <button
@@ -697,6 +708,36 @@ export default function TeamLeadAttendancePage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Remarks
+  </label>
+
+  <textarea
+    value={modalRecord.remarks}
+    onChange={(e) =>
+      setModalRecord({
+        ...modalRecord,
+        remarks: e.target.value,
+      })
+    }
+    placeholder="Enter attendance remarks..."
+    rows={3}
+    maxLength={500}
+    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+  />
+
+  <div className="flex justify-between mt-1">
+    <p className="text-xs text-gray-400">
+      Add a reason or note for this attendance record.
+    </p>
+
+    <span className="text-xs text-gray-400">
+      {modalRecord.remarks?.length || 0}/500
+    </span>
+  </div>
+</div>
 
               {modalError && <div className="text-sm text-red-600">{modalError}</div>}
             </div>

@@ -8,10 +8,12 @@ import { isRouteAllowedForRole, ROLE_REDIRECT, type UserRole } from "../types/ro
 interface DashboardShellProps {
   role: UserRole;
   email: string;
+  name?: string;
+
   children: React.ReactNode;
 }
 
-export function DashboardShell({ role, email, children }: DashboardShellProps) {
+export function DashboardShell({ role, email,name, children }: DashboardShellProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -30,6 +32,7 @@ export function DashboardShell({ role, email, children }: DashboardShellProps) {
       <Sidebar
         role={role}
         email={email}
+        name={name}
         isCollapsed={isCollapsed}
         onCollapsedChange={setIsCollapsed}
       />
