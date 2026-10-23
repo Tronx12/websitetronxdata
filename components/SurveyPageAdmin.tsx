@@ -283,7 +283,7 @@ export default function SurveyPageAdmin({
       setLoading(true);
       const params = new URLSearchParams({
         page: "1",
-        limit: "500",
+        limit: "0",
         sortBy: "createdAt",
         sortOrder: "desc",
         createdBy: selectedPerson._id,
@@ -772,25 +772,107 @@ export default function SurveyPageAdmin({
   }
 };
 
-  const handleWorkReport = async (range: "weekly" | "monthly") => {
-    try {
-      setReportLoading(range);
-      const res = await fetch(`/api/survey/work-report?range=${range}`);
-      if (!res.ok) throw new Error("Report failed");
+const handleWorkReport = async (
+  range: "weekly" | "monthly"
+) => {
+  try {
+    setReportLoading(range);
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `work-report-${range}-${Date.now()}.xlsx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      alert("Failed to generate work report");
-    } finally {
-      setReportLoading(null);
+    const res = await fetch(
+      `/api/survey/work-report?range=${range}`,
+      {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      }
+    );
+
+    if (!res.ok) {
+      const errorText = await res.text();
+
+      console.error(
+        `[WORK REPORT] ${range} failed:`,
+        res.status,
+        errorText
+      );
+
+      let message = `Failed to generate ${range} work report`;
+
+      try {
+        const errorJson = JSON.parse(errorText);
+
+        if (errorJson?.message) {
+          message = errorJson.message;
+        }
+
+        if (errorJson?.error) {
+          console.error(
+            "[WORK REPORT] Backend error:",
+            errorJson.error
+          );
+        }
+      } catch {
+        if (errorText) {
+          message = errorText;
+        }
+      }
+
+      throw new Error(message);
     }
-  };
+
+    const blob = await res.blob();
+
+    if (!blob.size) {
+      throw new Error("The work report is empty.");
+    }
+
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `work-report-${range}-${Date.now()}.xlsx`;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    window.URL.revokeObjectURL(url);
+
+  } catch (error) {
+    console.error(
+      "[WORK REPORT DOWNLOAD ERROR]",
+      error
+    );
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Failed to generate work report"
+    );
+  } finally {
+    setReportLoading(null);
+  }
+};
+
+  // const handleWorkReport = async (range: "weekly" | "monthly") => {
+  //   try {
+  //     setReportLoading(range);
+  //     const res = await fetch(`/api/survey/work-report?range=${range}`);
+  //     if (!res.ok) throw new Error("Report failed");
+
+  //     const blob = await res.blob();
+  //     const url = window.URL.createObjectURL(blob);
+  //     const a = document.createElement("a");
+  //     a.href = url;
+  //     a.download = `work-report-${range}-${Date.now()}.xlsx`;
+  //     a.click();
+  //     window.URL.revokeObjectURL(url);
+  //   } catch {
+  //     alert("Failed to generate work report");
+  //   } finally {
+  //     setReportLoading(null);
+  //   }
+  // };
 
   // ---------- Edit ----------
   const openEdit = (item: SurveyItem) => {

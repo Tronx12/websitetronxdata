@@ -2461,13 +2461,26 @@ const dateTo = searchParams.get("dateTo");
 
 
 
-    const limit = Math.min(
+    // const limit = Math.min(
 
-      100,
+    //   100,
 
-      Math.max(1, Number.isFinite(limitNumber) ? limitNumber : 20)
+    //   Math.max(1, Number.isFinite(limitNumber) ? limitNumber : 20)
 
-    );
+    // );
+
+    const requestedLimit = Number(searchParams.get("limit") || "20");
+
+const limit =
+  requestedLimit === 0
+    ? 0
+    : Math.min(
+        5000,
+        Math.max(
+          1,
+          Number.isFinite(requestedLimit) ? requestedLimit : 20
+        )
+      );
 
 
 
@@ -3101,107 +3114,163 @@ if (dateFrom || dateTo) {
 
 
 
-        const [items, countAgg] = await Promise.all([
+    //     const [items, countAgg] = await Promise.all([
 
-      SurveyData.find(filter)
+    //   SurveyData.find(filter)
 
-        .sort({ [sortBy]: sortOrder })
+    //     .sort({ [sortBy]: sortOrder })
 
-        .skip(skip)
+    //     .skip(skip)
 
-        .limit(limit)
+    //     .limit(limit)
 
-        .lean(),
+    //     .lean(),
 
 
 
-      SurveyData.aggregate([
+    //   SurveyData.aggregate([
 
-        { $match: filter },
+    //     { $match: filter },
 
-        {
+    //     {
 
-          $addFields: {
+    //       $addFields: {
 
-            _countNum: {
+    //         _countNum: {
 
-              $let: {
+    //           $let: {
 
-                vars: {
+    //             vars: {
 
-                  raw: {
+    //               raw: {
 
+    //                 $ifNull: [
+
+    //                   "$data.Counts",
+
+    //                   {
+
+    //                     $ifNull: [
+
+    //                       "$data.counts",
+
+    //                       { $ifNull: ["$counts", "1"] },
+
+    //                     ],
+
+    //                   },
+
+    //                 ],
+
+    //               },
+
+    //             },
+
+    //             in: {
+
+    //               $convert: {
+
+    //                 input: "$$raw",
+
+    //                 to: "int",
+
+    //                 onError: 1,
+
+    //                 onNull: 1,
+
+    //               },
+
+    //             },
+
+    //           },
+
+    //         },
+
+    //       },
+
+    //     },
+
+    //     {
+
+    //       $group: {
+
+    //         _id: null,
+
+    //         total: { $sum: 1 },
+
+    //         totalCounts: {
+
+    //           $sum: {
+
+    //             $cond: [{ $gt: ["$_countNum", 0] }, "$_countNum", 1],
+
+    //           },
+
+    //         },
+
+    //       },
+
+    //     },
+
+    //   ]),
+
+    // ]);
+
+    const [items, countAgg] = await Promise.all([
+  SurveyData.find(filter)
+    .sort({ [sortBy]: sortOrder })
+    .skip(limit === 0 ? 0 : skip)
+    .limit(limit) // limit = 0 means no limit
+    .lean(),
+
+  SurveyData.aggregate([
+    { $match: filter },
+    {
+      $addFields: {
+        _countNum: {
+          $let: {
+            vars: {
+              raw: {
+                $ifNull: [
+                  "$data.Counts",
+                  {
                     $ifNull: [
-
-                      "$data.Counts",
-
-                      {
-
-                        $ifNull: [
-
-                          "$data.counts",
-
-                          { $ifNull: ["$counts", "1"] },
-
-                        ],
-
-                      },
-
+                      "$data.counts",
+                      { $ifNull: ["$counts", "1"] },
                     ],
-
                   },
-
-                },
-
-                in: {
-
-                  $convert: {
-
-                    input: "$$raw",
-
-                    to: "int",
-
-                    onError: 1,
-
-                    onNull: 1,
-
-                  },
-
-                },
-
+                ],
               },
-
             },
-
-          },
-
-        },
-
-        {
-
-          $group: {
-
-            _id: null,
-
-            total: { $sum: 1 },
-
-            totalCounts: {
-
-              $sum: {
-
-                $cond: [{ $gt: ["$_countNum", 0] }, "$_countNum", 1],
-
+            in: {
+              $convert: {
+                input: "$$raw",
+                to: "int",
+                onError: 1,
+                onNull: 1,
               },
-
             },
-
           },
-
         },
-
-      ]),
-
-    ]);
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        totalCounts: {
+          $sum: {
+            $cond: [
+              { $gt: ["$_countNum", 0] },
+              "$_countNum",
+              1,
+            ],
+          },
+        },
+      },
+    },
+  ]),
+]);
 
 
 
