@@ -58,9 +58,7 @@ const PREDEFINED_REASONS = [
 const WS_URL =
   process.env.NEXT_PUBLIC_DQA_WS_URL || "wss://oe-websocket.onrender.com";
 
-const SHEET_URL = `https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_DQA_SHEET_ID ||
-  "154f6pemEnid-mgnv3CGEuC4pAv0XjlNIdcRpONb3KAo"
-  }/edit`;
+
 
 const POLL_MS = 4000;
 const LOAD_TIMEOUT_MS = 25000;
@@ -270,6 +268,14 @@ export default function DqaView() {
   );
 
   const me = activeName.trim().toLowerCase();
+
+  const pid = pidRef.trim();
+
+
+
+  const SHEET_URL = `https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_DQA_SHEET_ID ||
+  "154f6pemEnid-mgnv3CGEuC4pAv0XjlNIdcRpONb3KAo"
+  }/edit?gid=${pid}#gid=${pid}`;
 
   // ── helpers ──────────────────────────────────────────────
 
@@ -927,7 +933,110 @@ export default function DqaView() {
     }
   };
 
-  const openSheet = () => window.open(SHEET_URL, "_blank", "noopener,noreferrer");
+  // const openSheet = () => window.open(SHEET_URL);
+
+//   const openSheet = async () => {
+//   const pid = pidRef.trim();
+
+//   if (!pid) {
+//     alert("Please enter PID");
+//     return;
+//   }
+
+//   try {
+//     const res = await fetch(
+//       `/api/dqa/sheet-gid?pid=${encodeURIComponent(pid)}`
+//     );
+
+//     const data = await res.json();
+
+//     if (!res.ok || !data.success) {
+//       alert(data.message || `Sheet not found for PID: ${pid}`);
+//       return;
+//     }
+
+//     const sheetUrl =
+//       `https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_DQA_SHEET_ID}/edit` +
+//       `?gid=${data.gid}#gid=${data.gid}`;
+
+//     window.open(sheetUrl, "_blank", "noopener,noreferrer");
+//   } catch (error) {
+//     console.error("Open sheet error:", error);
+//     alert("Unable to open sheet");
+//   }
+// };
+
+const openSheet = async () => {
+  const pid = pidRef.trim();
+
+  if (!pid) {
+    alert("Please enter PID");
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `/api/dqa/sheet-gid?pid=${encodeURIComponent(pid)}`
+    );
+
+    const data = await res.json();
+
+    console.log("Sheet lookup response:", data);
+
+    if (!res.ok || !data.success) {
+      const availableTabs = data.availableTabs
+        ?.map(
+          (tab: any) =>
+            `${tab.title} (GID: ${tab.gid})`
+        )
+        .join("\n");
+
+      alert(
+        `${data.message || "Sheet tab not found"}${
+          availableTabs
+            ? `\n\nAvailable tabs:\n${availableTabs}`
+            : ""
+        }`
+      );
+
+      return;
+    }
+
+    // IMPORTANT:
+    // Use spreadsheetId returned by backend.
+    // Do NOT use process.env.NEXT_PUBLIC_DQA_SHEET_ID here.
+    const spreadsheetId = data.spreadsheetId;
+    const gid = data.gid;
+
+    if (!spreadsheetId) {
+      alert("Spreadsheet ID was not returned by the server.");
+      return;
+    }
+
+    if (!gid) {
+      alert("GID was not returned by the server.");
+      return;
+    }
+
+    const sheetUrl =
+      `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit` +
+      `?gid=${gid}#gid=${gid}`;
+
+    console.log("Opening Google Sheet:", sheetUrl);
+
+    window.open(
+      sheetUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  } catch (error) {
+    console.error("Open sheet error:", error);
+
+    alert(
+      "Unable to open Google Sheet. Check the browser console and server logs."
+    );
+  }
+};
 
   // ── dashboard numbers ────────────────────────────────────
 

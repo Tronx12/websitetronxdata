@@ -126,3 +126,58 @@ export function formatISTDateTime(
     ...options,
   });
 }
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_ONLY = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+const LOCAL_DATETIME =
+  /^(\d{4}-\d{2}-\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/;
+
+/**
+ * Turns user input into an IST calendar key "YYYY-MM-DD".
+ *  - "2026-10-15"            -> kept as-is
+ *  - "2026-10-15T09:30"      -> date part kept (no timezone given = IST)
+ *  - "2026-10-14T20:00:00Z"  -> converted to IST date (2026-10-15)
+ * Returns "" if invalid.
+ */
+export function normalizeToISTDateKey(input: string | Date): string {
+  if (typeof input === "string") {
+    const v = input.trim();
+    if (DATE_ONLY.test(v)) return istDayRangeUtc(v) ? v : "";
+    const m = LOCAL_DATETIME.exec(v);
+    if (m) return istDayRangeUtc(m[1]) ? m[1] : "";
+  }
+  return toISTDateKey(input);
+}
+
+/**
+ * Parses a time as IST and returns the exact instant (Date).
+ *  - "09:30"                 -> 09:30 IST on dateKey
+ *  - "2026-10-15T09:30"      -> 09:30 IST (no timezone = IST)
+ *  - "...Z" or "...+05:30"   -> exact instant, untouched
+ * Returns null for empty values, throws for invalid ones.
+ */
+export function parseISTDateTime(
+  value: string | null | undefined,
+  dateKey: string
+): Date | null {
+  if (!value || !String(value).trim()) return null;
+  const v = String(value).trim();
+
+  const build = (key: string, h: number, mi: number, s: number) => {
+    const range = istDayRangeUtc(key);
+    if (!range || h > 23 || mi > 59 || s > 59) {
+      throw new Error(`Invalid time: ${value}`);
+    }
+    return new Date(range.startUtc.getTime() + ((h * 60 + mi) * 60 + s) * 1000);
+  };
+
+  let m = TIME_ONLY.exec(v);
+  if (m) return build(dateKey, +m[1], +m[2], +(m[3] ?? 0));
+
+  m = LOCAL_DATETIME.exec(v);
+  if (m) return build(m[1], +m[2], +m[3], +(m[4] ?? 0));
+
+  const d = new Date(v); // has Z or offset, so it is an exact instant
+  if (Number.isNaN(d.getTime())) throw new Error(`Invalid time: ${value}`);
+  return d;
+}
