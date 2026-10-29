@@ -182,15 +182,37 @@ export default function AttendencePage({ currentUserId }: Props) {
 
   // `date` is a date-only attendance key stored at UTC midnight.
   // Render that key in UTC so 01 Oct does not become 30 Sep in India.
-  const formatAttendanceDate = (date: string) => {
-    const value = new Date(date);
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone: "UTC",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }).format(value);
-  };
+  // const formatAttendanceDate = (date: string) => {
+  //   const value = new Date(date);
+  //   return new Intl.DateTimeFormat("en-GB", {
+  //     timeZone: "UTC",
+  //     day: "2-digit",
+  //     month: "short",
+  //     year: "numeric",
+  //   }).format(value);
+  // };
+
+
+const formatAttendanceDate = (date: string) => {
+  if (!date) return "—";
+
+  const value = new Date(date);
+
+  if (Number.isNaN(value.getTime())) {
+    return String(date).slice(0, 10);
+  }
+
+  // Attendance date must be displayed in IST.
+  // This prevents 29 Oct from becoming 28 Oct
+  // when the database stores the date as UTC.
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(value);
+};
+
 
   const formatTime = (date: string | null) => {
     if (!date) return "—";
