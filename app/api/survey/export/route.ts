@@ -454,7 +454,7 @@ export async function GET(req: NextRequest) {
     // TEAM LEAD
     // -------------------------------------------------------
 
-    else if (role === "teamlead" || role === "seniorteamlead") {
+    else if (role === "teamlead") {
       const scopeFilter =
         await resolveTeamLeadCreatedByFilter(
           searchParams,
@@ -487,7 +487,9 @@ export async function GET(req: NextRequest) {
     else if (
       role === "admin" ||
       role === "hr"||
-      role === "dataqualityanalyst"
+      role === "dataqualityanalyst"||
+      role === "seniorteamlead"
+
 
     ) {
       /*
