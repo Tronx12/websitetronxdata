@@ -1240,7 +1240,7 @@ const openSheet = async () => {
                       <div className="mb-2 text-xs font-bold text-purple-600">
                         ✅ {pidApproved.length} approved — new submission must be DIFFERENT
                       </div>
-                      {pidApproved.map((oe) => (
+                      {/* {pidApproved.map((oe) => (
                         <div
                           key={keyOf(oe)}
                           className="mb-2 rounded-lg border border-purple-200 bg-white p-3 text-sm"
@@ -1254,7 +1254,47 @@ const openSheet = async () => {
                             {oe.dqaCorrection?.trim() || oe.oeResponse}
                           </div>
                         </div>
-                      ))}
+                      ))} */}
+
+                      
+{pidApproved.map((oe) => {
+  const question = getQuestionText(oe);
+
+  return (
+    <div
+      key={keyOf(oe)}
+      className="mb-2 rounded-lg border border-purple-200 bg-white p-3 text-sm"
+    >
+      <div className="mb-2 text-[11px] text-slate-500">
+        📅 {formatTS(oe.approvedTime || oe.timestamp)} ·{" "}
+        {oe.approvedBy || "DQA"}
+      </div>
+
+      <div className="mb-2 font-bold text-purple-700">
+        {oe.qNumber || "Question"}
+      </div>
+
+      {/* Actual Question Text */}
+      <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+        <div className="mb-1 text-xs font-bold text-blue-700">
+          ❓ QUESTION TEXT
+        </div>
+        <div className="whitespace-pre-wrap text-sm text-slate-800">
+          {question || "Question text not available"}
+        </div>
+      </div>
+
+      {/* Approved OE */}
+      <div className="rounded bg-purple-50 p-2 text-sm">
+        <div className="mb-1 text-xs font-bold text-purple-700">
+          ✅ APPROVED OE RESPONSE
+        </div>
+        {oe.dqaCorrection?.trim() || oe.oeResponse || "No response available"}
+      </div>
+    </div>
+  );
+})}
+
                     </>
                   )}
                 </div>
