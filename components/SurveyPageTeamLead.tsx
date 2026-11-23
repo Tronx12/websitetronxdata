@@ -4110,6 +4110,7 @@ import {
   List,
 } from "lucide-react";
 import { SUGGESTED_FIELDS, SurveyCategory } from "@/lib/survey-fields";
+import MonthlySubmissionModal from "@/components/MonthlySubmissionModal";
 
 /* ==================================================
    TYPES
@@ -4253,6 +4254,7 @@ export default function SurveyPageTeamLead({
   const [reportLoading, setReportLoading] = useState<
     "weekly" | "monthly" | null
   >(null);
+  const [showMonthlySubmissionModal, setShowMonthlySubmissionModal] = useState(false);
 
   const [paste, setPaste] = useState("");
   const [message, setMessage] = useState<{
@@ -5211,6 +5213,14 @@ export default function SurveyPageTeamLead({
                 <FileSpreadsheet className="w-4 h-4" />
               )}
               Monthly Work Report
+            </button>
+            <button
+              onClick={() => setShowMonthlySubmissionModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-xs transition"
+              title="Download Monthly Submission Report (S.no., TNX Project ID, Study Type, parents id, child id, respondents id, status, count, note)"
+            >
+              <Download className="w-4 h-4" />
+              Monthly Submissions
             </button>
             {showRecords && selectedIds.size > 0 && (
               <button
@@ -6173,6 +6183,11 @@ export default function SurveyPageTeamLead({
           </div>
         </div>
       )}
+
+      <MonthlySubmissionModal
+        isOpen={showMonthlySubmissionModal}
+        onClose={() => setShowMonthlySubmissionModal(false)}
+      />
     </div>
   );
 }

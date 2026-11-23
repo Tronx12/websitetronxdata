@@ -20,6 +20,7 @@ import {
   Calendar,
   List,
 } from "lucide-react";
+import MonthlySubmissionModal from "@/components/MonthlySubmissionModal";
 import { SUGGESTED_FIELDS, SurveyCategory } from "@/lib/survey-fields";
 
 // ---------- Types ----------
@@ -161,6 +162,7 @@ export default function SurveyPageAdmin({
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [reportLoading, setReportLoading] = useState<"weekly" | "monthly" | null>(null);
+  const [showMonthlySubmissionModal, setShowMonthlySubmissionModal] = useState(false);
 
   // Paste (optional for admin)
   const [paste, setPaste] = useState("");
@@ -1228,6 +1230,14 @@ const handleWorkReport = async (
             )}
             Monthly Report
           </button>
+          <button
+            onClick={() => setShowMonthlySubmissionModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-xs transition"
+            title="Download Monthly Submission Report (S.no., TNX Project ID, Study Type, parents id, child id, respondents id, status, count, note)"
+          >
+            <Download className="w-4 h-4" />
+            Monthly Submissions
+          </button>
           {viewMode === "PERSON_DATA" && (
             <>
               {selectedIds.size > 0 && (
@@ -2046,6 +2056,12 @@ const handleWorkReport = async (
     </div>
   )
 }
+
+      <MonthlySubmissionModal
+        isOpen={showMonthlySubmissionModal}
+        onClose={() => setShowMonthlySubmissionModal(false)}
+        teamId={selectedTeam?._id}
+      />
     </div >
   );
 }
