@@ -21,9 +21,11 @@ import {
   ChevronLeft,
 
   ChevronRight,
-  Trash2
+  Trash2,
+  Calendar
 
 } from "lucide-react";
+import MonthlySubmissionModal from "@/components/MonthlySubmissionModal";
 
 import { SUGGESTED_FIELDS, SurveyCategory } from "@/lib/survey-fields";
 
@@ -214,6 +216,7 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
   const [exportEndDate, setExportEndDate] = useState("");
 
   const [showExportOptions, setShowExportOptions] = useState(false);
+  const [showMonthlySubmissionModal, setShowMonthlySubmissionModal] = useState(false);
 
 
 
@@ -1018,17 +1021,13 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
 
 
 
-        <div className="relative">
-
-          <button
-
-            onClick={() => setShowExportOptions((prev) => !prev)}
-
-            disabled={exporting || total === 0}
-
-            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
-
-          >
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setShowExportOptions((prev) => !prev)}
+              disabled={exporting || total === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+            >
 
             {exporting ? (
 
@@ -1250,7 +1249,18 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
 
         </div>
 
+        <button
+          onClick={() => setShowMonthlySubmissionModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium shadow-xs transition"
+          title="Download Monthly Submission Report (S.no., TNX Project ID, Study Type, parents id, child id, respondents id, status, count, note)"
+        >
+          <Calendar className="w-4 h-4" />
+          Monthly Submissions
+        </button>
+
       </div>
+
+    </div>
 
 
 
@@ -2470,6 +2480,12 @@ export default function SurveyPage({ userId }: SurveyPageProps) {
         )}
 
       </div>
+
+      <MonthlySubmissionModal
+        isOpen={showMonthlySubmissionModal}
+        onClose={() => setShowMonthlySubmissionModal(false)}
+        userId={userId}
+      />
 
     </div>
 

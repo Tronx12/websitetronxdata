@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import { connectDB } from "@/config/db";
 import SurveyData from "@/models/SurveyData";
 import Team from "@/models/Team";
+import Auth from "@/models/Auth";
 import { getCurrentUser } from "@/lib/getuser";
 
 export const dynamic = "force-dynamic";
@@ -96,13 +97,16 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Role check: admin, seniorteamlead, dataqualityanalyst, teamlead, hr
+    // Role check: admin, seniorteamlead, dataqualityanalyst, teamlead, hr, survey, surveytester, tester
     const allowedRoles = [
       "admin",
       "seniorteamlead",
       "dataqualityanalyst",
       "teamlead",
       "hr",
+      "survey",
+      "surveytester",
+      "tester",
     ];
 
     if (!allowedRoles.includes(role)) {
@@ -118,6 +122,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const monthParam = searchParams.get("month");
     const requestedTeamId = searchParams.get("teamId");
+    const requestedUserId = searchParams.get("userId") || searchParams.get("createdBy");
 
     const { startDate, endDate, monthKey } = getMonthDateRange(monthParam);
 
@@ -129,36 +134,63 @@ export async function GET(req: NextRequest) {
       },
     };
 
-    // Role scoping
-    if (role === "teamlead") {
-      const memberIds = await getTeamMemberIdsForLead(userOid);
-      filter.createdBy = { $in: memberIds };
-    } else if (
-      (role === "admin" ||
-        role === "hr" ||
-        role === "seniorteamlead" ||
-        role === "dataqualityanalyst") &&
-      requestedTeamId &&
-      requestedTeamId !== "all"
-    ) {
-      const teamOid = toObjectId(requestedTeamId);
-      if (teamOid) {
-        const team = await Team.findOne({
-          _id: teamOid,
-          isActive: true,
-        })
-          .select("members teamLead")
-          .lean();
+    let targetUserName: string | null = null;
 
-        if (team) {
-          const tIds: mongoose.Types.ObjectId[] = [];
-          if ((team as any).teamLead) {
-            tIds.push(new mongoose.Types.ObjectId(String((team as any).teamLead)));
+    // Role scoping
+    if (role === "survey" || role === "surveytester" || role === "tester") {
+      // Survey testers can strictly only download their own submissions
+      filter.createdBy = userOid;
+      targetUserName = user.name || "tester";
+    } else if (role === "teamlead") {
+      const memberIds = await getTeamMemberIdsForLead(userOid);
+      if (requestedUserId) {
+        const targetUserOid = toObjectId(requestedUserId);
+        if (targetUserOid && memberIds.some((id) => id.toString() === targetUserOid.toString())) {
+          filter.createdBy = targetUserOid;
+          const u = await Auth.findById(targetUserOid).select("name email").lean();
+          if (u) targetUserName = (u as any).name || (u as any).email;
+        } else {
+          return NextResponse.json(
+            { success: false, message: "Selected user is not part of your team" },
+            { status: 403 }
+          );
+        }
+      } else {
+        filter.createdBy = { $in: memberIds };
+      }
+    } else if (
+      role === "admin" ||
+      role === "hr" ||
+      role === "seniorteamlead" ||
+      role === "dataqualityanalyst"
+    ) {
+      if (requestedUserId) {
+        const targetUserOid = toObjectId(requestedUserId);
+        if (targetUserOid) {
+          filter.createdBy = targetUserOid;
+          const u = await Auth.findById(targetUserOid).select("name email").lean();
+          if (u) targetUserName = (u as any).name || (u as any).email;
+        }
+      } else if (requestedTeamId && requestedTeamId !== "all") {
+        const teamOid = toObjectId(requestedTeamId);
+        if (teamOid) {
+          const team = await Team.findOne({
+            _id: teamOid,
+            isActive: true,
+          })
+            .select("members teamLead")
+            .lean();
+
+          if (team) {
+            const tIds: mongoose.Types.ObjectId[] = [];
+            if ((team as any).teamLead) {
+              tIds.push(new mongoose.Types.ObjectId(String((team as any).teamLead)));
+            }
+            ((team as any).members || []).forEach((m: any) => {
+              tIds.push(new mongoose.Types.ObjectId(String(m)));
+            });
+            filter.createdBy = { $in: tIds };
           }
-          ((team as any).members || []).forEach((m: any) => {
-            tIds.push(new mongoose.Types.ObjectId(String(m)));
-          });
-          filter.createdBy = { $in: tIds };
         }
       }
     }
@@ -358,12 +390,17 @@ export async function GET(req: NextRequest) {
 
     const buffer = await workbook.xlsx.writeBuffer();
 
+    const safeUserPart = targetUserName
+      ? `-${targetUserName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`
+      : "";
+    const filename = `monthly-submission-report${safeUserPart}-${monthKey}.xlsx`;
+
     return new Response(buffer, {
       status: 200,
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="monthly-submission-report-${monthKey}.xlsx"`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store",
       },
     });

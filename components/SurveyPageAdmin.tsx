@@ -2061,6 +2061,20 @@ const handleWorkReport = async (
         isOpen={showMonthlySubmissionModal}
         onClose={() => setShowMonthlySubmissionModal(false)}
         teamId={selectedTeam?._id}
+        userId={selectedPerson?._id}
+        userName={selectedPerson?.name}
+        availableUsers={
+          viewMode === "PERSON_DATA"
+            ? undefined
+            : viewMode === "TEAM_MEMBERS"
+            ? teamPeople.map((p) => ({
+                _id: p._id,
+                name: p.name,
+                email: p.email,
+                role: p.role,
+              }))
+            : undefined
+        }
       />
     </div >
   );

@@ -6187,6 +6187,26 @@ export default function SurveyPageTeamLead({
       <MonthlySubmissionModal
         isOpen={showMonthlySubmissionModal}
         onClose={() => setShowMonthlySubmissionModal(false)}
+        userId={
+          mainTab === "MY_DATA"
+            ? currentUserId
+            : selectedMember?._id || undefined
+        }
+        userName={
+          mainTab === "MY_DATA"
+            ? currentUserName
+            : selectedMember?.name || undefined
+        }
+        availableUsers={
+          mainTab === "TEAM_DATA" && !selectedMember
+            ? teamMembers.map((m) => ({
+                _id: m._id,
+                name: m.name,
+                email: m.email,
+                role: m.role,
+              }))
+            : undefined
+        }
       />
     </div>
   );

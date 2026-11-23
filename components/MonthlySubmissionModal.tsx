@@ -1,18 +1,33 @@
 "use client";
 
-import React, { useState } from "react";
-import { Download, Loader2, X, Calendar, FileSpreadsheet, CheckCircle2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Download, Loader2, X, FileSpreadsheet, CheckCircle2, User } from "lucide-react";
+
+export interface AvailableUser {
+  _id: string;
+  name: string;
+  email?: string;
+  role?: string;
+}
 
 interface MonthlySubmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
   teamId?: string | null;
+  userId?: string | null;
+  userName?: string | null;
+  availableUsers?: AvailableUser[];
+  title?: string;
 }
 
 export default function MonthlySubmissionModal({
   isOpen,
   onClose,
   teamId,
+  userId,
+  userName,
+  availableUsers,
+  title,
 }: MonthlySubmissionModalProps) {
   // Current month format: YYYY-MM
   const getCurrentMonthStr = () => {
@@ -31,8 +46,16 @@ export default function MonthlySubmissionModal({
   };
 
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthStr);
+  const [selectedUserId, setSelectedUserId] = useState<string>(userId || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedUserId(userId || "");
+      setError(null);
+    }
+  }, [isOpen, userId]);
 
   if (!isOpen) return null;
 
@@ -76,6 +99,11 @@ export default function MonthlySubmissionModal({
         params.append("teamId", teamId);
       }
 
+      const effectiveUserId = selectedUserId || userId;
+      if (effectiveUserId) {
+        params.append("userId", effectiveUserId);
+      }
+
       const res = await fetch(
         `/api/survey/monthly-submission-report?${params.toString()}`
       );
@@ -96,10 +124,20 @@ export default function MonthlySubmissionModal({
         throw new Error("The report returned empty data.");
       }
 
+      // Try reading filename from Content-Disposition header
+      const disposition = res.headers.get("content-disposition");
+      let filename = `monthly-submission-report-${selectedMonth}.xlsx`;
+      if (disposition && disposition.includes("filename=")) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          filename = match[1].trim();
+        }
+      }
+
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `monthly-submission-report-${selectedMonth}.xlsx`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -144,7 +182,7 @@ export default function MonthlySubmissionModal({
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Monthly Submission Report
+                {title || "Monthly Submission Report"}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Download month-wise submission report (1st to last date of month)
@@ -167,8 +205,45 @@ export default function MonthlySubmissionModal({
           </div>
         )}
 
-        {/* Month Selection */}
+        {/* Form Body */}
         <div className="mt-5 space-y-4">
+          {/* User / Tester Filter (if availableUsers provided) */}
+          {availableUsers && availableUsers.length > 0 ? (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                Filter by Survey Tester / Member
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-800 shadow-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                >
+                  <option value="">All Survey Testers / Members</option>
+                  {availableUsers.map((u) => (
+                    <option key={u._id} value={u._id}>
+                      {u.name} {u.role ? `(${u.role})` : u.email ? `(${u.email})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : userName || userId ? (
+            /* Fixed user badge (e.g. Survey-tester dashboard or specific person page) */
+            <div className="flex items-center gap-2.5 rounded-xl bg-blue-50/70 border border-blue-200/60 p-3 text-xs text-blue-900 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200">
+              <User className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <div>
+                <span className="text-gray-500 dark:text-gray-400 font-medium mr-1.5">
+                  Downloading submissions for:
+                </span>
+                <span className="font-bold text-blue-800 dark:text-blue-300">
+                  {userName || "Your Account"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Month Selection */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
               Select Month
