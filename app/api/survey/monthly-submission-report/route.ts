@@ -230,6 +230,7 @@ export async function GET(req: NextRequest) {
     // 9. note
     worksheet.columns = [
       { header: "S.no.", key: "sNo", width: 10 },
+      { header: "Project Name", key: "projectname", width: 32 },
       { header: "TNX Project ID", key: "tnxProjectId", width: 22 },
       { header: "Study Type", key: "studyType", width: 18 },
       { header: "parents id", key: "parentsId", width: 20 },
@@ -270,6 +271,17 @@ export async function GET(req: NextRequest) {
     // Populate data rows
     records.forEach((item: any, index: number) => {
       const data = item.data || {};
+
+      // Project Name
+      const projectname =
+        data["Project Name"] ||
+        data["projectName"] ||
+        data["projectname"] ||
+        data["Project name"] ||
+        data["project_name"] ||
+        item.projectName ||
+        "N/A";
+
 
       // TNX Project ID
       const tnxProjectId =
@@ -349,6 +361,7 @@ export async function GET(req: NextRequest) {
 
       const row = worksheet.addRow({
         sNo: index + 1,
+        projectname: String(projectname),
         tnxProjectId: String(tnxProjectId),
         studyType: String(studyType),
         parentsId: String(parentsId),
